@@ -1,0 +1,12 @@
+<Bindings>
+	<Binding name="NEXT_RAID_MARKER" header="KAMIKAZELIB" default="SHIFT-SPACE">
+		NextRaidMarker()
+	</Binding>
+	<Binding name="CLEAR_RAID_MARKERS">
+		ClearRaidMarkers()
+	</Binding>
+	<Binding name="CLEAR_AND_NEXT_RAID_MARKER" default="CTRL-SHIFT-SPACE">
+		ClearRaidMarkers()
+		NextRaidMarker()
+	</Binding>
+</Bindings>

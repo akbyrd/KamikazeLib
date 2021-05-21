@@ -1,14 +1,7 @@
-## Interface: 70000
+## Interface: 90005
 ## Title: KamikazeLib
+## Author: Kamikazebob
 ## Notes: Random helper functionality
-## Credits: Kamikazebob
+## Version: 1.0
 
-LibStub.lua
-LegionArtifacts-1.1.lua
 KamikazeLib.lua
-
-## function GetArtifactTraitRank(powerID, spellID)
-##     local info = C_ArtifactUI.GetPowerInfo(powerID)
-##     assert(info["spellID"] == spellID, "Power's spellID does not match expected")
-##     return info["currentRank"]
-## end

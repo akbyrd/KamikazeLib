@@ -1,0 +1,26 @@
+https://wowpedia.fandom.com/wiki/HOWTOs
+
+Getting the current interface number
+/run print((select(4, GetBuildInfo())))
+
+* There is the /dump slash command for general debugging, /etrace for showing events and /fstack for debugging visible UI elements.
+* Export, clone, download or bookmark Blizzard's user interface code a.k.a. the FrameXML. If you don't know what a specific API does it's best to just reference it in FrameXML. Not everything is documented so we generally look through the code from Blizzard or other addons.
+* For VS Code the Lua extension by Sumneko adds IntelliSense features like code completion.
+https://wowpedia.fandom.com/wiki/Create_a_WoW_AddOn_in_under_15_Minutes
+https://wowpedia.fandom.com/wiki/Lua_Coding_Tips
+https://wowpedia.fandom.com/wiki/Blizzard_DebugTools
+
+To store data or save user settings, set the SavedVariables in the TOC which will persist between sessions. You can /reload instead of restarting the game client when updating the TOC file.
+Tip: use /dump HelloWorldDB or /tinspect HelloWorldDB to show the contents of a global table.
+Has notes on packaging and distribution
+https://wowpedia.fandom.com/wiki/Create_a_WoW_AddOn_in_under_15_Minutes
+
+The API
+https://wowpedia.fandom.com/wiki/World_of_Warcraft_API
+https://github.com/Gethe/wow-ui-source
+https://wowpedia.fandom.com/wiki/Viewing_Blizzard%27s_interface_code
+
+Stuff I might care about
+https://wowpedia.fandom.com/wiki/Creating_key_bindings
+https://wowpedia.fandom.com/wiki/Using_the_Interface_Options_Addons_panel
+http://www.iriel.org/wow/docs/SecureHeadersGuide-4.0-r1.pdf
