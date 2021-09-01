@@ -6,6 +6,7 @@ Getting the current interface number
 * There is the /dump slash command for general debugging, /etrace for showing events and /fstack for debugging visible UI elements.
 * Export, clone, download or bookmark Blizzard's user interface code a.k.a. the FrameXML. If you don't know what a specific API does it's best to just reference it in FrameXML. Not everything is documented so we generally look through the code from Blizzard or other addons.
 * For VS Code the Lua extension by Sumneko adds IntelliSense features like code completion.
+DevTools_Dump
 https://wowpedia.fandom.com/wiki/Create_a_WoW_AddOn_in_under_15_Minutes
 https://wowpedia.fandom.com/wiki/Lua_Coding_Tips
 https://wowpedia.fandom.com/wiki/Blizzard_DebugTools
@@ -24,3 +25,43 @@ Stuff I might care about
 https://wowpedia.fandom.com/wiki/Creating_key_bindings
 https://wowpedia.fandom.com/wiki/Using_the_Interface_Options_Addons_panel
 http://www.iriel.org/wow/docs/SecureHeadersGuide-4.0-r1.pdf
+
+Other Tutorials
+https://www.mmo-champion.com/threads/817817-Creating-Your-Own-WoW-Addon
+https://www.youtube.com/playlist?list=PL3wt7cLYn4N-3D3PTTUZBM2t1exFmoA2G
+https://www.youtube.com/playlist?list=PLtKjv92L0ihCEwnh3jNifgGaZ6KxKV9AW
+
+CreateFrame(frameType, name, parent, template, id)
+Frame types come from UI.xsd
+
+Interesting templates
+SharedUIPanelTemplates.xml
+OptionsPanelTemplates.xml
+UIWidgetHorizontalWidgetContainerTemplate
+ManagedVerticalLayoutFrameTemplate
+VerticalLayoutFrame
+
+Sliders - SetValue must come after SetMinMaxValues!
+
+local toggle = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_TOGGLE", self.options, "InterfaceOptionsCheckButtonTemplate")
+toggle.Text:SetText("Text Checkbox")
+toggle.tooltipText = "Text Checkbox Tooltip"
+toggle.SetValue = function() end
+toggle.layoutIndex = 2
+
+local default = 1
+local step = 1
+local min, max = 1, 33
+local slider = CreateFrame("Slider", "KL_MOUSE_OPTIONS_SLIDER", self.options, "OptionsSliderTemplate")
+slider.Text:SetFontObject(GameFontNormal)
+slider.Text:SetText("Test Slider")
+slider.Low:SetText(tostring(min))
+slider.High:SetText(tostring(max))
+slider.tooltipText = "Text Slider Tooltip"
+slider.topPadding = 10
+slider.bottomPadding = 10
+slider:SetValueStep(step)
+slider:SetMinMaxValues(min, max)
+slider:SetObeyStepOnDrag(true)
+slider:SetValue(default)
+slider.layoutIndex = 3

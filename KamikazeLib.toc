@@ -3,5 +3,7 @@
 ## Author: Kamikazebob
 ## Notes: Random helper functionality
 ## Version: 1.0
+## SavedVariables: KLSavedVars
 
-KamikazeLib.lua
+WorldMarkers.lua
+MouseCursor.lua

@@ -1,12 +1,5 @@
 <Bindings>
-	<Binding name="NEXT_RAID_MARKER" header="KAMIKAZELIB" default="SHIFT-SPACE">
-		NextRaidMarker()
-	</Binding>
-	<Binding name="CLEAR_RAID_MARKERS">
-		ClearRaidMarkers()
-	</Binding>
-	<Binding name="CLEAR_AND_NEXT_RAID_MARKER" default="CTRL-SHIFT-SPACE">
-		ClearRaidMarkers()
-		NextRaidMarker()
-	</Binding>
+	<Binding name="CLICK KL_NEXT_WORLD_MARKER:LeftButton" header="KAMIKAZELIB" default="SHIFT-SPACE" />
+	<Binding name="CLICK KL_CLEAR_WORLD_MARKERS:LeftButton" default="CTRL-SPACE" />
+	<Binding name="CLICK KL_CLEAR_AND_NEXT_WORLD_MARKER:LeftButton" default="CTRL-SHIFT-SPACE" />
 </Bindings>
