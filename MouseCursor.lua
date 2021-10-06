@@ -1,4 +1,3 @@
--- TODO: Add option to hide with screenshots
 -- TODO: Add a color option
 
 -- TODO: Scroll view
@@ -20,6 +19,7 @@ function eventFrame:Initialize()
 		g = 1,
 		b = 1,
 		a = 0.1,
+		hideInScreenshots = true,
 	}
 
 	local function ShallowCopyTableNoRefs(from, to)
@@ -90,18 +90,18 @@ function eventFrame:Initialize()
 	header.bottomPadding = 14
 	header.layoutIndex = NextLayoutIndex()
 
-	local checkbox = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_ENABLE", self.options, "InterfaceOptionsCheckButtonTemplate")
-	checkbox.Text:SetText("Enable")
-	checkbox:SetChecked(self.config.enabled)
-	checkbox.SetValue = function(self, value)
+	local enableCheckbox = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_ENABLE", self.options, "InterfaceOptionsCheckButtonTemplate")
+	enableCheckbox.Text:SetText("Enable")
+	enableCheckbox:SetChecked(self.config.enabled)
+	enableCheckbox.SetValue = function(self, value)
 		-- NOTE: Value is a string for whatever weird reason
 		local enabled = value == "1"
 		eventFrame.config.enabled = enabled
 		eventFrame:UpdateEnabled()
 		eventFrame:UpdatePosition()
 	end
-	checkbox.layoutIndex = NextLayoutIndex()
-	self.options.checkbox = checkbox
+	enableCheckbox.layoutIndex = NextLayoutIndex()
+	self.options.enableCheckbox = enableCheckbox
 
 	local step = 1
 	local min, max = 1, 33
@@ -165,6 +165,17 @@ function eventFrame:Initialize()
 	dropdown.leftPadding = -15
 	self.options.dropdown = dropdown
 
+	local hideInScreenshotsCheckbox = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_HIDE_IN_SCREENSHOTS", self.options, "InterfaceOptionsCheckButtonTemplate")
+	hideInScreenshotsCheckbox.Text:SetText("Hide In Screenshots")
+	hideInScreenshotsCheckbox:SetChecked(self.config.hideInScreenshots)
+	hideInScreenshotsCheckbox.SetValue = function(self, value)
+		-- NOTE: Value is a string for whatever weird reason
+		local enabled = value == "1"
+		eventFrame.config.hideInScreenshots = enabled
+	end
+	hideInScreenshotsCheckbox.layoutIndex = NextLayoutIndex()
+	self.options.hideInScreenshotsCheckbox = hideInScreenshotsCheckbox
+
 	self.options.spacing       = 10
 	self.options.topPadding    = 16
 	self.options.leftPadding   = 16
@@ -195,9 +206,10 @@ function eventFrame:Initialize()
 end
 
 function eventFrame:RefreshWidgets()
-	self.options.checkbox:SetChecked(self.config.enabled)
+	self.options.enableCheckbox:SetChecked(self.config.enabled)
 	self.options.slider:SetValue(self.config.thickness)
 	UIDropDownMenu_SetText(self.options.dropdown, self.config.strata)
+	self.options.hideInScreenshotsCheckbox:SetChecked(self.config.hideInScreenshots)
 end
 
 local function Round(x)
@@ -321,11 +333,13 @@ function eventFrame:OnEvent(event, ...)
 			self:UpdatePosition()
 		end
 	elseif event == "SCREENSHOT_STARTED" then
-		self:HideCrosshair()
-	elseif event == "SCREENSHOT_SUCCEEDED" then
-		self:ShowCrosshair()
-	elseif event == "SCREENSHOT_FAILED" then
-		self:ShowCrosshair()
+		if self.config.hideInScreenshots then
+			self:HideCrosshair()
+		end
+	elseif event == "SCREENSHOT_SUCCEEDED" or event == "SCREENSHOT_FAILED" then
+		if self.config.hideInScreenshots then
+			self:ShowCrosshair()
+		end
 	end
 end
 
