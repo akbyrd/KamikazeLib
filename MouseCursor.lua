@@ -1,46 +1,108 @@
--- TODO: Apply config change immediately
--- TODO: Restore previous options on Cancel button
--- TODO: Support Default button
+-- TODO: Hide in screenshots
+-- TODO: Add a color option
+
+-- TODO: Scroll view
+-- TODO: Slider value/edit box
+-- TODO: Better way to specify padding?
+-- TODO: Try to refactor to make it easier to follow and harder to make mistakes
 -- TODO: Add a circle option
+-- TODO: Lazily create config options when opened
+-- TODO: More consistent handling of self vs proper names (e.g. eventFrame, options, config)
 
 local eventFrame = CreateFrame("FRAME", "KL_MOUSE_CURSOR")
 
 function eventFrame:Initialize()
 	self.defaultConfig = {
-		strata = "LOW",
-		thickness = 1,
+		enabled = true,
+		strata = "BACKGROUND",
+		thickness = 3,
 		r = 1,
 		g = 1,
 		b = 1,
 		a = 0.1,
 	}
 
+	local function ShallowCopyTableNoRefs(from, to)
+		to = to or {}
+		for k, v in pairs(from) do
+			assert(type(value) ~= "table", "Attempting to shallow copy a reference to a table")
+			to[k] = v
+		end
+		return to
+	end
+
 	if KLSavedVars == nil then
 		KLSavedVars = {}
-		KLSavedVars.cursorConfig = {}
-		for k, v in pairs(self.defaultConfig) do
-			KLSavedVars.cursorConfig[k] = v
-		end
+		KLSavedVars.cursorConfig = ShallowCopyTableNoRefs(self.defaultConfig)
 	end
+
 	self.config = KLSavedVars.cursorConfig
 
 	self.options = CreateFrame("FRAME", "KL_MOUSE_OPTIONS", nil, "VerticalLayoutFrame")
-	self.options.name    = "KamikazeLib"
-	self.options.parent  = nil
-	self.options.okay    = nil
-	self.options.cancel  = nil
-	self.options.default = nil
-	self.options.refresh = nil
+	self.options.name   = "KamikazeLib"
+	self.options.parent = nil
+
+	self.options.refresh = function(self)
+		-- NOTE: If the user resets to defaults then hits cancel we want to undo all changes,
+		-- including the reset to defaults. Since refresh happens right after defaults we have to be
+		-- careful to avoid creating a new "previousConfig" checkpoint, which would make it impossible
+		-- to revert to the original settings from before the default button was pressed.
+		if self.justAppliedDefaults then
+			self.justAppliedDefaults = nil
+			return
+		end
+
+		eventFrame.previousConfig = ShallowCopyTableNoRefs(eventFrame.config)
+	end
+
+	self.options.okay = function(self)
+		eventFrame.previousConfig = nil
+	end
+
+	self.options.cancel = function(self)
+		ShallowCopyTableNoRefs(eventFrame.previousConfig, eventFrame.config)
+		eventFrame.previousConfig = nil
+		eventFrame:UpdateEverything()
+		eventFrame:RefreshWidgets()
+	end
+
+	self.options.default = function(self)
+		ShallowCopyTableNoRefs(eventFrame.defaultConfig, eventFrame.config)
+		eventFrame:UpdateEverything()
+		eventFrame:RefreshWidgets()
+		self.justAppliedDefaults = true
+	end
+
 	InterfaceOptions_AddCategory(self.options)
+
+	local layoutIndex = 1
+	local function NextLayoutIndex()
+		local li = layoutIndex
+		layoutIndex = layoutIndex + 1
+		return li
+	end
 
 	local header = self.options:CreateFontString(nil, "ARTWORK")
 	header:SetFontObject(GameFontNormalLarge)
 	header:SetText("KamikazeLib Options")
 	header:SetJustifyH("LEFT")
 	header:SetJustifyV("TOP")
-	header.layoutIndex = 1
+	header.bottomPadding = 14
+	header.layoutIndex = NextLayoutIndex()
 
-	local default = 1
+	local checkbox = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_ENABLE", self.options, "InterfaceOptionsCheckButtonTemplate")
+	checkbox.Text:SetText("Enable")
+	checkbox:SetChecked(self.config.enabled)
+	checkbox.SetValue = function(self, value)
+		-- NOTE: Value is a string for whatever weird reason
+		local enabled = value == "1"
+		eventFrame.config.enabled = enabled
+		eventFrame:UpdateEnabled()
+		eventFrame:UpdatePosition()
+	end
+	checkbox.layoutIndex = NextLayoutIndex()
+	self.options.checkbox = checkbox
+
 	local step = 1
 	local min, max = 1, 33
 	local slider = CreateFrame("Slider", "KL_MOUSE_OPTIONS_THICKNESS", self.options, "OptionsSliderTemplate")
@@ -57,14 +119,16 @@ function eventFrame:Initialize()
 	slider:SetScript("OnValueChanged", function(self, value, userInput)
 		eventFrame.config.thickness = value
 		eventFrame:UpdateSize()
+		eventFrame:UpdatePosition()
 	end)
-	slider.layoutIndex = 2
+	slider.layoutIndex = NextLayoutIndex()
+	self.options.slider = slider
 
 	local label = self.options:CreateFontString(nil, "ARTWORK");
 	label:SetFontObject("GameFontNormal")
-	label.bottomPadding = -8
 	label:SetText("Strata");
-	label.layoutIndex = 3
+	label.bottomPadding = -8
+	label.layoutIndex = NextLayoutIndex()
 
 	local values = {
 		"BACKGROUND",
@@ -96,20 +160,17 @@ function eventFrame:Initialize()
 			end
 		end
 	end
-	dropdown.layoutIndex = 4
+	dropdown.layoutIndex = NextLayoutIndex()
 	UIDropDownMenu_Initialize(dropdown, dropdown.Initialize, nil, 1, values)
 	dropdown.leftPadding = -15
+	self.options.dropdown = dropdown
 
-	-- TODO: Better way to specify padding?
-	-- TODO: Scroll view
-	-- TODO: Backdrop for testing
-	-- TODO: Slider value/edit box
 	self.options.spacing       = 10
 	self.options.topPadding    = 16
 	self.options.leftPadding   = 16
 	self.options.bottomPadding = 16
 	self.options.rightPadding  = 16
-	self.options: Layout()
+	self.options:Layout()
 
 	self.crosshairH = CreateFrame("FRAME", "KL_MOUSE_CURSOR_HORIZONTAL", self)
 	self.crosshairH:SetPoint("LEFT")
@@ -129,14 +190,36 @@ function eventFrame:Initialize()
 	self.crosshairVB.texture:SetAllPoints(true)
 	self.crosshairVB.texture:SetColorTexture(self.config.r, self.config.g, self.config.b, self.config.a)
 
-	self:UpdateSize()
-	self:UpdateStrata()
-	self:UpdatePosition()
+	self:UpdateEverything()
+end
+
+function eventFrame:RefreshWidgets()
+	self.options.checkbox:SetChecked(self.config.enabled)
+	self.options.slider:SetValue(self.config.thickness)
+	UIDropDownMenu_SetText(self.options.dropdown, self.config.strata)
 end
 
 local function Round(x)
 	-- NOTE: Round half up toward positive infinity. Not great for negative numbers.
 	return math.floor(x + 0.5)
+end
+
+function eventFrame:UpdateEnabled()
+	if self.config.enabled then
+		self:RegisterEvent("UI_SCALE_CHANGED")
+		self:SetScript("OnUpdate", self.OnUpdate)
+
+		self.crosshairH:Show()
+		self.crosshairVT:Show()
+		self.crosshairVB:Show()
+	else
+		self:UnregisterEvent("UI_SCALE_CHANGED")
+		self:SetScript("OnUpdate", nil)
+
+		self.crosshairH:Hide()
+		self.crosshairVT:Hide()
+		self.crosshairVB:Hide()
+	end
 end
 
 function eventFrame:UpdateSize()
@@ -187,6 +270,13 @@ function eventFrame:UpdatePosition()
 	self.crosshairVB:SetPoint("BOTTOM", nil, "BOTTOMLEFT", mx, 0)
 end
 
+function eventFrame:UpdateEverything()
+	self:UpdateEnabled()
+	self:UpdateSize()
+	self:UpdateStrata()
+	self:UpdatePosition()
+end
+
 local function ShowOptions()
 	-- NOTE: The very first time OpenToCategory is called it ignores the panel option. It seems it
 	-- needs to be opened once before it works properly.
@@ -213,6 +303,7 @@ function eventFrame:OnEvent(event, ...)
 		-- NOTE: UI_SCALE_CHANGED can happen before VARIABLES_LOADED
 		if self.initialized then
 			self:UpdateSize()
+			self:UpdatePosition()
 		end
 	end
 end
@@ -222,8 +313,6 @@ local function SlashCommandHandler(msg, editBox)
 end
 
 eventFrame:RegisterEvent("VARIABLES_LOADED")
-eventFrame:RegisterEvent("UI_SCALE_CHANGED")
-eventFrame:SetScript("OnUpdate", eventFrame.OnUpdate)
 eventFrame:SetScript("OnEvent", eventFrame.OnEvent)
 
 SLASH_KAMIKAZELIB1 = "/kamikazelib"
