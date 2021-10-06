@@ -1,3 +1,4 @@
+-- TODO: Add option to hide with screenshots
 -- TODO: Add a color option
 
 -- TODO: Scroll view
@@ -8,7 +9,7 @@
 -- TODO: Lazily create config options when opened
 -- TODO: More consistent handling of self vs proper names (e.g. eventFrame, options, config)
 
-local eventFrame = CreateFrame("FRAME", "KL_MOUSE_CURSOR")
+local eventFrame = CreateFrame("FRAME", "KL_MOUSE_CURSOR", UIParent)
 
 function eventFrame:Initialize()
 	self.defaultConfig = {
@@ -189,6 +190,7 @@ function eventFrame:Initialize()
 	self.crosshairVB.texture:SetAllPoints(true)
 	self.crosshairVB.texture:SetColorTexture(self.config.r, self.config.g, self.config.b, self.config.a)
 
+	self:SetIgnoreParentScale(true)
 	self:UpdateEverything()
 end
 

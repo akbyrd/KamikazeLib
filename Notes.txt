@@ -33,6 +33,7 @@ https://www.youtube.com/playlist?list=PLtKjv92L0ihCEwnh3jNifgGaZ6KxKV9AW
 
 CreateFrame(frameType, name, parent, template, id)
 Frame types come from UI.xsd
+If you don't use UIParent as frame parent, it won't be hidden when hiding the interface. There are no events for handling this manually.
 
 Interesting templates
 SharedUIPanelTemplates.xml
