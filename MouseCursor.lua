@@ -1,4 +1,3 @@
--- TODO: Hide in screenshots
 -- TODO: Add a color option
 
 -- TODO: Scroll view
@@ -204,21 +203,35 @@ local function Round(x)
 	return math.floor(x + 0.5)
 end
 
+function eventFrame:ShowCrosshair()
+	self.crosshairH:Show()
+	self.crosshairVT:Show()
+	self.crosshairVB:Show()
+end
+
+function eventFrame:HideCrosshair()
+	self.crosshairH:Hide()
+	self.crosshairVT:Hide()
+	self.crosshairVB:Hide()
+end
+
 function eventFrame:UpdateEnabled()
 	if self.config.enabled then
 		self:RegisterEvent("UI_SCALE_CHANGED")
+		self:RegisterEvent("SCREENSHOT_STARTED")
+		self:RegisterEvent("SCREENSHOT_SUCCEEDED")
+		self:RegisterEvent("SCREENSHOT_FAILED")
 		self:SetScript("OnUpdate", self.OnUpdate)
 
-		self.crosshairH:Show()
-		self.crosshairVT:Show()
-		self.crosshairVB:Show()
+		self:ShowCrosshair()
 	else
 		self:UnregisterEvent("UI_SCALE_CHANGED")
+		self:UnregisterEvent("SCREENSHOT_STARTED")
+		self:UnregisterEvent("SCREENSHOT_SUCCEEDED")
+		self:UnregisterEvent("SCREENSHOT_FAILED")
 		self:SetScript("OnUpdate", nil)
 
-		self.crosshairH:Hide()
-		self.crosshairVT:Hide()
-		self.crosshairVB:Hide()
+		self:HideCrosshair()
 	end
 end
 
@@ -305,6 +318,12 @@ function eventFrame:OnEvent(event, ...)
 			self:UpdateSize()
 			self:UpdatePosition()
 		end
+	elseif event == "SCREENSHOT_STARTED" then
+		self:HideCrosshair()
+	elseif event == "SCREENSHOT_SUCCEEDED" then
+		self:ShowCrosshair()
+	elseif event == "SCREENSHOT_FAILED" then
+		self:ShowCrosshair()
 	end
 end
 
