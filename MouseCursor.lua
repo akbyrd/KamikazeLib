@@ -1,8 +1,10 @@
--- TODO: Add a color option
+-- TODO: Make a color swatch button for color
+-- TODO: Mouse position is wrong after reloading UI
+-- TODO: Implement an unpack function
 
 -- TODO: Scroll view
 -- TODO: Slider value/edit box
--- TODO: Better way to specify padding?
+-- TODO: Better color picker
 -- TODO: Try to refactor to make it easier to follow and harder to make mistakes
 -- TODO: Add a circle option
 -- TODO: Lazily create config options when opened
@@ -12,20 +14,37 @@ local eventFrame = CreateFrame("FRAME", "KL_MOUSE_CURSOR", UIParent)
 
 function eventFrame:Initialize()
 	self.defaultConfig = {
-		enabled = true,
-		strata = "BACKGROUND",
-		thickness = 3,
-		r = 1,
-		g = 1,
-		b = 1,
-		a = 0.1,
+		enabled           = true,
+		thickness         = 3,
+		color             = { r = 1, g = 1, b = 1, a = 0.1 },
+		strata            = "BACKGROUND",
 		hideInScreenshots = true,
 	}
+
+	local function DeepCopy(from, to, visited)
+		to = to or {}
+		visited = visited or {}
+		for k, v in pairs(from) do
+			if type(v) == "table" then
+				if visited[v] then
+					to[k] = visited[v]
+				else
+					local t = {}
+					to[k] = t
+					visited[v] = t
+					DeepCopy(v, t, visited)
+				end
+			else
+				to[k] = v
+			end
+		end
+		return to
+	end
 
 	local function ShallowCopyTableNoRefs(from, to)
 		to = to or {}
 		for k, v in pairs(from) do
-			assert(type(value) ~= "table", "Attempting to shallow copy a reference to a table")
+			assert(type(v) ~= "table", "Attempting to shallow copy a reference to a table")
 			to[k] = v
 		end
 		return to
@@ -33,7 +52,7 @@ function eventFrame:Initialize()
 
 	if KLSavedVars == nil then
 		KLSavedVars = {}
-		KLSavedVars.cursorConfig = ShallowCopyTableNoRefs(self.defaultConfig)
+		KLSavedVars.cursorConfig = DeepCopy(self.defaultConfig)
 	end
 
 	self.config = KLSavedVars.cursorConfig
@@ -41,6 +60,10 @@ function eventFrame:Initialize()
 	self.options = CreateFrame("FRAME", "KL_MOUSE_OPTIONS", nil, "VerticalLayoutFrame")
 	self.options.name   = "KamikazeLib"
 	self.options.parent = nil
+
+	self.options:SetScript("OnHide", function(self)
+		eventFrame:TryHideColorPicker()
+	end)
 
 	self.options.refresh = function(self)
 		-- NOTE: If the user resets to defaults then hits cancel we want to undo all changes,
@@ -52,7 +75,7 @@ function eventFrame:Initialize()
 			return
 		end
 
-		eventFrame.previousConfig = ShallowCopyTableNoRefs(eventFrame.config)
+		eventFrame.previousConfig = DeepCopy(eventFrame.config)
 	end
 
 	self.options.okay = function(self)
@@ -60,16 +83,17 @@ function eventFrame:Initialize()
 	end
 
 	self.options.cancel = function(self)
-		ShallowCopyTableNoRefs(eventFrame.previousConfig, eventFrame.config)
+		DeepCopy(eventFrame.previousConfig, eventFrame.config)
 		eventFrame.previousConfig = nil
 		eventFrame:UpdateEverything()
 		eventFrame:RefreshWidgets()
 	end
 
 	self.options.default = function(self)
-		ShallowCopyTableNoRefs(eventFrame.defaultConfig, eventFrame.config)
+		DeepCopy(eventFrame.defaultConfig, eventFrame.config)
 		eventFrame:UpdateEverything()
 		eventFrame:RefreshWidgets()
+		eventFrame:TryHideColorPicker()
 		self.justAppliedDefaults = true
 	end
 
@@ -176,6 +200,39 @@ function eventFrame:Initialize()
 	hideInScreenshotsCheckbox.layoutIndex = NextLayoutIndex()
 	self.options.hideInScreenshotsCheckbox = hideInScreenshotsCheckbox
 
+	local box = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_COLOR", self.options, "InterfaceOptionsCheckButtonTemplate")
+	box.Text:SetText("Test Color")
+	box.SetValue = function(self, value)
+
+
+		local c = eventFrame.config.color
+		ColorPickerFrame.hasOpacity = true
+		ColorPickerFrame.opacity = 1 - c.a
+		ColorPickerFrame.previousValues = ShallowCopyTableNoRefs(c)
+		ColorPickerFrame.func = function()
+			local c = eventFrame.config.color
+			c.r, c.g, c.b = ColorPickerFrame:GetColorRGB()
+			eventFrame:UpdateColor()
+		end
+		ColorPickerFrame.opacityFunc = function()
+			local c = eventFrame.config.color
+			c.a = 1 - OpacitySliderFrame:GetValue()
+			eventFrame:UpdateColor()
+		end
+		ColorPickerFrame.cancelFunc = function(previousValues)
+			local c = eventFrame.config.color
+			c = ShallowCopyTableNoRefs(previousValues, c)
+			eventFrame:UpdateColor()
+		end
+		ColorPickerFrame:SetColorRGB(c.r, c.g, c.b)
+		ColorPickerFrame:Hide()
+		ColorPickerFrame:Show()
+		eventFrame.colorPickerFunc = ColorPickerFrame.func
+
+
+	end
+	box.layoutIndex = NextLayoutIndex()
+
 	self.options.spacing       = 10
 	self.options.topPadding    = 16
 	self.options.leftPadding   = 16
@@ -187,19 +244,16 @@ function eventFrame:Initialize()
 	self.crosshairH:SetPoint("LEFT")
 	self.crosshairH.texture = self.crosshairH:CreateTexture()
 	self.crosshairH.texture:SetAllPoints(true)
-	self.crosshairH.texture:SetColorTexture(self.config.r, self.config.g, self.config.b, self.config.a)
 
 	self.crosshairVT = CreateFrame("FRAME", "KL_MOUSE_CURSOR_VERTICAL_TOP", self)
 	self.crosshairVT:SetPoint("TOP")
 	self.crosshairVT.texture = self.crosshairVT:CreateTexture()
 	self.crosshairVT.texture:SetAllPoints(true)
-	self.crosshairVT.texture:SetColorTexture(self.config.r, self.config.g, self.config.b, self.config.a)
 
 	self.crosshairVB = CreateFrame("FRAME", "KL_MOUSE_CURSOR_VERTICAL_BOTTOM", self)
 	self.crosshairVB:SetPoint("BOTTOM")
 	self.crosshairVB.texture = self.crosshairVB:CreateTexture()
 	self.crosshairVB.texture:SetAllPoints(true)
-	self.crosshairVB.texture:SetColorTexture(self.config.r, self.config.g, self.config.b, self.config.a)
 
 	self:SetIgnoreParentScale(true)
 	self:UpdateEverything()
@@ -227,6 +281,27 @@ function eventFrame:HideCrosshair()
 	self.crosshairH:Hide()
 	self.crosshairVT:Hide()
 	self.crosshairVB:Hide()
+end
+
+function eventFrame:TryHideColorPicker()
+	-- NOTE: The color picker API is absolute garbage.
+	-- - We have no way of knowing when the okay button is pressed.
+	-- - We have no way to know if we still have the picker open (except the hack below).
+	-- - If we open the picker before setting all possible callbacks it will call something random.
+	-- - If we open the picker while someone else is using it out values aren't applied.
+	-- - Built-in uses of the picker don't do the hide-show pattern (e.g. the chat background color).
+	-- - It isn't modal and we can interact with the frame that opened the picker.
+	-- - Reading opacity from "func" callback has undefined results.
+	-- So we can't really tell when we need to hide the color picker. We don't know if it's still
+	-- open and we don't know if someone else started using it. In fact, someone else using the
+	-- picker without setting all the fields can break _us_ by causing callbacks at unexpected
+	-- times.
+	if ColorPickerFrame.func == self.colorPickerFunc then
+		ColorPickerFrame:Hide()
+		ColorPickerFrame.func = nil
+		ColorPickerFrame.opacityFunc = nil
+		ColorPickerFrame.cancelFunc = nil
+	end
 end
 
 function eventFrame:UpdateEnabled()
@@ -297,11 +372,20 @@ function eventFrame:UpdatePosition()
 	self.crosshairVB:SetPoint("BOTTOM", nil, "BOTTOMLEFT", mx, 0)
 end
 
+function eventFrame:UpdateColor()
+	local c = self.config.color
+	local r, g, b, a = c.r, c.g, c.b, c.a
+	self.crosshairH.texture:SetColorTexture(r, g, b, a)
+	self.crosshairVT.texture:SetColorTexture(r, g, b, a)
+	self.crosshairVB.texture:SetColorTexture(r, g, b, a)
+end
+
 function eventFrame:UpdateEverything()
 	self:UpdateEnabled()
 	self:UpdateSize()
 	self:UpdateStrata()
 	self:UpdatePosition()
+	self:UpdateColor()
 end
 
 local function ShowOptions()
