@@ -1,4 +1,4 @@
-## Interface: 90005
+## Interface: 120000
 ## Title: KamikazeLib
 ## Author: Kamikazebob
 ## Notes: Random helper functionality

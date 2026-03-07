@@ -1,3 +1,5 @@
+-- TODO: This needs to be completely rewritten for the new settings API
+
 -- TODO: Make a color swatch button for color
 -- TODO: Mouse position is wrong after reloading UI
 -- TODO: Implement an unpack function
@@ -61,11 +63,16 @@ function eventFrame:Initialize()
 	self.options.name   = "KamikazeLib"
 	self.options.parent = nil
 
+	local category, layout = Settings.RegisterCanvasLayoutCategory(self.options, self.options.name)
+	self.options.category = category
+	Settings.RegisterAddOnCategory(category)
+
 	self.options:SetScript("OnHide", function(self)
 		eventFrame:TryHideColorPicker()
 	end)
 
-	self.options.refresh = function(self)
+	self.options.OnRefresh = function(self)
+		-- NOTE: Runs twice when opening the window
 		-- NOTE: If the user resets to defaults then hits cancel we want to undo all changes,
 		-- including the reset to defaults. Since refresh happens right after defaults we have to be
 		-- careful to avoid creating a new "previousConfig" checkpoint, which would make it impossible
@@ -78,26 +85,20 @@ function eventFrame:Initialize()
 		eventFrame.previousConfig = DeepCopy(eventFrame.config)
 	end
 
-	self.options.okay = function(self)
+	self.options.OnCommit = function(self)
+		-- NOTE: Runs when closing the window
 		eventFrame.previousConfig = nil
 	end
 
-	self.options.cancel = function(self)
-		DeepCopy(eventFrame.previousConfig, eventFrame.config)
-		eventFrame.previousConfig = nil
-		eventFrame:UpdateEverything()
-		eventFrame:RefreshWidgets()
-	end
-
-	self.options.default = function(self)
+	-- TODO Requires a vertical layout to work
+	self.options.OnDefault = function(self)
+		print("OnDefault")
 		DeepCopy(eventFrame.defaultConfig, eventFrame.config)
 		eventFrame:UpdateEverything()
 		eventFrame:RefreshWidgets()
 		eventFrame:TryHideColorPicker()
 		self.justAppliedDefaults = true
 	end
-
-	InterfaceOptions_AddCategory(self.options)
 
 	local layoutIndex = 1
 	local function NextLayoutIndex()
@@ -117,13 +118,12 @@ function eventFrame:Initialize()
 	local enableCheckbox = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_ENABLE", self.options, "InterfaceOptionsCheckButtonTemplate")
 	enableCheckbox.Text:SetText("Enable")
 	enableCheckbox:SetChecked(self.config.enabled)
-	enableCheckbox.SetValue = function(self, value)
-		-- NOTE: Value is a string for whatever weird reason
-		local enabled = value == "1"
+	enableCheckbox:SetScript("OnClick", function(self)
+		local enabled = self:GetChecked()
 		eventFrame.config.enabled = enabled
 		eventFrame:UpdateEnabled()
 		eventFrame:UpdatePosition()
-	end
+	end)
 	enableCheckbox.layoutIndex = NextLayoutIndex()
 	self.options.enableCheckbox = enableCheckbox
 
@@ -388,16 +388,6 @@ function eventFrame:UpdateEverything()
 	self:UpdateColor()
 end
 
-local function ShowOptions()
-	-- NOTE: The very first time OpenToCategory is called it ignores the panel option. It seems it
-	-- needs to be opened once before it works properly.
-	if not InterfaceOptionsFrame:IsShown() then
-		InterfaceOptionsFrame_Show()
-	end
-
-	InterfaceOptionsFrame_OpenToCategory(eventFrame.options)
-end
-
 -- Built-in Callbacks
 
 function eventFrame:OnUpdate()
@@ -428,7 +418,7 @@ function eventFrame:OnEvent(event, ...)
 end
 
 local function SlashCommandHandler(msg, editBox)
-	ShowOptions()
+	Settings.OpenToCategory(eventFrame.options.category.ID)
 end
 
 eventFrame:RegisterEvent("VARIABLES_LOADED")

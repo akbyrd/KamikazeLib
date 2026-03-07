@@ -1,3 +1,11 @@
+Symlink to share development and installed locations
+Soft links don't work (updates hang, app won't launch)
+New-Item -ItemType Junction -Path "C:\Program Files\World of Warcraft\_retail_\Interface\AddOns\KamikazeLib" -Target .
+
+API Documentation
+-----------------
+/api
+
 https://wowpedia.fandom.com/wiki/HOWTOs
 
 Getting the current interface number

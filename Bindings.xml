@@ -1,5 +1,5 @@
 <Bindings>
-	<Binding name="CLICK KL_NEXT_WORLD_MARKER:LeftButton" header="KAMIKAZELIB" default="SHIFT-SPACE" />
-	<Binding name="CLICK KL_CLEAR_WORLD_MARKERS:LeftButton" default="CTRL-SPACE" />
-	<Binding name="CLICK KL_CLEAR_AND_NEXT_WORLD_MARKER:LeftButton" default="CTRL-SHIFT-SPACE" />
+	<Binding category="BINDING_HEADER_KAMIKAZELIB" name="CLICK KL_NEXT_WORLD_MARKER:LeftButton" default="SHIFT-SPACE" />
+	<Binding category="BINDING_HEADER_KAMIKAZELIB" name="CLICK KL_CLEAR_WORLD_MARKERS:LeftButton" default="CTRL-SPACE" />
+	<Binding category="BINDING_HEADER_KAMIKAZELIB" name="CLICK KL_CLEAR_AND_NEXT_WORLD_MARKER:LeftButton" default="CTRL-SHIFT-SPACE" />
 </Bindings>
