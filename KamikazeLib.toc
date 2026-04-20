@@ -7,3 +7,4 @@
 
 WorldMarkers.lua
 MouseCursor.lua
+CombatText.lua
