@@ -417,8 +417,20 @@ function eventFrame:OnEvent(event, ...)
 	end
 end
 
-local function SlashCommandHandler(msg, editBox)
-	Settings.OpenToCategory(eventFrame.options.category.ID)
+local function SlashCommandHandler(msg)
+	local args = {}
+	for word in msg:gmatch("%S+") do
+		table.insert(args, word:lower())
+	end
+
+	if #args == 0 then
+		Settings.OpenToCategory(eventFrame.options.category.ID)
+	else
+		local category = args[1]
+		if category == "sct" then
+			Kami.CT.OnCommand(args)
+		end
+	end
 end
 
 eventFrame:RegisterEvent("VARIABLES_LOADED")
