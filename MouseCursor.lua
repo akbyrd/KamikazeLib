@@ -10,12 +10,19 @@
 -- TODO: Try to refactor to make it easier to follow and harder to make mistakes
 -- TODO: Add a circle option
 -- TODO: Lazily create config options when opened
--- TODO: More consistent handling of self vs proper names (e.g. eventFrame, options, config)
 
-local eventFrame = CreateFrame("FRAME", "KL_MOUSE_CURSOR", UIParent)
+local Kami = select(2, ...)
+local MC = {}
+Kami.MC = MC
 
-function eventFrame:Initialize()
-	self.defaultConfig = {
+function MC.Init()
+	MC.frame = CreateFrame("FRAME", "KL_MOUSE_CURSOR", UIParent)
+	MC.frame:RegisterEvent("VARIABLES_LOADED")
+	MC.frame:SetScript("OnEvent", MC.OnEvent)
+end
+
+function MC.Initialize()
+	MC.defaultConfig = {
 		enabled           = true,
 		thickness         = 3,
 		color             = { r = 1, g = 1, b = 1, a = 0.1 },
@@ -23,6 +30,7 @@ function eventFrame:Initialize()
 		hideInScreenshots = true,
 	}
 
+	-- TODO: Mark the root from/to as visited
 	local function DeepCopy(from, to, visited)
 		to = to or {}
 		visited = visited or {}
@@ -52,52 +60,52 @@ function eventFrame:Initialize()
 		return to
 	end
 
-	if KLSavedVars == nil then
-		KLSavedVars = {}
-		KLSavedVars.cursorConfig = DeepCopy(self.defaultConfig)
+	-- TODO: New defaults will not get added
+	if KLSavedVars.cursorConfig == nil then
+		KLSavedVars.cursorConfig = DeepCopy(MC.defaultConfig)
 	end
 
-	self.config = KLSavedVars.cursorConfig
+	MC.config = KLSavedVars.cursorConfig
 
-	self.options = CreateFrame("FRAME", "KL_MOUSE_OPTIONS", nil, "VerticalLayoutFrame")
-	self.options.name   = "KamikazeLib"
-	self.options.parent = nil
+	MC.options = CreateFrame("FRAME", "KL_MOUSE_OPTIONS", nil, "VerticalLayoutFrame")
+	MC.options.name   = "KamikazeLib"
+	MC.options.parent = nil
 
-	local category, layout = Settings.RegisterCanvasLayoutCategory(self.options, self.options.name)
-	self.options.category = category
+	local category, layout = Settings.RegisterCanvasLayoutCategory(MC.options, MC.options.name)
+	MC.options.category = category
 	Settings.RegisterAddOnCategory(category)
 
-	self.options:SetScript("OnHide", function(self)
-		eventFrame:TryHideColorPicker()
+	MC.options:SetScript("OnHide", function()
+		MC.TryHideColorPicker()
 	end)
 
-	self.options.OnRefresh = function(self)
+	MC.options.OnRefresh = function()
 		-- NOTE: Runs twice when opening the window
 		-- NOTE: If the user resets to defaults then hits cancel we want to undo all changes,
 		-- including the reset to defaults. Since refresh happens right after defaults we have to be
 		-- careful to avoid creating a new "previousConfig" checkpoint, which would make it impossible
 		-- to revert to the original settings from before the default button was pressed.
-		if self.justAppliedDefaults then
-			self.justAppliedDefaults = nil
+		if MC.justAppliedDefaults then
+			MC.justAppliedDefaults = nil
 			return
 		end
 
-		eventFrame.previousConfig = DeepCopy(eventFrame.config)
+		MC.previousConfig = DeepCopy(MC.config)
 	end
 
-	self.options.OnCommit = function(self)
+	MC.options.OnCommit = function()
 		-- NOTE: Runs when closing the window
-		eventFrame.previousConfig = nil
+		MC.previousConfig = nil
 	end
 
 	-- TODO Requires a vertical layout to work
-	self.options.OnDefault = function(self)
+	MC.options.OnDefault = function()
 		print("OnDefault")
-		DeepCopy(eventFrame.defaultConfig, eventFrame.config)
-		eventFrame:UpdateEverything()
-		eventFrame:RefreshWidgets()
-		eventFrame:TryHideColorPicker()
-		self.justAppliedDefaults = true
+		DeepCopy(MC.defaultConfig, MC.config)
+		MC.UpdateEverything()
+		MC.RefreshWidgets()
+		MC.TryHideColorPicker()
+		MC.justAppliedDefaults = true
 	end
 
 	local layoutIndex = 1
@@ -107,7 +115,7 @@ function eventFrame:Initialize()
 		return li
 	end
 
-	local header = self.options:CreateFontString(nil, "ARTWORK")
+	local header = MC.options:CreateFontString(nil, "ARTWORK")
 	header:SetFontObject(GameFontNormalLarge)
 	header:SetText("KamikazeLib Options")
 	header:SetJustifyH("LEFT")
@@ -115,21 +123,21 @@ function eventFrame:Initialize()
 	header.bottomPadding = 14
 	header.layoutIndex = NextLayoutIndex()
 
-	local enableCheckbox = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_ENABLE", self.options, "InterfaceOptionsCheckButtonTemplate")
+	local enableCheckbox = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_ENABLE", MC.options, "InterfaceOptionsCheckButtonTemplate")
 	enableCheckbox.Text:SetText("Enable")
-	enableCheckbox:SetChecked(self.config.enabled)
-	enableCheckbox:SetScript("OnClick", function(self)
-		local enabled = self:GetChecked()
-		eventFrame.config.enabled = enabled
-		eventFrame:UpdateEnabled()
-		eventFrame:UpdatePosition()
+	enableCheckbox:SetChecked(MC.config.enabled)
+	enableCheckbox:SetScript("OnClick", function(checkbox)
+		local enabled = checkbox:GetChecked()
+		MC.config.enabled = enabled
+		MC.UpdateEnabled()
+		MC.UpdatePosition()
 	end)
 	enableCheckbox.layoutIndex = NextLayoutIndex()
-	self.options.enableCheckbox = enableCheckbox
+	MC.options.enableCheckbox = enableCheckbox
 
 	local step = 1
 	local min, max = 1, 33
-	local slider = CreateFrame("Slider", "KL_MOUSE_OPTIONS_THICKNESS", self.options, "OptionsSliderTemplate")
+	local slider = CreateFrame("Slider", "KL_MOUSE_OPTIONS_THICKNESS", MC.options, "OptionsSliderTemplate")
 	slider.Text:SetFontObject(GameFontNormal)
 	slider.Text:SetText("Crosshair Thickness")
 	slider.Low:SetText(tostring(min))
@@ -139,16 +147,16 @@ function eventFrame:Initialize()
 	slider:SetValueStep(step)
 	slider:SetMinMaxValues(min, max)
 	slider:SetObeyStepOnDrag(true)
-	slider:SetValue(self.config.thickness)
-	slider:SetScript("OnValueChanged", function(self, value, userInput)
-		eventFrame.config.thickness = value
-		eventFrame:UpdateSize()
-		eventFrame:UpdatePosition()
+	slider:SetValue(MC.config.thickness)
+	slider:SetScript("OnValueChanged", function(slider, value)
+		MC.config.thickness = value
+		MC.UpdateSize()
+		MC.UpdatePosition()
 	end)
 	slider.layoutIndex = NextLayoutIndex()
-	self.options.slider = slider
+	MC.options.slider = slider
 
-	local label = self.options:CreateFontString(nil, "ARTWORK");
+	local label = MC.options:CreateFontString(nil, "ARTWORK");
 	label:SetFontObject("GameFontNormal")
 	label:SetText("Strata");
 	label.bottomPadding = -8
@@ -161,109 +169,105 @@ function eventFrame:Initialize()
 		"HIGH",
 		"DIALOG",
 	}
-	local dropdown = CreateFrame("Frame", "KL_MOUSE_OPTIONS_STRATA", self.options, "UIDropDownMenuTemplate")
-	function dropdown.SetValue(button, value, arg2, wasChecked)
+	local dropdown = CreateFrame("Frame", "KL_MOUSE_OPTIONS_STRATA", MC.options, "UIDropDownMenuTemplate")
+	local function DropDownSetValue(dropdown, button, value, arg2, wasChecked)
 		if wasChecked then return end
-		eventFrame.config.strata = value
-		eventFrame:UpdateStrata()
+		MC.config.strata = value
+		MC.UpdateStrata()
 		UIDropDownMenu_SetText(dropdown, value)
 	end
-	function dropdown:Initialize(level, menuList)
+	local function DropDownInit(dropdown, level, menuList)
 		-- NOTE: For some reason this is also called when the drop opens and menuList will be nil
 		local info = UIDropDownMenu_CreateInfo()
 
 		for _, value in ipairs(values) do
 			info.text     = value
 			info.arg1     = value
-			info.checked  = eventFrame.config.strata == value
-			info.func     = dropdown.SetValue
+			info.checked  = MC.config.strata == value
+			info.func     = DropDownSetValue
 			info.menuList = menuList
 			UIDropDownMenu_AddButton(info, level)
 			if info.checked then
-				UIDropDownMenu_SetText(self, info.text)
+				UIDropDownMenu_SetText(dropdown, info.text)
 			end
 		end
 	end
 	dropdown.layoutIndex = NextLayoutIndex()
-	UIDropDownMenu_Initialize(dropdown, dropdown.Initialize, nil, 1, values)
+	UIDropDownMenu_Initialize(dropdown, DropDownInit, nil, 1, values)
 	dropdown.leftPadding = -15
-	self.options.dropdown = dropdown
+	MC.options.dropdown = dropdown
 
-	local hideInScreenshotsCheckbox = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_HIDE_IN_SCREENSHOTS", self.options, "InterfaceOptionsCheckButtonTemplate")
+	local hideInScreenshotsCheckbox = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_HIDE_IN_SCREENSHOTS", MC.options, "InterfaceOptionsCheckButtonTemplate")
 	hideInScreenshotsCheckbox.Text:SetText("Hide In Screenshots")
-	hideInScreenshotsCheckbox:SetChecked(self.config.hideInScreenshots)
-	hideInScreenshotsCheckbox.SetValue = function(self, value)
+	hideInScreenshotsCheckbox:SetChecked(MC.config.hideInScreenshots)
+	hideInScreenshotsCheckbox.SetValue = function(checkbox, value)
 		-- NOTE: Value is a string for whatever weird reason
 		local enabled = value == "1"
-		eventFrame.config.hideInScreenshots = enabled
+		MC.config.hideInScreenshots = enabled
 	end
 	hideInScreenshotsCheckbox.layoutIndex = NextLayoutIndex()
-	self.options.hideInScreenshotsCheckbox = hideInScreenshotsCheckbox
+	MC.options.hideInScreenshotsCheckbox = hideInScreenshotsCheckbox
 
-	local box = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_COLOR", self.options, "InterfaceOptionsCheckButtonTemplate")
+	local box = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_COLOR", MC.options, "InterfaceOptionsCheckButtonTemplate")
 	box.Text:SetText("Test Color")
-	box.SetValue = function(self, value)
-
-
-		local c = eventFrame.config.color
+	box.SetValue = function()
+		local c = MC.config.color
 		ColorPickerFrame.hasOpacity = true
 		ColorPickerFrame.opacity = 1 - c.a
 		ColorPickerFrame.previousValues = ShallowCopyTableNoRefs(c)
 		ColorPickerFrame.func = function()
-			local c = eventFrame.config.color
+			local c = MC.config.color
 			c.r, c.g, c.b = ColorPickerFrame:GetColorRGB()
-			eventFrame:UpdateColor()
+			MC.UpdateColor()
 		end
 		ColorPickerFrame.opacityFunc = function()
-			local c = eventFrame.config.color
+			local c = MC.config.color
 			c.a = 1 - OpacitySliderFrame:GetValue()
-			eventFrame:UpdateColor()
+			MC.UpdateColor()
 		end
 		ColorPickerFrame.cancelFunc = function(previousValues)
-			local c = eventFrame.config.color
+			local c = MC.config.color
 			c = ShallowCopyTableNoRefs(previousValues, c)
-			eventFrame:UpdateColor()
+			MC.UpdateColor()
 		end
 		ColorPickerFrame:SetColorRGB(c.r, c.g, c.b)
 		ColorPickerFrame:Hide()
 		ColorPickerFrame:Show()
-		eventFrame.colorPickerFunc = ColorPickerFrame.func
-
-
+		MC.colorPickerFunc = ColorPickerFrame.func
 	end
 	box.layoutIndex = NextLayoutIndex()
 
-	self.options.spacing       = 10
-	self.options.topPadding    = 16
-	self.options.leftPadding   = 16
-	self.options.bottomPadding = 16
-	self.options.rightPadding  = 16
-	self.options:Layout()
+	MC.options.spacing       = 10
+	MC.options.topPadding    = 16
+	MC.options.leftPadding   = 16
+	MC.options.bottomPadding = 16
+	MC.options.rightPadding  = 16
+	MC.options:Layout()
 
-	self.crosshairH = CreateFrame("FRAME", "KL_MOUSE_CURSOR_HORIZONTAL", self)
-	self.crosshairH:SetPoint("LEFT")
-	self.crosshairH.texture = self.crosshairH:CreateTexture()
-	self.crosshairH.texture:SetAllPoints(true)
+	MC.crosshairH = CreateFrame("FRAME", "KL_MOUSE_CURSOR_HORIZONTAL", MC.frame)
+	MC.crosshairH:SetPoint("LEFT")
+	MC.crosshairH.texture = MC.crosshairH:CreateTexture()
+	MC.crosshairH.texture:SetAllPoints(true)
 
-	self.crosshairVT = CreateFrame("FRAME", "KL_MOUSE_CURSOR_VERTICAL_TOP", self)
-	self.crosshairVT:SetPoint("TOP")
-	self.crosshairVT.texture = self.crosshairVT:CreateTexture()
-	self.crosshairVT.texture:SetAllPoints(true)
+	MC.crosshairVT = CreateFrame("FRAME", "KL_MOUSE_CURSOR_VERTICAL_TOP", MC.frame)
+	MC.crosshairVT:SetPoint("TOP")
+	MC.crosshairVT.texture = MC.crosshairVT:CreateTexture()
+	MC.crosshairVT.texture:SetAllPoints(true)
 
-	self.crosshairVB = CreateFrame("FRAME", "KL_MOUSE_CURSOR_VERTICAL_BOTTOM", self)
-	self.crosshairVB:SetPoint("BOTTOM")
-	self.crosshairVB.texture = self.crosshairVB:CreateTexture()
-	self.crosshairVB.texture:SetAllPoints(true)
+	MC.crosshairVB = CreateFrame("FRAME", "KL_MOUSE_CURSOR_VERTICAL_BOTTOM", MC.frame)
+	MC.crosshairVB:SetPoint("BOTTOM")
+	MC.crosshairVB.texture = MC.crosshairVB:CreateTexture()
+	MC.crosshairVB.texture:SetAllPoints(true)
 
-	self:SetIgnoreParentScale(true)
-	self:UpdateEverything()
+	MC.frame:SetIgnoreParentScale(true)
+	MC.UpdateEverything()
 end
 
-function eventFrame:RefreshWidgets()
-	self.options.enableCheckbox:SetChecked(self.config.enabled)
-	self.options.slider:SetValue(self.config.thickness)
-	UIDropDownMenu_SetText(self.options.dropdown, self.config.strata)
-	self.options.hideInScreenshotsCheckbox:SetChecked(self.config.hideInScreenshots)
+function MC.RefreshWidgets()
+	MC.options.enableCheckbox:SetChecked(MC.config.enabled)
+	MC.options.slider:SetValue(MC.config.thickness)
+	UIDropDownMenu_SetText(MC.options.dropdown, MC.config.strata)
+	MC.options.hideInScreenshotsCheckbox:SetChecked(MC.config.hideInScreenshots)
 end
 
 local function Round(x)
@@ -271,19 +275,19 @@ local function Round(x)
 	return math.floor(x + 0.5)
 end
 
-function eventFrame:ShowCrosshair()
-	self.crosshairH:Show()
-	self.crosshairVT:Show()
-	self.crosshairVB:Show()
+function MC.ShowCrosshair()
+	MC.crosshairH:Show()
+	MC.crosshairVT:Show()
+	MC.crosshairVB:Show()
 end
 
-function eventFrame:HideCrosshair()
-	self.crosshairH:Hide()
-	self.crosshairVT:Hide()
-	self.crosshairVB:Hide()
+function MC.HideCrosshair()
+	MC.crosshairH:Hide()
+	MC.crosshairVT:Hide()
+	MC.crosshairVB:Hide()
 end
 
-function eventFrame:TryHideColorPicker()
+function MC.TryHideColorPicker()
 	-- NOTE: The color picker API is absolute garbage.
 	-- - We have no way of knowing when the okay button is pressed.
 	-- - We have no way to know if we still have the picker open (except the hack below).
@@ -296,7 +300,7 @@ function eventFrame:TryHideColorPicker()
 	-- open and we don't know if someone else started using it. In fact, someone else using the
 	-- picker without setting all the fields can break _us_ by causing callbacks at unexpected
 	-- times.
-	if ColorPickerFrame.func == self.colorPickerFunc then
+	if ColorPickerFrame.func == MC.colorPickerFunc then
 		ColorPickerFrame:Hide()
 		ColorPickerFrame.func = nil
 		ColorPickerFrame.opacityFunc = nil
@@ -304,57 +308,57 @@ function eventFrame:TryHideColorPicker()
 	end
 end
 
-function eventFrame:UpdateEnabled()
-	if self.config.enabled then
-		self:RegisterEvent("UI_SCALE_CHANGED")
-		self:RegisterEvent("SCREENSHOT_STARTED")
-		self:RegisterEvent("SCREENSHOT_SUCCEEDED")
-		self:RegisterEvent("SCREENSHOT_FAILED")
-		self:SetScript("OnUpdate", self.OnUpdate)
+function MC.UpdateEnabled()
+	if MC.config.enabled then
+		MC.frame:RegisterEvent("UI_SCALE_CHANGED")
+		MC.frame:RegisterEvent("SCREENSHOT_STARTED")
+		MC.frame:RegisterEvent("SCREENSHOT_SUCCEEDED")
+		MC.frame:RegisterEvent("SCREENSHOT_FAILED")
+		MC.frame:SetScript("OnUpdate", MC.OnUpdate)
 
-		self:ShowCrosshair()
+		MC.ShowCrosshair()
 	else
-		self:UnregisterEvent("UI_SCALE_CHANGED")
-		self:UnregisterEvent("SCREENSHOT_STARTED")
-		self:UnregisterEvent("SCREENSHOT_SUCCEEDED")
-		self:UnregisterEvent("SCREENSHOT_FAILED")
-		self:SetScript("OnUpdate", nil)
+		MC.frame:UnregisterEvent("UI_SCALE_CHANGED")
+		MC.frame:UnregisterEvent("SCREENSHOT_STARTED")
+		MC.frame:UnregisterEvent("SCREENSHOT_SUCCEEDED")
+		MC.frame:UnregisterEvent("SCREENSHOT_FAILED")
+		MC.frame:SetScript("OnUpdate", nil)
 
-		self:HideCrosshair()
+		MC.HideCrosshair()
 	end
 end
 
-function eventFrame:UpdateSize()
+function MC.UpdateSize()
 	local canvasH = 768
 	local screenW, screenH = GetPhysicalScreenSize()
 
-	self.screenW = screenW
-	self.screenH = screenH
-	self.screenToCanvas = canvasH / screenH
-	self.canvasToScreen = screenH / canvasH
-	self:SetScale(self.screenToCanvas)
+	MC.screenW = screenW
+	MC.screenH = screenH
+	MC.screenToCanvas = canvasH / screenH
+	MC.canvasToScreen = screenH / canvasH
+	MC.frame:SetScale(MC.screenToCanvas)
 
-	self.crosshairH:SetWidth(screenW)
-	self.crosshairH:SetHeight(self.config.thickness)
-	self.crosshairVT:SetWidth(self.config.thickness)
-	self.crosshairVB:SetWidth(self.config.thickness)
+	MC.crosshairH:SetWidth(screenW)
+	MC.crosshairH:SetHeight(MC.config.thickness)
+	MC.crosshairVT:SetWidth(MC.config.thickness)
+	MC.crosshairVB:SetWidth(MC.config.thickness)
 end
 
-function eventFrame:UpdateStrata()
-	self.crosshairH:SetFrameStrata(self.config.strata)
-	self.crosshairVT:SetFrameStrata(self.config.strata)
-	self.crosshairVB:SetFrameStrata(self.config.strata)
+function MC.UpdateStrata()
+	MC.crosshairH:SetFrameStrata(MC.config.strata)
+	MC.crosshairVT:SetFrameStrata(MC.config.strata)
+	MC.crosshairVB:SetFrameStrata(MC.config.strata)
 end
 
-function eventFrame:UpdatePosition()
+function MC.UpdatePosition()
 	local mx, my = GetCursorPosition()
-	mx = Round(mx * self.canvasToScreen)
-	my = Round(my * self.canvasToScreen - 1)
+	mx = Round(mx * MC.canvasToScreen)
+	my = Round(my * MC.canvasToScreen - 1)
 
-	local vth = self.screenH - my - math.ceil (self.config.thickness / 2)
-	local vbh =                my - math.floor(self.config.thickness / 2)
-	self.crosshairVT:SetHeight(math.max(0.001, vth))
-	self.crosshairVB:SetHeight(math.max(0.001, vbh))
+	local vth = MC.screenH - my - math.ceil (MC.config.thickness / 2)
+	local vbh =              my - math.floor(MC.config.thickness / 2)
+	MC.crosshairVT:SetHeight(math.max(0.001, vth))
+	MC.crosshairVB:SetHeight(math.max(0.001, vbh))
 
 	-- NOTE: Rounding in the final canvas space prevents "shimmering" that occurs from floating point
 	-- rounding errors. Without this a crosshair set to 1 pixel thickness will flicker between 0 and
@@ -362,80 +366,59 @@ function eventFrame:UpdatePosition()
 	-- math.floor is missing), but presumably a truncation happens somewhere internally when
 	-- rendering so it works out.
 	local function RoundCanvas(x)
-		return x + 0.5*self.screenToCanvas
+		return x + 0.5*MC.screenToCanvas
 	end
 	mx = RoundCanvas(mx)
 	my = RoundCanvas(my)
 
-	self.crosshairH :SetPoint("LEFT",   nil, "BOTTOMLEFT", 0,  my)
-	self.crosshairVT:SetPoint("TOP",    nil, "TOPLEFT",    mx, 0)
-	self.crosshairVB:SetPoint("BOTTOM", nil, "BOTTOMLEFT", mx, 0)
+	MC.crosshairH :SetPoint("LEFT",   nil, "BOTTOMLEFT", 0,  my)
+	MC.crosshairVT:SetPoint("TOP",    nil, "TOPLEFT",    mx, 0)
+	MC.crosshairVB:SetPoint("BOTTOM", nil, "BOTTOMLEFT", mx, 0)
 end
 
-function eventFrame:UpdateColor()
-	local c = self.config.color
+function MC.UpdateColor()
+	local c = MC.config.color
 	local r, g, b, a = c.r, c.g, c.b, c.a
-	self.crosshairH.texture:SetColorTexture(r, g, b, a)
-	self.crosshairVT.texture:SetColorTexture(r, g, b, a)
-	self.crosshairVB.texture:SetColorTexture(r, g, b, a)
+	MC.crosshairH.texture:SetColorTexture(r, g, b, a)
+	MC.crosshairVT.texture:SetColorTexture(r, g, b, a)
+	MC.crosshairVB.texture:SetColorTexture(r, g, b, a)
 end
 
-function eventFrame:UpdateEverything()
-	self:UpdateEnabled()
-	self:UpdateSize()
-	self:UpdateStrata()
-	self:UpdatePosition()
-	self:UpdateColor()
+function MC.UpdateEverything()
+	MC.UpdateEnabled()
+	MC.UpdateSize()
+	MC.UpdateStrata()
+	MC.UpdatePosition()
+	MC.UpdateColor()
 end
 
 -- Built-in Callbacks
 
-function eventFrame:OnUpdate()
-	if self.initialized then
-		self:UpdatePosition()
+function MC.OnUpdate(frame, elapsed)
+	if MC.initialized then
+		MC.UpdatePosition()
 	end
 end
 
-function eventFrame:OnEvent(event, ...)
+function MC.OnEvent(frame, event, ...)
 	if event == "VARIABLES_LOADED" then
-		self:Initialize()
-		self.initialized = true
+		MC.Initialize()
+		MC.initialized = true
 	elseif event == "UI_SCALE_CHANGED" then
 		-- NOTE: UI_SCALE_CHANGED can happen before VARIABLES_LOADED
-		if self.initialized then
-			self:UpdateSize()
-			self:UpdatePosition()
+		if MC.initialized then
+			MC.UpdateSize()
+			MC.UpdatePosition()
 		end
 	elseif event == "SCREENSHOT_STARTED" then
-		if self.config.hideInScreenshots then
-			self:HideCrosshair()
+		if MC.config.hideInScreenshots then
+			MC.HideCrosshair()
 		end
 	elseif event == "SCREENSHOT_SUCCEEDED" or event == "SCREENSHOT_FAILED" then
-		if self.config.hideInScreenshots then
-			self:ShowCrosshair()
+		if MC.config.hideInScreenshots then
+			MC.ShowCrosshair()
 		end
 	end
 end
 
-local function SlashCommandHandler(msg)
-	local args = {}
-	for word in msg:gmatch("%S+") do
-		table.insert(args, word:lower())
-	end
-
-	if #args == 0 then
-		Settings.OpenToCategory(eventFrame.options.category.ID)
-	else
-		local category = args[1]
-		if category == "sct" then
-			Kami.CT.OnCommand(args)
-		end
-	end
-end
-
-eventFrame:RegisterEvent("VARIABLES_LOADED")
-eventFrame:SetScript("OnEvent", eventFrame.OnEvent)
-
-SLASH_KAMIKAZELIB1 = "/kamikazelib"
-SLASH_KAMIKAZELIB2 = "/kl"
-SlashCmdList.KAMIKAZELIB = SlashCommandHandler
+MC.Init()

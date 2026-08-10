@@ -1,5 +1,5 @@
+local Kami = select(2, ...)
 local CT = {}
-Kami = {}
 Kami.CT = CT
 
 function CT.Init()

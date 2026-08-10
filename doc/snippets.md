@@ -6,6 +6,10 @@ New-Item `
 ```
 
 ```
+/dump Kami.CDM.cfg
+```
+
+```
 /dump GetBuildInfo()
 /script Kami.CT.frame:SetScript("OnUpdate", nil)
 ```

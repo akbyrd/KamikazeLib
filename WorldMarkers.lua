@@ -1,5 +1,3 @@
-_G.BINDING_HEADER_KAMIKAZELIB = "KamikazeLib"
-
 -- Re-order world markers to match target markers
 local wmReorder = { 5, 6, 3, 2, 7, 1, 4, 8 }
 local wmNext = 1
