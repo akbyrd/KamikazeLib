@@ -15,7 +15,7 @@ local Kami = select(2, ...)
 local MC = {}
 Kami.MC = MC
 
-function MC.Init()
+function MC.Load()
 	MC.frame = CreateFrame("FRAME", "KL_MOUSE_CURSOR", UIParent)
 	MC.frame:RegisterEvent("VARIABLES_LOADED")
 	MC.frame:SetScript("OnEvent", MC.OnEvent)
@@ -61,11 +61,12 @@ function MC.Initialize()
 	end
 
 	-- TODO: New defaults will not get added
-	if KLSavedVars.cursorConfig == nil then
-		KLSavedVars.cursorConfig = DeepCopy(MC.defaultConfig)
+	-- TODO: Use a metatable for defaults?
+	if KLSavedVars.MC == nil then
+		KLSavedVars.MC = DeepCopy(MC.defaultConfig)
 	end
 
-	MC.config = KLSavedVars.cursorConfig
+	MC.config = KLSavedVars.MC
 
 	MC.options = CreateFrame("FRAME", "KL_MOUSE_OPTIONS", nil, "VerticalLayoutFrame")
 	MC.options.name   = "KamikazeLib"
@@ -421,4 +422,4 @@ function MC.OnEvent(frame, event, ...)
 	end
 end
 
-MC.Init()
+MC.Load()

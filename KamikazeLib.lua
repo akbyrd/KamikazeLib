@@ -1,12 +1,11 @@
 local Kami = select(2, ...)
-_G.Kami = Kami
-_G.BINDING_HEADER_KAMIKAZELIB = "KamikazeLib"
 
-function Kami.Init()
-	KLSavedVars = {}
-
-	SLASH_KAMIKAZELIB1 = "/kamikazelib"
-	SLASH_KAMIKAZELIB2 = "/kl"
+function Kami.Load()
+	_G.Kami = Kami
+	_G.KLSavedVars = {}
+	_G.BINDING_HEADER_KAMIKAZELIB = "KamikazeLib"
+	_G.SLASH_KAMIKAZELIB1 = "/kamikazelib"
+	_G.SLASH_KAMIKAZELIB2 = "/kl"
 
 	SlashCmdList.KAMIKAZELIB = function(msg)
 		local args = {}
@@ -25,4 +24,4 @@ function Kami.Init()
 	end
 end
 
-Kami.Init()
+Kami.Load()
