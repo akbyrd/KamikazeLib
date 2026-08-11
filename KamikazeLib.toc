@@ -5,7 +5,12 @@
 ## Version: 1.0
 ## SavedVariables: KLSavedVars
 
+Lib\LibStub\LibStub.lua
+Lib\LibCustomGlow-1.0\LibCustomGlow-1.0.lua
+
 KamikazeLib.lua
+Util.lua
 WorldMarkers.lua
 MouseCursor.lua
 CombatText.lua
+CDM.lua

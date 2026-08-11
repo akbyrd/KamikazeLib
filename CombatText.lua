@@ -138,13 +138,8 @@ function CT.CreateElement()
 	label:SetPoint("BOTTOMLEFT", frame, "BOTTOM", -(100 - 80) / 2, 0)
 	label:SetTextColor(1, 0.87, 0)
 
-	local xFactor = 1 * min(1, CT.cfg.iconAspect)
-	local yFactor = 1 / max(1, CT.cfg.iconAspect)
-	local texXMin = 0.5 - (0.5 - CT.cfg.iconZoom) * xFactor
-	local texYMin = 0.5 - (0.5 - CT.cfg.iconZoom) * yFactor
-	local icon    = frame:CreateTexture(nil, "BACKGROUND")
-	icon:SetSize(CT.cfg.iconSize * xFactor, CT.cfg.iconSize * yFactor)
-	icon:SetTexCoord(texXMin, 1 - texXMin, texYMin, 1 - texYMin)
+	local icon = frame:CreateTexture(nil, "BACKGROUND")
+	Kami.Util.RectIcon(icon, icon, CT.cfg.iconSize, CT.cfg.iconZoom, CT.cfg.iconAspect)
 	icon:SetPoint("RIGHT", label, "LEFT", -6, -.0625 * CT.cfg.fontSize)
 
 	local elem = {
