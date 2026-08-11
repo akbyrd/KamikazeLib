@@ -11,7 +11,10 @@ New-Item `
 
 ```
 /dump GetBuildInfo()
-/script Kami.CT.frame:SetScript("OnUpdate", nil)
+```
+
+```
+/dump GetCVar("useUiScale"), GetCVar("uiScale")
 ```
 
 ```lua
@@ -23,4 +26,11 @@ if LibStub then
 		local path = LSM:Fetch(LSM.MediaType.FONT, "my font")
 	end
 end
+```
+
+```lua
+local ppScale = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
+
+local pixels_to_canvas = PixelUtil.GetPixelToUIUnitFactor()
+local canvas_to_local = 1 / frame:GetEffectiveScale()
 ```
