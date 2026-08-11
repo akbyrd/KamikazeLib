@@ -8,8 +8,8 @@ API Documentation
 
 https://wowpedia.fandom.com/wiki/HOWTOs
 
-Getting the current interface number
-/run print((select(4, GetBuildInfo())))
+Getting the current interface number (4th result)
+/dump GetBuildInfo()
 
 * There is the /dump slash command for general debugging, /etrace for showing events and /fstack for debugging visible UI elements.
 * Export, clone, download or bookmark Blizzard's user interface code a.k.a. the FrameXML. If you don't know what a specific API does it's best to just reference it in FrameXML. Not everything is documented so we generally look through the code from Blizzard or other addons.
@@ -74,3 +74,19 @@ slider:SetMinMaxValues(min, max)
 slider:SetObeyStepOnDrag(true)
 slider:SetValue(default)
 slider.layoutIndex = 3
+
+
+
+Cooldown Swipe
+--------------
+Spell on cooldown     - show swipe, bling
+Spell not on cooldown - no swipe
+
+Spell recharging 0-1  - show swipe, bling
+Spell recharging 1... - show edge, no bling
+Spell not recharging  - no edge
+
+Spell usable          - show gcd, no bling
+Spell not usable      - no gcd
+
+Bling happens at true CD end, not at GCD end when it replaces the end of the CD

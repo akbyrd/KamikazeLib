@@ -6,15 +6,10 @@ New-Item `
 ```
 
 ```
-/dump Kami.CDM.cfg
-```
-
-```
+/api
 /dump GetBuildInfo()
-```
-
-```
 /dump GetCVar("useUiScale"), GetCVar("uiScale")
+/dump Kami.CDM.cfg
 ```
 
 ```lua
