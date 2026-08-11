@@ -66,7 +66,7 @@ function MC.Initialize()
 		KLSavedVars.MC = DeepCopy(MC.defaultConfig)
 	end
 
-	MC.config = KLSavedVars.MC
+	MC.cfg = KLSavedVars.MC
 
 	MC.options = CreateFrame("FRAME", "KL_MOUSE_OPTIONS", nil, "VerticalLayoutFrame")
 	MC.options.name   = "KamikazeLib"
@@ -91,7 +91,7 @@ function MC.Initialize()
 			return
 		end
 
-		MC.previousConfig = DeepCopy(MC.config)
+		MC.previousConfig = DeepCopy(MC.cfg)
 	end
 
 	MC.options.OnCommit = function()
@@ -102,7 +102,7 @@ function MC.Initialize()
 	-- TODO Requires a vertical layout to work
 	MC.options.OnDefault = function()
 		print("OnDefault")
-		DeepCopy(MC.defaultConfig, MC.config)
+		DeepCopy(MC.defaultConfig, MC.cfg)
 		MC.UpdateEverything()
 		MC.RefreshWidgets()
 		MC.TryHideColorPicker()
@@ -126,10 +126,10 @@ function MC.Initialize()
 
 	local enableCheckbox = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_ENABLE", MC.options, "InterfaceOptionsCheckButtonTemplate")
 	enableCheckbox.Text:SetText("Enable")
-	enableCheckbox:SetChecked(MC.config.enabled)
+	enableCheckbox:SetChecked(MC.cfg.enabled)
 	enableCheckbox:SetScript("OnClick", function(checkbox)
 		local enabled = checkbox:GetChecked()
-		MC.config.enabled = enabled
+		MC.cfg.enabled = enabled
 		MC.UpdateEnabled()
 		MC.UpdatePosition()
 	end)
@@ -148,9 +148,9 @@ function MC.Initialize()
 	slider:SetValueStep(step)
 	slider:SetMinMaxValues(min, max)
 	slider:SetObeyStepOnDrag(true)
-	slider:SetValue(MC.config.thickness)
+	slider:SetValue(MC.cfg.thickness)
 	slider:SetScript("OnValueChanged", function(slider, value)
-		MC.config.thickness = value
+		MC.cfg.thickness = value
 		MC.UpdateSize()
 		MC.UpdatePosition()
 	end)
@@ -173,7 +173,7 @@ function MC.Initialize()
 	local dropdown = CreateFrame("Frame", "KL_MOUSE_OPTIONS_STRATA", MC.options, "UIDropDownMenuTemplate")
 	local function DropDownSetValue(dropdown, button, value, arg2, wasChecked)
 		if wasChecked then return end
-		MC.config.strata = value
+		MC.cfg.strata = value
 		MC.UpdateStrata()
 		UIDropDownMenu_SetText(dropdown, value)
 	end
@@ -184,7 +184,7 @@ function MC.Initialize()
 		for _, value in ipairs(values) do
 			info.text     = value
 			info.arg1     = value
-			info.checked  = MC.config.strata == value
+			info.checked  = MC.cfg.strata == value
 			info.func     = DropDownSetValue
 			info.menuList = menuList
 			UIDropDownMenu_AddButton(info, level)
@@ -200,11 +200,11 @@ function MC.Initialize()
 
 	local hideInScreenshotsCheckbox = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_HIDE_IN_SCREENSHOTS", MC.options, "InterfaceOptionsCheckButtonTemplate")
 	hideInScreenshotsCheckbox.Text:SetText("Hide In Screenshots")
-	hideInScreenshotsCheckbox:SetChecked(MC.config.hideInScreenshots)
+	hideInScreenshotsCheckbox:SetChecked(MC.cfg.hideInScreenshots)
 	hideInScreenshotsCheckbox.SetValue = function(checkbox, value)
 		-- NOTE: Value is a string for whatever weird reason
 		local enabled = value == "1"
-		MC.config.hideInScreenshots = enabled
+		MC.cfg.hideInScreenshots = enabled
 	end
 	hideInScreenshotsCheckbox.layoutIndex = NextLayoutIndex()
 	MC.options.hideInScreenshotsCheckbox = hideInScreenshotsCheckbox
@@ -212,22 +212,22 @@ function MC.Initialize()
 	local box = CreateFrame("CheckButton", "KL_MOUSE_OPTIONS_COLOR", MC.options, "InterfaceOptionsCheckButtonTemplate")
 	box.Text:SetText("Test Color")
 	box.SetValue = function()
-		local c = MC.config.color
+		local c = MC.cfg.color
 		ColorPickerFrame.hasOpacity = true
 		ColorPickerFrame.opacity = 1 - c.a
 		ColorPickerFrame.previousValues = ShallowCopyTableNoRefs(c)
 		ColorPickerFrame.func = function()
-			local c = MC.config.color
+			local c = MC.cfg.color
 			c.r, c.g, c.b = ColorPickerFrame:GetColorRGB()
 			MC.UpdateColor()
 		end
 		ColorPickerFrame.opacityFunc = function()
-			local c = MC.config.color
+			local c = MC.cfg.color
 			c.a = 1 - OpacitySliderFrame:GetValue()
 			MC.UpdateColor()
 		end
 		ColorPickerFrame.cancelFunc = function(previousValues)
-			local c = MC.config.color
+			local c = MC.cfg.color
 			c = ShallowCopyTableNoRefs(previousValues, c)
 			MC.UpdateColor()
 		end
@@ -265,10 +265,10 @@ function MC.Initialize()
 end
 
 function MC.RefreshWidgets()
-	MC.options.enableCheckbox:SetChecked(MC.config.enabled)
-	MC.options.slider:SetValue(MC.config.thickness)
-	UIDropDownMenu_SetText(MC.options.dropdown, MC.config.strata)
-	MC.options.hideInScreenshotsCheckbox:SetChecked(MC.config.hideInScreenshots)
+	MC.options.enableCheckbox:SetChecked(MC.cfg.enabled)
+	MC.options.slider:SetValue(MC.cfg.thickness)
+	UIDropDownMenu_SetText(MC.options.dropdown, MC.cfg.strata)
+	MC.options.hideInScreenshotsCheckbox:SetChecked(MC.cfg.hideInScreenshots)
 end
 
 local function Round(x)
@@ -310,7 +310,7 @@ function MC.TryHideColorPicker()
 end
 
 function MC.UpdateEnabled()
-	if MC.config.enabled then
+	if MC.cfg.enabled then
 		MC.frame:RegisterEvent("UI_SCALE_CHANGED")
 		MC.frame:RegisterEvent("SCREENSHOT_STARTED")
 		MC.frame:RegisterEvent("SCREENSHOT_SUCCEEDED")
@@ -340,15 +340,15 @@ function MC.UpdateSize()
 	MC.frame:SetScale(MC.screenToCanvas)
 
 	MC.crosshairH:SetWidth(screenW)
-	MC.crosshairH:SetHeight(MC.config.thickness)
-	MC.crosshairVT:SetWidth(MC.config.thickness)
-	MC.crosshairVB:SetWidth(MC.config.thickness)
+	MC.crosshairH:SetHeight(MC.cfg.thickness)
+	MC.crosshairVT:SetWidth(MC.cfg.thickness)
+	MC.crosshairVB:SetWidth(MC.cfg.thickness)
 end
 
 function MC.UpdateStrata()
-	MC.crosshairH:SetFrameStrata(MC.config.strata)
-	MC.crosshairVT:SetFrameStrata(MC.config.strata)
-	MC.crosshairVB:SetFrameStrata(MC.config.strata)
+	MC.crosshairH:SetFrameStrata(MC.cfg.strata)
+	MC.crosshairVT:SetFrameStrata(MC.cfg.strata)
+	MC.crosshairVB:SetFrameStrata(MC.cfg.strata)
 end
 
 function MC.UpdatePosition()
@@ -356,8 +356,8 @@ function MC.UpdatePosition()
 	mx = Round(mx * MC.canvasToScreen)
 	my = Round(my * MC.canvasToScreen - 1)
 
-	local vth = MC.screenH - my - math.ceil (MC.config.thickness / 2)
-	local vbh =              my - math.floor(MC.config.thickness / 2)
+	local vth = MC.screenH - my - math.ceil (MC.cfg.thickness / 2)
+	local vbh =              my - math.floor(MC.cfg.thickness / 2)
 	MC.crosshairVT:SetHeight(math.max(0.001, vth))
 	MC.crosshairVB:SetHeight(math.max(0.001, vbh))
 
@@ -378,7 +378,7 @@ function MC.UpdatePosition()
 end
 
 function MC.UpdateColor()
-	local c = MC.config.color
+	local c = MC.cfg.color
 	local r, g, b, a = c.r, c.g, c.b, c.a
 	MC.crosshairH.texture:SetColorTexture(r, g, b, a)
 	MC.crosshairVT.texture:SetColorTexture(r, g, b, a)
@@ -412,11 +412,11 @@ function MC.OnEvent(frame, event, ...)
 			MC.UpdatePosition()
 		end
 	elseif event == "SCREENSHOT_STARTED" then
-		if MC.config.hideInScreenshots then
+		if MC.cfg.hideInScreenshots then
 			MC.HideCrosshair()
 		end
 	elseif event == "SCREENSHOT_SUCCEEDED" or event == "SCREENSHOT_FAILED" then
-		if MC.config.hideInScreenshots then
+		if MC.cfg.hideInScreenshots then
 			MC.ShowCrosshair()
 		end
 	end
