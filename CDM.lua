@@ -50,10 +50,8 @@ function CDM.ApplyStyle()
 				end
 			end
 
-			-- Hide the out of range overlay
+			-- Hide the out of range overlay and built-in cooldown
 			frame.OutOfRange:SetAlpha(0)
-
-			-- Hide cooldown
 			frame.Cooldown:SetAlpha(0)
 			frame.CooldownFlash:SetAlpha(0)
 
@@ -73,15 +71,10 @@ function CDM.ApplyStyle()
 				frame.Cooldown2:SetSwipeColor(0, 0, 0, 0.6)
 				frame.Cooldown2:SetDrawBling(false)
 				frame.Cooldown2:SetHideCountdownNumbers(false) -- TODO: Use edit mode setting
-				-- TODO: Try to remove
-				-- TODO: Does this even get called? Cooldown2 gets Clear called on it
-				frame.Cooldown2:SetScript("OnCooldownDone", function(cooldown)
-					frame.activeSpellID = nil
-				end)
+				frame.Cooldown2:SetScript("OnCooldownDone", function(cooldown) frame.activeSpellID = nil end)
 
 				-- BUG: Edge and bling are broken in 12.1 They aren't scaled properly and they don't
-				-- clip. They just show up as a rotating rectangle. So we manually rescale and clip
-				-- them.
+				-- clip. They show up as a rotating rectangle. So we manually rescale and clip them.
 				frame.Clip = CreateFrame("Frame", nil, frame)
 				frame.Clip:SetAllPoints(frame.Cooldown2)
 				frame.Clip:SetClipsChildren(true)
@@ -157,9 +150,15 @@ end
 --end
 
 function CDM.RefreshCooldown(frame, trusted)
+	-- TODO: Avoid this systemically. 2 problem cases:
+	-- 1. SPELL_UPDATE_* events arrive before PLAYER_ENTERING_WORLD
+	-- 2. Frame pool grows after we ran init
+	-- We can handle those cases and avoid this late decision
+	if not frame.Cooldown2 then return end
+
+	-- Spell id can be nil in edit mode. At least 2 spells are always shown.
 	local spellID = frame:GetSpellID()
 	if not spellID then return end
-	if not frame.Cooldown2 then return end -- TODO: Can this happen? Prevent at the event loop level
 
 	-- Pooled items can be rebound to a new spell while an old timeline is running
 	if frame.activeSpellID and frame.activeSpellID ~= spellID then
@@ -174,13 +173,10 @@ function CDM.RefreshCooldown(frame, trusted)
 
 		local onCooldown = cooldownInfo.isActive and not onGCD
 		if onCooldown then
-			-- TODO: Do we want this check around the duration set? Won't it prevent CDR from updating?
-			if not frame.activeSpellID then
-				local duration = C_Spell.GetSpellCooldownDuration(spellID, true)
-				frame.activeSpellID = spellID
-				frame.Cooldown2:SetCooldownFromDurationObject(duration)
-				frame.Bling:SetCooldownFromDurationObject(duration)
-			end
+			local duration = C_Spell.GetSpellCooldownDuration(spellID, true)
+			frame.activeSpellID = spellID
+			frame.Cooldown2:SetCooldownFromDurationObject(duration)
+			frame.Bling:SetCooldownFromDurationObject(duration)
 		elseif frame.activeSpellID then
 			frame.activeSpellID = nil
 			frame.Cooldown2:Clear()
