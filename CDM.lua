@@ -18,25 +18,23 @@ function CDM.Load()
 	}
 
 	CDM.viewers = {
-		[EssentialCooldownViewer] = true,
-		[UtilityCooldownViewer]   = true,
-		[BuffIconCooldownViewer]  = true,
-		[BuffBarCooldownViewer]   = true,
+		EssentialCooldownViewer,
+		UtilityCooldownViewer,
 	}
 
 	CDM.frame = CreateFrame("Frame", "KL_CDM")
 	CDM.frame:SetScript("OnEvent", CDM.OnEvent)
 	CDM.frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	CDM.frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+	CDM.frame:RegisterEvent("SPELL_UPDATE_CHARGES")
 
-	for iViewer, viewer in ipairs(CDM.viewers) do
-		hooksecurefunc(viewer, "RefreshLayout", CDM.RefreshLayout)
-	end
+	--for viewer, v in pairs(CDM.viewers) do
+	--	hooksecurefunc(viewer, "RefreshLayout", CDM.RefreshLayout)
+	--end
 end
 
--- TODO: Disable aura highlight
 function CDM.ApplyStyle()
-	local viewers = { EssentialCooldownViewer, UtilityCooldownViewer }
-	for iViewer, viewer in ipairs(viewers) do
+	for iViewer, viewer in ipairs(CDM.viewers) do
 		local frames = viewer:GetLayoutChildren()
 		for iFrame, frame in ipairs(frames) do
 			-- Remove mask (reveals the silver border)
@@ -53,7 +51,7 @@ function CDM.ApplyStyle()
 			end
 
 			-- Hide the out of range overlay
-			frame.OutOfRange:SetColorTexture(0, 0, 0, 0)
+			frame.OutOfRange:SetAlpha(0)
 
 			-- Hide cooldown
 			frame.Cooldown:SetAlpha(0)
@@ -62,45 +60,63 @@ function CDM.ApplyStyle()
 			-- Cooldown animations
 			if not frame.Cooldown2 then
 				local level = frame.Cooldown:GetFrameLevel()
+				local a = CDM.cfg.iconAspect
+				local b = CDM.cfg.iconBorder
+				local size = sqrt(1 + min(a, 1/a)^2) * frame:GetWidth() - 2*b
 
 				-- Cooldown swipe
 				frame.Cooldown2 = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
 				frame.Cooldown2:SetAllPoints(frame.Cooldown)
-				frame.Cooldown2:SetFrameLevel(level + 3)
+				frame.Cooldown2:SetFrameLevel(level + 2)
 				frame.Cooldown2:SetDrawEdge(false)
-				frame.Cooldown2:SetSwipeColor(0, 0, 0, 0.6)
 				frame.Cooldown2:SetSwipeTexture("Interface\\BUTTONS\\WHITE8X8")
-				frame.Cooldown2:SetBlingTexture("Interface\\Cooldown\\starburst", 1, 1, 1, 1)
+				frame.Cooldown2:SetSwipeColor(0, 0, 0, 0.6)
+				frame.Cooldown2:SetDrawBling(false)
 				frame.Cooldown2:SetHideCountdownNumbers(false) -- TODO: Use edit mode setting
+				-- TODO: Try to remove
+				-- TODO: Does this even get called? Cooldown2 gets Clear called on it
 				frame.Cooldown2:SetScript("OnCooldownDone", function(cooldown)
-					frame.Cooldown2.wasOnGCD = nil
-					frame.Cooldown2.onGCDCount = 0
-					frame.Cooldown2.activeSpellID = nil
+					frame.activeSpellID = nil
 				end)
 
-				frame.Cooldown2.iViewer = iViewer
-				frame.Cooldown2.iFrame = iFrame
+				-- BUG: Edge and bling are broken in 12.1 They aren't scaled properly and they don't
+				-- clip. They just show up as a rotating rectangle. So we manually rescale and clip
+				-- them.
+				frame.Clip = CreateFrame("Frame", nil, frame)
+				frame.Clip:SetAllPoints(frame.Cooldown2)
+				frame.Clip:SetClipsChildren(true)
 
 				-- Recharge edge
-				frame.Recharge = CreateFrame("Cooldown", nil, frame)
-				frame.Recharge:SetAllPoints(frame.Cooldown2)
-				frame.Recharge:SetFrameLevel(level + 2)
+				frame.Recharge = CreateFrame("Cooldown", nil, frame.Clip)
+				frame.Recharge:SetPoint("CENTER")
+				frame.Recharge:SetSize(size, size)
+				frame.Recharge:SetFrameLevel(level + 1)
 				frame.Recharge:SetDrawSwipe(false)
 				frame.Recharge:SetDrawEdge(true)
-				frame.Recharge:SetEdgeColor(0.6, 1, 0, 1)
 				frame.Recharge:SetEdgeTexture("Interface\\AddOns\\KamikazeLib\\Media\\CD-Swipe-Edge.tga")
+				frame.Recharge:SetEdgeColor(0.6, 1, 0, 1)
 				frame.Recharge:SetHideCountdownNumbers(true)
+
+				-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
+
+				-- Bling
+				frame.Bling = CreateFrame("Cooldown", nil, frame.Clip, "CooldownFrameTemplate")
+				frame.Bling:SetPoint("CENTER")
+				frame.Bling:SetSize(size, size)
+				frame.Bling:SetFrameLevel(level + 4)
+				frame.Bling:SetDrawSwipe(false)
+				frame.Bling:SetDrawEdge(false)
+				frame.Bling:SetDrawBling(true)
+				frame.Bling:SetBlingTexture("Interface\\Cooldown\\star4", 0.3, 0.6, 1, 0.64)
+				frame.Bling:SetHideCountdownNumbers(true)
 
 				-- GCD swipe
 				frame.GCD = CreateFrame("Cooldown", nil, frame)
 				frame.GCD:SetAllPoints(frame.Cooldown2)
-				frame.GCD:SetFrameLevel(level + 1)
-				frame.GCD:SetSwipeColor(0, 0, 0, 0.6)
+				frame.GCD:SetFrameLevel(level + 3)
 				frame.GCD:SetSwipeTexture("Interface\\BUTTONS\\WHITE8X8")
+				frame.GCD:SetSwipeColor(0, 0, 0, 0.6)
 				frame.GCD:SetHideCountdownNumbers(true)
-
-				hooksecurefunc(frame.Cooldown, "SetCooldown", function(cooldown, start, duration, modRate) CDM.RefreshCooldown(frame) end)
-				hooksecurefunc(frame.Cooldown, "Clear",       function(cooldown)                           CDM.RefreshCooldown(frame) end)
 			end
 
 			-- Proc glow
@@ -114,7 +130,6 @@ function CDM.ApplyStyle()
 
 			-- Add border (shrink icon, range overlay, and swipe)
 			local ppScale = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
-			local bSize   = CDM.cfg.iconBorder * ppScale
 			frame.Border1 = frame:CreateTexture(nil, "BACKGROUND", nil, 0) -- TODO: Don't recreate
 			frame.Border1:SetAllPoints()
 			frame.Border1:SetColorTexture(0, 0, 0, 1)
@@ -125,9 +140,10 @@ function CDM.ApplyStyle()
 			frame.Border2:SetColorTexture(0, 0, 0, 1)
 
 			local function Inset(f)
+				local s = CDM.cfg.iconBorder * ppScale
 				f:ClearAllPoints()
-				f:SetPoint("TOPLEFT", bSize, -bSize)
-				f:SetPoint("BOTTOMRIGHT", -bSize, bSize)
+				f:SetPoint("TOPLEFT", s, -s)
+				f:SetPoint("BOTTOMRIGHT", -s, s)
 			end
 			Inset(frame.Icon)
 			Inset(frame.OutOfRange)
@@ -136,86 +152,56 @@ function CDM.ApplyStyle()
 	end
 end
 
-function CDM.RefreshLayout(viewer)
-	--print("RefreshLayout", GetTime())
-end
+--function CDM.RefreshLayout(viewer)
+--	print("RefreshLayout", GetTime())
+--end
 
--- TODO: Occasional flicker with bling
--- TODO: Maybe separate the bling?
--- TODO: When an ability is cast while a charge ability has less time remaining than the GCD the recharge edge is enabled early.
--- TODO: Don't play bling when charges instantly refund
-
--- NOTE: This is incredibly fussy, despite the seemingly simple desired outcome.
--- SetCooldown is called 2-3x when a spell is activated and 1x when a non-final recharge completes
--- Clear() will kill the bling
--- Problem: When a charge spell charge completes, the cooldown is no longer active and Clear kills the bling
--- Solution: When there's no cooldown, end the animation immediately if one is active
---
--- After a GCD finishes, sometimes there's an errant call where isActive is true and isOnGCD is false
--- The duration object is a default / empty one
--- Problem: This tricks us into thinking the spell is on CD and showing a full swipe for a frame
--- Solution: ???
-function CDM.RefreshCooldown(frame)
+function CDM.RefreshCooldown(frame, trusted)
 	local spellID = frame:GetSpellID()
 	if not spellID then return end
+	if not frame.Cooldown2 then return end -- TODO: Can this happen? Prevent at the event loop level
 
-	local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
-	local chargeInfo   = C_Spell.GetSpellCharges(spellID)
+	-- Pooled items can be rebound to a new spell while an old timeline is running
+	if frame.activeSpellID and frame.activeSpellID ~= spellID then
+		frame.activeSpellID = nil
+		frame.Cooldown2:Clear()
+		frame.Bling:Clear()
+	end
 
-	-- isActive false, isOnGCD nil   - init
-	-- isActive true,  isOnGCD true  - cast x2 (on gcd until server confirms cast)
-	-- isActive true,  isOnGCD false - cast x2 (actually cast)
-	-- isActive true,  isOnGCD nil   - done
+	if trusted then
+		local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
+		local onGCD = cooldownInfo.isOnGCD or false
 
-	-- isActive true,  isOnGCD false - cast
-	-- isActive true,  isOnGCD true  - other
-	-- isActive false, isOnGCD false - done
-	-- isActive true,  isOnGCD false - bad frame ()
-
-	if cooldownInfo.isActive then
-		if frame.Cooldown2.wasOnGCD ~= cooldownInfo.isOnGCD then
-			frame.Cooldown2.wasOnGCD = cooldownInfo.isOnGCD
-			if frame.Cooldown2.wasOnGCD then
-				frame.Cooldown2.onGCDCount = (frame.Cooldown2.onGCDCount or 0) + 1
+		local onCooldown = cooldownInfo.isActive and not onGCD
+		if onCooldown then
+			-- TODO: Do we want this check around the duration set? Won't it prevent CDR from updating?
+			if not frame.activeSpellID then
+				local duration = C_Spell.GetSpellCooldownDuration(spellID, true)
+				frame.activeSpellID = spellID
+				frame.Cooldown2:SetCooldownFromDurationObject(duration)
+				frame.Bling:SetCooldownFromDurationObject(duration)
 			end
+		elseif frame.activeSpellID then
+			frame.activeSpellID = nil
+			frame.Cooldown2:Clear()
+			frame.Bling:SetCooldownDuration(1e-3)
+		end
+
+		if onGCD then
+			local duration = C_Spell.GetSpellCooldownDuration(spellID, false)
+			frame.GCD:SetCooldownFromDurationObject(duration)
+		else
+			frame.GCD:Clear()
 		end
 	end
 
-	if frame.Cooldown2.iViewer == 1 and frame.Cooldown2.iFrame == 2 then
-		print(GetTime(), cooldownInfo.isActive, cooldownInfo.isOnGCD, frame.Cooldown2.onGCDCount)
-	end
-
-	local onCooldown = cooldownInfo.isActive and not cooldownInfo.isOnGCD
-	if onCooldown and frame.Cooldown2.onGCDCount ~= 2 then
-		if frame.Cooldown2.activeSpellID == nil then
-			local duration = C_Spell.GetSpellCooldownDuration(spellID, true)
-			frame.Cooldown2.activeSpellID = spellID
-			frame.Cooldown2:SetDrawSwipe(true)
-			frame.Cooldown2:SetCooldownFromDurationObject(duration)
-		end
-	else
-		if frame.Cooldown2.activeSpellID then
-			frame.Cooldown2.wasOnGCD = nil
-			frame.Cooldown2.onGCDCount = 0
-			frame.Cooldown2.activeSpellID = nil
-			frame.Cooldown2:SetDrawSwipe(false)
-			frame.Cooldown2:SetCooldownDuration(1e-3)
-		end
-	end
-
-	local recharging = chargeInfo and chargeInfo.isActive and not onCooldown
+	local chargeInfo = C_Spell.GetSpellCharges(spellID)
+	local recharging = chargeInfo and chargeInfo.isActive and not frame.activeSpellID
 	if recharging then
 		local duration = C_Spell.GetSpellChargeDuration(spellID)
 		frame.Recharge:SetCooldownFromDurationObject(duration)
 	else
 		frame.Recharge:Clear()
-	end
-
-	if cooldownInfo.isOnGCD then
-		local duration = C_Spell.GetSpellCooldownDuration(spellID, false)
-		frame.GCD:SetCooldownFromDurationObject(duration)
-	else
-		frame.GCD:Clear()
 	end
 end
 
@@ -239,13 +225,20 @@ function CDM.ProcGlow(frame, show)
 	frame.ProcGlow = show
 end
 
+-- TODO: Direct dispatch for events?
 function CDM.OnEvent(frame, event, ...)
 	if event == "PLAYER_ENTERING_WORLD" then
 		CDM.ApplyStyle()
+	elseif event == "SPELL_UPDATE_COOLDOWN" or event == "SPELL_UPDATE_CHARGES" then
+		local trusted = event == "SPELL_UPDATE_COOLDOWN"
+		-- TODO: Push loops into the function?
+		for iViewer, viewer in ipairs(CDM.viewers) do
+			local frames = viewer:GetLayoutChildren()
+			for iFrame, frame in ipairs(frames) do
+				CDM.RefreshCooldown(frame, trusted)
+			end
+		end
 	end
 end
 
 CDM.Load()
-
--- NOTE: Potentially useful things
--- EssentialCooldownViewer:MarkDirty()

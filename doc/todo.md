@@ -88,6 +88,10 @@ Buff Bars - 1.5
 
 Maybe Useful
 ------------
+EssentialCooldownViewer:MarkDirty()
+SetBlingTexture("Interface\\Cooldown\\star4", 0.3, 0.6, 1, 0.64)
+SetBlingTexture("Interface\\Cooldown\\starburst", 0.3, 0.6, 1, 0.64)
+SetBlingTexture("Interface\\BUTTONS\\WHITE8X8", 1, 1, 1, 1)
 
 
 

@@ -90,3 +90,4 @@ Spell usable          - show gcd, no bling
 Spell not usable      - no gcd
 
 Bling happens at true CD end, not at GCD end when it replaces the end of the CD
+If we don't want bling early in the CD->GCD case, can use TriggerAvailableAlert
