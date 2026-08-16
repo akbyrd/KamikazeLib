@@ -66,7 +66,7 @@ function CDM.ApplyStyle()
 				local b = CDM.cfg.iconBorder
 				local size = sqrt(1 + min(a, 1/a)^2) * frame:GetWidth() - 2*b
 
-				-- TODO: I don't think I need to recreate the swipe anymore
+				-- NOTE: The CD/GCD swipes are separate because we don't want the active aura highlight
 
 				-- Cooldown swipe
 				frame.Cooldown2 = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
@@ -185,9 +185,7 @@ function CDM.RefreshCooldown(frame, trusted)
 
 	if trusted then
 		local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
-		local onGCD = cooldownInfo.isOnGCD or false -- TODO: Why is this separated?
-
-		local onCooldown = cooldownInfo.isActive and not onGCD
+		local onCooldown = cooldownInfo.isActive and not cooldownInfo.isOnGCD
 		if onCooldown then
 			local duration = C_Spell.GetSpellCooldownDuration(spellID, true)
 			frame.activeSpellID = spellID
@@ -199,7 +197,7 @@ function CDM.RefreshCooldown(frame, trusted)
 			frame.Bling:SetCooldownDuration(1e-3)
 		end
 
-		if onGCD then
+		if cooldownInfo.isOnGCD then
 			local duration = C_Spell.GetSpellCooldownDuration(spellID, false)
 			frame.GCD:SetCooldownFromDurationObject(duration)
 		else
@@ -283,6 +281,8 @@ end
 function CDM.OnEvent(frame, event, ...)
 	if event == "PLAYER_ENTERING_WORLD" then
 		CDM.ApplyStyle()
+	-- TODO: Might be able to use recovery category to check for GCD
+	-- SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, spellCategory, startRecoveryCategory, itemID)
 	elseif event == "SPELL_UPDATE_COOLDOWN" or event == "SPELL_UPDATE_CHARGES" then
 		local trusted = event == "SPELL_UPDATE_COOLDOWN"
 		-- TODO: Push loops into the function?
