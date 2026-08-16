@@ -12,9 +12,11 @@ function CDM.Load()
 		iconBorder = 2,
 		iconAspect = 1.65,
 
-		procColor = { 1, 1, 0, 1},
+		procColor = { 1, 1, 0, 1 },
 		procSpeed = 0.15,
 		procWidth = 2,
+
+		pressColor = { 1, 1, 1, 0.25 },
 	}
 
 	CDM.viewers = {
@@ -28,6 +30,8 @@ function CDM.Load()
 	CDM.frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 	CDM.frame:RegisterEvent("SPELL_UPDATE_CHARGES")
 
+	hooksecurefunc("SecureActionButton_OnClick", CDM.OnSecureActionButtonClick)
+
 	--for viewer, v in pairs(CDM.viewers) do
 	--	hooksecurefunc(viewer, "RefreshLayout", CDM.RefreshLayout)
 	--end
@@ -35,7 +39,7 @@ end
 
 function CDM.ApplyStyle()
 	for iViewer, viewer in ipairs(CDM.viewers) do
-		local frames = viewer:GetLayoutChildren()
+		local frames = viewer:GetLayoutChildren() -- TODO: GetItemFrames?
 		for iFrame, frame in ipairs(frames) do
 			-- Remove mask (reveals the silver border)
 			local mask = frame.Icon:GetMaskTexture(1)
@@ -62,12 +66,13 @@ function CDM.ApplyStyle()
 				local b = CDM.cfg.iconBorder
 				local size = sqrt(1 + min(a, 1/a)^2) * frame:GetWidth() - 2*b
 
+				-- TODO: I don't think I need to recreate the swipe anymore
+
 				-- Cooldown swipe
 				frame.Cooldown2 = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
 				frame.Cooldown2:SetAllPoints(frame.Cooldown)
 				frame.Cooldown2:SetFrameLevel(level + 2)
 				frame.Cooldown2:SetDrawEdge(false)
-				frame.Cooldown2:SetSwipeTexture("Interface\\BUTTONS\\WHITE8X8")
 				frame.Cooldown2:SetSwipeColor(0, 0, 0, 0.6)
 				frame.Cooldown2:SetDrawBling(false)
 				frame.Cooldown2:SetHideCountdownNumbers(false) -- TODO: Use edit mode setting
@@ -110,6 +115,17 @@ function CDM.ApplyStyle()
 				frame.GCD:SetSwipeTexture("Interface\\BUTTONS\\WHITE8X8")
 				frame.GCD:SetSwipeColor(0, 0, 0, 0.6)
 				frame.GCD:SetHideCountdownNumbers(true)
+
+				-- Press highlight
+				frame.Press = CreateFrame("Frame", nil, frame)
+				frame.Press:SetAllPoints(frame.Cooldown2)
+				frame.Press:SetFrameLevel(level + 5)
+				frame.Press:Hide()
+
+				frame.Press.Texture = frame.Press:CreateTexture(nil, "OVERLAY")
+				frame.Press.Texture:SetAllPoints()
+				frame.Press.Texture:SetColorTexture(unpack(CDM.cfg.pressColor))
+				frame.Press.Texture:SetBlendMode("ADD")
 			end
 
 			-- Proc glow
@@ -169,7 +185,7 @@ function CDM.RefreshCooldown(frame, trusted)
 
 	if trusted then
 		local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
-		local onGCD = cooldownInfo.isOnGCD or false
+		local onGCD = cooldownInfo.isOnGCD or false -- TODO: Why is this separated?
 
 		local onCooldown = cooldownInfo.isActive and not onGCD
 		if onCooldown then
@@ -219,6 +235,48 @@ function CDM.ProcGlow(frame, show)
 		end
 	end
 	frame.ProcGlow = show
+end
+
+-- TODO: We don't always get paired down/up events. Might want to do more robust cleanup
+-- TODO: Test mouse 3-5
+function CDM.OnSecureActionButtonClick(button, mouseButton, down, isKeyPress, isSecureAction)
+	local actionType = SecureButton_GetModifiedAttribute(button, "type", mouseButton)
+	if actionType == "action" then
+		local slot = button:CalculateAction(mouseButton)
+		local slotType, id, subType = GetActionInfo(slot)
+		local spellID
+
+		if slotType == "spell" then
+			spellID = id
+
+		elseif slotType == "macro" and subType == "spell" then
+			spellID = id
+
+		elseif slotType == "macro" then
+			spellID = GetMacroSpell(id)
+
+		elseif slotType == "item" then
+			spellID = C_ActionBar.GetSpell(slot)
+		end
+
+		if spellID then
+			for iViewer, viewer in ipairs(CDM.viewers) do
+				for iFrame, frame in ipairs(viewer:GetItemFrames()) do
+					local info = frame:GetCooldownInfo()
+					if info then
+						if spellID == info.spellID or spellID == info.overrideSpellID then
+							frame.Press:SetShown(down)
+
+							if CDM.activePress and CDM.activePress ~= frame.Press then
+								CDM.activePress.Hide()
+								CDM.activePress = frame.Press
+							end
+						end
+					end
+				end
+			end
+		end
+	end
 end
 
 -- TODO: Direct dispatch for events?
