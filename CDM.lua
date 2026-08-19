@@ -16,7 +16,9 @@ function CDM.Load()
 		procSpeed = 0.15,
 		procWidth = 2,
 
-		pressColor = { 1, 1, 1, 0.25 },
+		borderColor = { 0, 0, 0, 1 },
+		pressColor  = { 1, 1, 1, 0.25 },
+		assistColor = { 0.2, 0.6, 0.95, 1 },
 	}
 
 	CDM.viewers = {
@@ -38,29 +40,34 @@ end
 function CDM.ApplyStyle()
 	CDM.frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 
+	-- Assistant glow
+	hooksecurefunc(AssistedCombatManager, "UpdateAllAssistedHighlightFramesForSpell", CDM.AssistantGlow)
+
 	for iViewer, viewer in ipairs(CDM.viewers) do
 		local frames = viewer:GetItemFrames()
 		for iFrame, frame in ipairs(frames) do
-			-- Remove mask (reveals the silver border)
-			local mask = frame.Icon:GetMaskTexture(1)
-			if mask then
-				frame.Icon:RemoveMaskTexture(mask)
-			end
+			if not frame.initialized then
+				frame.initialized = true
 
-			-- Hide the overlay
-			for _, region in ipairs({ frame:GetRegions() }) do
-				if region.GetAtlas and region:GetAtlas() == "UI-HUD-CoolDownManager-IconOverlay" then
-					region:Hide()
+				-- Remove mask (reveals the silver border)
+				local mask = frame.Icon:GetMaskTexture(1)
+				if mask then
+					frame.Icon:RemoveMaskTexture(mask)
 				end
-			end
 
-			-- Hide the out of range overlay and built-in cooldown
-			frame.OutOfRange:SetAlpha(0)
-			frame.Cooldown:SetAlpha(0)
-			frame.CooldownFlash:SetAlpha(0)
+				-- Hide the overlay
+				for _, region in ipairs({ frame:GetRegions() }) do
+					if region.GetAtlas and region:GetAtlas() == "UI-HUD-CoolDownManager-IconOverlay" then
+						region:Hide()
+					end
+				end
 
-			-- Cooldown animations
-			if not frame.Cooldown2 then
+				-- Hide the out of range overlay and built-in cooldown
+				frame.OutOfRange:SetAlpha(0)
+				frame.Cooldown:SetAlpha(0)
+				frame.CooldownFlash:SetAlpha(0)
+
+				-- Cooldown animations
 				local level = frame.Cooldown:GetFrameLevel()
 				local a = CDM.cfg.iconAspect
 				local b = CDM.cfg.iconBorder
@@ -125,37 +132,39 @@ function CDM.ApplyStyle()
 				frame.Press.Texture:SetAllPoints()
 				frame.Press.Texture:SetColorTexture(unpack(CDM.cfg.pressColor))
 				frame.Press.Texture:SetBlendMode("ADD")
+
+				-- TODO: Swap to SPELL_ACTIVATION_OVERLAY_GLOW_SHOW/HIDE
+				-- Proc glow
+				hooksecurefunc(frame, "RefreshOverlayGlow", CDM.ProcGlow)
+
+				-- Zoom & aspect ratio
+				local z = CDM.cfg.iconZoom
+				local a = CDM.cfg.iconAspect
+				local s = max(frame:GetSize())
+				Kami.Util.RectIcon(frame, frame.Icon, s, z, a)
+
+				-- Add border
+				local ppScale = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
+				frame.Border1 = frame:CreateTexture(nil, "BACKGROUND", nil, 0)
+				frame.Border1:SetAllPoints()
+				frame.Border1:SetColorTexture(unpack(CDM.cfg.borderColor))
+
+				frame.Border2 = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
+				frame.Border2:SetPoint("TOPLEFT", ppScale, -ppScale)
+				frame.Border2:SetPoint("BOTTOMRIGHT", -ppScale, ppScale)
+				frame.Border2:SetColorTexture(unpack(CDM.cfg.borderColor))
+
+				-- Shrink all content to fit inside border
+				local function Inset(f)
+					local s = CDM.cfg.iconBorder * ppScale
+					f:ClearAllPoints()
+					f:SetPoint("TOPLEFT", s, -s)
+					f:SetPoint("BOTTOMRIGHT", -s, s)
+				end
+				Inset(frame.Icon)
+				Inset(frame.OutOfRange)
+				Inset(frame.Cooldown2)
 			end
-
-			-- Proc glow
-			hooksecurefunc(frame, "RefreshOverlayGlow", CDM.ProcGlow)
-
-			-- Zoom & aspect ratio
-			local z = CDM.cfg.iconZoom
-			local a = CDM.cfg.iconAspect
-			local s = max(frame:GetSize())
-			Kami.Util.RectIcon(frame, frame.Icon, s, z, a)
-
-			-- Add border (shrink icon, range overlay, and swipe)
-			local ppScale = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
-			frame.Border1 = frame:CreateTexture(nil, "BACKGROUND", nil, 0) -- TODO: Don't recreate
-			frame.Border1:SetAllPoints()
-			frame.Border1:SetColorTexture(0, 0, 0, 1)
-
-			frame.Border2 = frame:CreateTexture(nil, "BACKGROUND", nil, 1) -- TODO: Don't recreate
-			frame.Border2:SetPoint("TOPLEFT", ppScale, -ppScale)
-			frame.Border2:SetPoint("BOTTOMRIGHT", -ppScale, ppScale)
-			frame.Border2:SetColorTexture(0, 0, 0, 1)
-
-			local function Inset(f)
-				local s = CDM.cfg.iconBorder * ppScale
-				f:ClearAllPoints()
-				f:SetPoint("TOPLEFT", s, -s)
-				f:SetPoint("BOTTOMRIGHT", -s, s)
-			end
-			Inset(frame.Icon)
-			Inset(frame.OutOfRange)
-			Inset(frame.Cooldown2)
 		end
 	end
 end
@@ -172,19 +181,26 @@ function CDM.RefreshCooldown()
 		for iFrame, frame in ipairs(frames) do
 
 			-- NOTE: Spell id can be nil in edit mode. At least 2 spells are always shown.
-			local spellID = frame:GetSpellID()
+			local info = C_Spell.GetSpellCooldown(spellID)
+			local spellID = info and info.spellID
 
 			-- TODO: Handle in RefreshLayout hook?
+			-- TODO: Dislike the duplication this creates. Refactor to improve.
+			-- TODO: Doesn't clear GCD.
 			-- Pooled items can be rebound to a new spell while an old timeline is running
 			if frame.activeSpellID and frame.activeSpellID ~= spellID then
 				frame.activeSpellID = nil
 				frame.Cooldown2:Clear()
 				frame.Bling:Clear()
 				frame.Recharge:Clear()
+				if frame == CDM.glowFrame then
+					CDM.glowFrame = nil
+					frame.Border1:SetColorTexture(unpack(CDM.cfg.borderColor))
+					frame.Border2:SetColorTexture(unpack(CDM.cfg.borderColor))
+				end
 			end
 
-			if spellID then
-				local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
+			if info then
 				local onCooldown = cooldownInfo.isActive and not cooldownInfo.isOnGCD
 				if onCooldown then
 					local duration = C_Spell.GetSpellCooldownDuration(spellID, true)
@@ -217,7 +233,6 @@ function CDM.RefreshCooldown()
 	end
 end
 
--- TODO: Might want SPELL_ACTIVATION_OVERLAY_GLOW_SHOW/HIDE if it's used for assistant
 -- TODO: Try a 9-slice
 -- TODO: Should we store state on the frame or in our own table?
 function CDM.ProcGlow(frame, show)
@@ -235,6 +250,33 @@ function CDM.ProcGlow(frame, show)
 		end
 	end
 	frame.ProcGlow = show
+end
+
+-- TODO: Want a direct lookup for frames
+-- TODO: How do we handle overlapping borders?
+function CDM.AssistantGlow(mgr, glowSpellID)
+	if CDM.glowFrame then
+		local frame = CDM.glowFrame
+		CDM.glowFrame = nil
+		frame.Border1:SetColorTexture(unpack(CDM.cfg.borderColor))
+		frame.Border2:SetColorTexture(unpack(CDM.cfg.borderColor))
+	end
+
+	for iViewer, viewer in ipairs(CDM.viewers) do
+		local frames = viewer:GetItemFrames()
+		for iFrame, frame in ipairs(frames) do
+
+			-- NOTE: Cooldown info can be nil in edit mode. At least 2 spells are always shown.
+			local info = frame:GetCooldownInfo()
+			if info then
+				if info.spellID == glowSpellID or info.overrideSpellID == glowSpellID then
+					CDM.glowFrame = frame
+					frame.Border1:SetColorTexture(unpack(CDM.cfg.assistColor))
+					frame.Border2:SetColorTexture(unpack(CDM.cfg.assistColor))
+				end
+			end
+		end
+	end
 end
 
 -- TODO: We don't always get paired down/up events. Might want to do more robust cleanup

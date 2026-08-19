@@ -91,3 +91,23 @@ Spell not usable      - no gcd
 
 Bling happens at true CD end, not at GCD end when it replaces the end of the CD
 If we don't want bling early in the CD->GCD case, can use TriggerAvailableAlert
+
+
+
+Colors
+------
+Rage      ff180c
+Whirlwind 4fb1e0
+Offensive ff180c
+Defensive 5440ff
+CD Swipe  000000 70
+CD Edge   99ff00    / 0.6, 1.0, 0.0
+Assistant 3399f2 90 / 0.2, 0.6, 0.95, 0.9
+
+
+
+Aspect Ratios
+-------------
+Essential - 1.65
+Utility   - 1.27
+Buff Bars - 1.5

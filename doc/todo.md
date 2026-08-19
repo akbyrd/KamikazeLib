@@ -20,6 +20,15 @@ Requirements
 
 
 
+To Do
+-----
+Separate settings for each viewer
+Hide proc glow on Rampage
+Set cooldown text font
+Split into one-time and every-time parts
+
+
+
 Cooldown Manager Control
 ------------------------
 Abandoned
@@ -66,40 +75,9 @@ Use unit frame aura bars for buff bars?
 
 
 
-Colors
-------
-Rage      ff180c
-Whirlwind 4fb1e0
-Offensive ff180c
-Defensive 5440ff
-CD Swipe  000000 70
-CD Edge   99ff00    / 0.6, 1.0, 0.0
-Assistant 3399f2 90 / 0.2, 0.6, 0.95, 0.9
-
-
-
-Aspect Ratios
--------------
-Essential - 1.65
-Utility   - 1.27
-Buff Bars - 1.5
-
-
-
 Maybe Useful
 ------------
 EssentialCooldownViewer:MarkDirty()
 SetBlingTexture("Interface\\Cooldown\\star4", 0.3, 0.6, 1, 0.64)
 SetBlingTexture("Interface\\Cooldown\\starburst", 0.3, 0.6, 1, 0.64)
 SetBlingTexture("Interface\\BUTTONS\\WHITE8X8", 1, 1, 1, 1)
-
-
-
-To Do
------
-Show GCD on Raging Blow
-Separate settings for each viewer
-Hide proc glow on Rampage
-Set cooldown text font
-Split into one-time and every-time parts
-C_Spell.IsCurrentSpell - for button press?
