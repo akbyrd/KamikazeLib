@@ -37,7 +37,6 @@ end
 
 function CDM.ApplyStyle()
 	CDM.frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
-	CDM.frame:RegisterEvent("SPELL_UPDATE_CHARGES")
 
 	for iViewer, viewer in ipairs(CDM.viewers) do
 		local frames = viewer:GetItemFrames()
@@ -165,45 +164,56 @@ end
 --	print("RefreshLayout", GetTime())
 --end
 
-function CDM.RefreshCooldown(frame, spellID)
-	-- TODO: Handle in RefreshLayout hook?
-	-- Pooled items can be rebound to a new spell while an old timeline is running
-	if frame.activeSpellID and frame.activeSpellID ~= spellID then
-		frame.activeSpellID = nil
-		frame.Cooldown2:Clear()
-		frame.Bling:Clear()
-	end
+function CDM.RefreshCooldown()
+	-- NOTE: To show the GCD swipe we run on all frames, regardless of which spell the event is for.
 
-	local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
-	local onCooldown = cooldownInfo.isActive and not cooldownInfo.isOnGCD
-	if onCooldown then
-		local duration = C_Spell.GetSpellCooldownDuration(spellID, true)
-		frame.activeSpellID = spellID
-		frame.Cooldown2:SetCooldownFromDurationObject(duration)
-		frame.Bling:SetCooldownFromDurationObject(duration)
-	elseif frame.activeSpellID then
-		frame.activeSpellID = nil
-		frame.Cooldown2:Clear()
-		frame.Bling:SetCooldownDuration(1e-3)
-	end
+	for iViewer, viewer in ipairs(CDM.viewers) do
+		local frames = viewer:GetItemFrames()
+		for iFrame, frame in ipairs(frames) do
 
-	if cooldownInfo.isOnGCD then
-		local duration = C_Spell.GetSpellCooldownDuration(spellID, false)
-		frame.GCD:SetCooldownFromDurationObject(duration)
-	else
-		frame.GCD:Clear()
-	end
-end
+			-- NOTE: Spell id can be nil in edit mode. At least 2 spells are always shown.
+			local spellID = frame:GetSpellID()
 
--- TODO: Consider a small state machine: { GCD, CD, Ready } x { Recharge }
-function CDM.RefreshCharge(frame, spellID)
-	local chargeInfo = C_Spell.GetSpellCharges(spellID)
-	local recharging = chargeInfo and chargeInfo.isActive and not frame.activeSpellID
-	if recharging then
-		local duration = C_Spell.GetSpellChargeDuration(spellID)
-		frame.Recharge:SetCooldownFromDurationObject(duration)
-	else
-		frame.Recharge:Clear()
+			-- TODO: Handle in RefreshLayout hook?
+			-- Pooled items can be rebound to a new spell while an old timeline is running
+			if frame.activeSpellID and frame.activeSpellID ~= spellID then
+				frame.activeSpellID = nil
+				frame.Cooldown2:Clear()
+				frame.Bling:Clear()
+				frame.Recharge:Clear()
+			end
+
+			if spellID then
+				local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
+				local onCooldown = cooldownInfo.isActive and not cooldownInfo.isOnGCD
+				if onCooldown then
+					local duration = C_Spell.GetSpellCooldownDuration(spellID, true)
+					frame.activeSpellID = spellID
+					frame.Cooldown2:SetCooldownFromDurationObject(duration)
+					frame.Bling:SetCooldownFromDurationObject(duration)
+				elseif frame.activeSpellID then
+					frame.activeSpellID = nil
+					frame.Cooldown2:Clear()
+					frame.Bling:SetCooldownDuration(1e-3)
+				end
+
+				if cooldownInfo.isOnGCD then
+					local duration = C_Spell.GetSpellCooldownDuration(spellID, false)
+					frame.GCD:SetCooldownFromDurationObject(duration)
+				else
+					frame.GCD:Clear()
+				end
+
+				local chargeInfo = C_Spell.GetSpellCharges(spellID)
+				local recharging = chargeInfo and chargeInfo.isActive and not frame.activeSpellID
+				if recharging then
+					local duration = C_Spell.GetSpellChargeDuration(spellID)
+					frame.Recharge:SetCooldownFromDurationObject(duration)
+				else
+					frame.Recharge:Clear()
+				end
+			end
+		end
 	end
 end
 
@@ -269,44 +279,15 @@ function CDM.OnSecureActionButtonClick(button, mouseButton, down, isKeyPress, is
 	end
 end
 
--- TODO: Direct dispatch for events?
 -- TODO: Initialize new frames when they are created
 function CDM.OnEvent(frame, event, ...)
 	if event == "PLAYER_ENTERING_WORLD" then
 		CDM.ApplyStyle()
 
 	elseif event == "SPELL_UPDATE_COOLDOWN" then
-		-- TODO: Might be able to use recovery category to check for GCD
-		local eSpellID, baseSpellID, category, startRecoveryCategory, itemID = ...
-		for iViewer, viewer in ipairs(CDM.viewers) do
-			local frames = viewer:GetItemFrames()
-			for iFrame, frame in ipairs(frames) do
-
-				-- NOTE: Run on everything for GCD swipes
-				-- NOTE: Spell id can be nil in edit mode. At least 2 spells are always shown.
-				local spellID = frame:GetSpellID()
-				if spellID then
-					CDM.RefreshCooldown(frame, spellID)
-					CDM.RefreshCharge(frame, spellID)
-				end
-			end
-		end
-
-	-- TODO: Test on something with 3+ charges
-	--[[
-	elseif event == "SPELL_UPDATE_CHARGES" then
-		for iViewer, viewer in ipairs(CDM.viewers) do
-			local frames = viewer:GetItemFrames()
-			for iFrame, frame in ipairs(frames) do
-
-				-- NOTE: Spell id can be nil in edit mode. At least 2 spells are always shown.
-				local spellID = frame:GetSpellID()
-				if spellID then
-					CDM.RefreshCharge(frame, spellID)
-				end
-			end
-		end
-		]]
+		-- NOTE: spellID is nil when SPELL_UPDATE_COOLDOWN is a "broadcast" to update all spells.
+		local spellID, baseSpellID, category, startRecoveryCategory, itemID = ...
+		CDM.RefreshCooldown()
 	end
 end
 
