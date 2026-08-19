@@ -27,8 +27,6 @@ function CDM.Load()
 	CDM.frame = CreateFrame("Frame", "KL_CDM")
 	CDM.frame:SetScript("OnEvent", CDM.OnEvent)
 	CDM.frame:RegisterEvent("PLAYER_ENTERING_WORLD")
-	CDM.frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
-	CDM.frame:RegisterEvent("SPELL_UPDATE_CHARGES")
 
 	hooksecurefunc("SecureActionButton_OnClick", CDM.OnSecureActionButtonClick)
 
@@ -38,8 +36,11 @@ function CDM.Load()
 end
 
 function CDM.ApplyStyle()
+	CDM.frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+	CDM.frame:RegisterEvent("SPELL_UPDATE_CHARGES")
+
 	for iViewer, viewer in ipairs(CDM.viewers) do
-		local frames = viewer:GetLayoutChildren() -- TODO: GetItemFrames?
+		local frames = viewer:GetItemFrames()
 		for iFrame, frame in ipairs(frames) do
 			-- Remove mask (reveals the silver border)
 			local mask = frame.Icon:GetMaskTexture(1)
@@ -71,7 +72,7 @@ function CDM.ApplyStyle()
 				-- Cooldown swipe
 				frame.Cooldown2 = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
 				frame.Cooldown2:SetAllPoints(frame.Cooldown)
-				frame.Cooldown2:SetFrameLevel(level + 2)
+				frame.Cooldown2:SetFrameLevel(level + 1)
 				frame.Cooldown2:SetDrawEdge(false)
 				frame.Cooldown2:SetSwipeColor(0, 0, 0, 0.6)
 				frame.Cooldown2:SetDrawBling(false)
@@ -88,12 +89,20 @@ function CDM.ApplyStyle()
 				frame.Recharge = CreateFrame("Cooldown", nil, frame.Clip)
 				frame.Recharge:SetPoint("CENTER")
 				frame.Recharge:SetSize(size, size)
-				frame.Recharge:SetFrameLevel(level + 1)
+				frame.Recharge:SetFrameLevel(level + 2)
 				frame.Recharge:SetDrawSwipe(false)
 				frame.Recharge:SetDrawEdge(true)
 				frame.Recharge:SetEdgeTexture("Interface\\AddOns\\KamikazeLib\\Media\\CD-Swipe-Edge.tga")
 				frame.Recharge:SetEdgeColor(0.6, 1, 0, 1)
 				frame.Recharge:SetHideCountdownNumbers(true)
+
+				-- GCD swipe
+				frame.GCD = CreateFrame("Cooldown", nil, frame)
+				frame.GCD:SetAllPoints(frame.Cooldown2)
+				frame.GCD:SetFrameLevel(level + 3)
+				frame.GCD:SetSwipeTexture("Interface\\BUTTONS\\WHITE8X8")
+				frame.GCD:SetSwipeColor(0, 0, 0, 0.6)
+				frame.GCD:SetHideCountdownNumbers(true)
 
 				-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
 
@@ -108,20 +117,11 @@ function CDM.ApplyStyle()
 				frame.Bling:SetBlingTexture("Interface\\Cooldown\\star4", 0.3, 0.6, 1, 0.64)
 				frame.Bling:SetHideCountdownNumbers(true)
 
-				-- GCD swipe
-				frame.GCD = CreateFrame("Cooldown", nil, frame)
-				frame.GCD:SetAllPoints(frame.Cooldown2)
-				frame.GCD:SetFrameLevel(level + 3)
-				frame.GCD:SetSwipeTexture("Interface\\BUTTONS\\WHITE8X8")
-				frame.GCD:SetSwipeColor(0, 0, 0, 0.6)
-				frame.GCD:SetHideCountdownNumbers(true)
-
 				-- Press highlight
 				frame.Press = CreateFrame("Frame", nil, frame)
 				frame.Press:SetAllPoints(frame.Cooldown2)
 				frame.Press:SetFrameLevel(level + 5)
 				frame.Press:Hide()
-
 				frame.Press.Texture = frame.Press:CreateTexture(nil, "OVERLAY")
 				frame.Press.Texture:SetAllPoints()
 				frame.Press.Texture:SetColorTexture(unpack(CDM.cfg.pressColor))
@@ -165,17 +165,8 @@ end
 --	print("RefreshLayout", GetTime())
 --end
 
-function CDM.RefreshCooldown(frame, trusted)
-	-- TODO: Avoid this systemically. 2 problem cases:
-	-- 1. SPELL_UPDATE_* events arrive before PLAYER_ENTERING_WORLD
-	-- 2. Frame pool grows after we ran init
-	-- We can handle those cases and avoid this late decision
-	if not frame.Cooldown2 then return end
-
-	-- Spell id can be nil in edit mode. At least 2 spells are always shown.
-	local spellID = frame:GetSpellID()
-	if not spellID then return end
-
+function CDM.RefreshCooldown(frame, spellID)
+	-- TODO: Handle in RefreshLayout hook?
 	-- Pooled items can be rebound to a new spell while an old timeline is running
 	if frame.activeSpellID and frame.activeSpellID ~= spellID then
 		frame.activeSpellID = nil
@@ -183,28 +174,29 @@ function CDM.RefreshCooldown(frame, trusted)
 		frame.Bling:Clear()
 	end
 
-	if trusted then
-		local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
-		local onCooldown = cooldownInfo.isActive and not cooldownInfo.isOnGCD
-		if onCooldown then
-			local duration = C_Spell.GetSpellCooldownDuration(spellID, true)
-			frame.activeSpellID = spellID
-			frame.Cooldown2:SetCooldownFromDurationObject(duration)
-			frame.Bling:SetCooldownFromDurationObject(duration)
-		elseif frame.activeSpellID then
-			frame.activeSpellID = nil
-			frame.Cooldown2:Clear()
-			frame.Bling:SetCooldownDuration(1e-3)
-		end
-
-		if cooldownInfo.isOnGCD then
-			local duration = C_Spell.GetSpellCooldownDuration(spellID, false)
-			frame.GCD:SetCooldownFromDurationObject(duration)
-		else
-			frame.GCD:Clear()
-		end
+	local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
+	local onCooldown = cooldownInfo.isActive and not cooldownInfo.isOnGCD
+	if onCooldown then
+		local duration = C_Spell.GetSpellCooldownDuration(spellID, true)
+		frame.activeSpellID = spellID
+		frame.Cooldown2:SetCooldownFromDurationObject(duration)
+		frame.Bling:SetCooldownFromDurationObject(duration)
+	elseif frame.activeSpellID then
+		frame.activeSpellID = nil
+		frame.Cooldown2:Clear()
+		frame.Bling:SetCooldownDuration(1e-3)
 	end
 
+	if cooldownInfo.isOnGCD then
+		local duration = C_Spell.GetSpellCooldownDuration(spellID, false)
+		frame.GCD:SetCooldownFromDurationObject(duration)
+	else
+		frame.GCD:Clear()
+	end
+end
+
+-- TODO: Consider a small state machine: { GCD, CD, Ready } x { Recharge }
+function CDM.RefreshCharge(frame, spellID)
 	local chargeInfo = C_Spell.GetSpellCharges(spellID)
 	local recharging = chargeInfo and chargeInfo.isActive and not frame.activeSpellID
 	if recharging then
@@ -278,20 +270,43 @@ function CDM.OnSecureActionButtonClick(button, mouseButton, down, isKeyPress, is
 end
 
 -- TODO: Direct dispatch for events?
+-- TODO: Initialize new frames when they are created
 function CDM.OnEvent(frame, event, ...)
 	if event == "PLAYER_ENTERING_WORLD" then
 		CDM.ApplyStyle()
-	-- TODO: Might be able to use recovery category to check for GCD
-	-- SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, spellCategory, startRecoveryCategory, itemID)
-	elseif event == "SPELL_UPDATE_COOLDOWN" or event == "SPELL_UPDATE_CHARGES" then
-		local trusted = event == "SPELL_UPDATE_COOLDOWN"
-		-- TODO: Push loops into the function?
+
+	elseif event == "SPELL_UPDATE_COOLDOWN" then
+		-- TODO: Might be able to use recovery category to check for GCD
+		local eSpellID, baseSpellID, category, startRecoveryCategory, itemID = ...
 		for iViewer, viewer in ipairs(CDM.viewers) do
-			local frames = viewer:GetLayoutChildren()
+			local frames = viewer:GetItemFrames()
 			for iFrame, frame in ipairs(frames) do
-				CDM.RefreshCooldown(frame, trusted)
+
+				-- NOTE: Run on everything for GCD swipes
+				-- NOTE: Spell id can be nil in edit mode. At least 2 spells are always shown.
+				local spellID = frame:GetSpellID()
+				if spellID then
+					CDM.RefreshCooldown(frame, spellID)
+					CDM.RefreshCharge(frame, spellID)
+				end
 			end
 		end
+
+	-- TODO: Test on something with 3+ charges
+	--[[
+	elseif event == "SPELL_UPDATE_CHARGES" then
+		for iViewer, viewer in ipairs(CDM.viewers) do
+			local frames = viewer:GetItemFrames()
+			for iFrame, frame in ipairs(frames) do
+
+				-- NOTE: Spell id can be nil in edit mode. At least 2 spells are always shown.
+				local spellID = frame:GetSpellID()
+				if spellID then
+					CDM.RefreshCharge(frame, spellID)
+				end
+			end
+		end
+		]]
 	end
 end
 

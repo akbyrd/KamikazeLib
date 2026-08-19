@@ -1,22 +1,22 @@
 Requirements
 ------------
--[ ] Button press flash/overlay
+-[x] Non-square icons
+-[x] Ability highlight
+-[x] Button press flash/overlay
+-[ ] Rotation assistant
+-[ ] Center row
 -[ ] Custom row wrapping
 -[ ] Track any item
 -[ ] Track any spell
--[ ] Include item/spell in containers
--[ ] Rotation assistant
--[ ] Ability highlight
 -[ ] Disable ability highlight on specific spells
 -[ ] Cooldown text
--[ ] Custom spell color (classify?)
--[x] Non-square icons
--[ ] Settings work in combat
--[ ] Hide pip
 -[ ] Edit mode support
 -[ ] Anchoring
+----
+-[ ] Custom spell color (classify?)
+-[ ] Settings work in combat
+-[ ] Hide pip
 -[ ] Show permanent buff bars as full
--[x] No bling. Complicated and not terribly useful
 
 
 
