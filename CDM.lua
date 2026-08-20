@@ -52,39 +52,18 @@ function CDM.ReconcileFrames(viewer, cooldownIDs, forceSet)
 	end
 
 	for frame in viewer.itemFramePool:EnumerateActive() do
-		-- TODO: Handle items
-		-- spellID         +spell +trinket -pot -stone
-		-- spellCategoryID -spell -trinket +pot +stone
-		-- cooldownID      +spell +trinket +pot +stone
-		--
-		-- { Name = "cooldownID",             Type = "number",                      Nilable = false },
-		-- { Name = "spellID",                Type = "number",                      Nilable = true },
-		-- { Name = "spellCategoryID",        Type = "number",                      Nilable = true },
-		-- { Name = "overrideSpellID",        Type = "number",                      Nilable = true },
-		-- { Name = "overrideTooltipSpellID", Type = "number",                      Nilable = true },
-		-- { Name = "equipSlot",              Type = "luaIndex",                    Nilable = true },
-		-- { Name = "buffSlot",               Type = "luaIndex",                    Nilable = true },
-		-- { Name = "linkedSpellIDs",         Type = "table", InnerType = "number", Nilable = false },
-		-- { Name = "selfAura",               Type = "bool",                        Nilable = false },
-		-- { Name = "hasAura",                Type = "bool",                        Nilable = false },
-		-- { Name = "charges",                Type = "bool",                        Nilable = false },
-		-- { Name = "isKnown",                Type = "bool",                        Nilable = false },
-		-- { Name = "isInvisible",            Type = "bool",                        Nilable = false },
-		-- { Name = "flags",                  Type = "CooldownSetSpellFlags",       Nilable = false },
-		-- { Name = "category",               Type = "CooldownViewerCategory",      Nilable = false },
-
 		local cd = frame:GetCooldownInfo() -- CooldownViewerCooldown
-		if cd.spellID then
+		if cd and cd.spellID then
 			CDM.frames[cd.spellID] = frame
+		end
 
-			if not frame.Kami then
-				frame.Kami = {}
-				CDM.OnFrameAdded(frame)
-			end
+		if not frame.Kami then
+			frame.Kami = {}
+			CDM.OnFrameAdded(frame)
 		end
 	end
 
-	CDM.RefreshCooldowns()
+	CDM.RefreshSpells()
 end
 
 function CDM.OnFrameAdded(frame)
@@ -114,7 +93,7 @@ function CDM.OnFrameAdded(frame)
 	local b = CDM.cfg.iconBorder
 	local size = sqrt(1 + min(a, 1/a)^2) * frame:GetWidth() - 2*b
 
-	-- NOTE: The CD/GCD swipes are separate because we don't want the active aura highlight
+	-- NOTE: The CD swipe is replaced because we don't want the active aura highlight
 
 	-- Cooldown swipe
 	state.Cooldown = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
@@ -124,7 +103,6 @@ function CDM.OnFrameAdded(frame)
 	state.Cooldown:SetSwipeColor(0, 0, 0, 0.6)
 	state.Cooldown:SetDrawBling(false)
 	state.Cooldown:SetHideCountdownNumbers(false) -- TODO: Use edit mode setting
-	state.Cooldown:SetScript("OnCooldownDone", function(cooldown) state.onCD = nil end)
 
 	-- BUG: Edge and bling are broken in 12.1 They aren't scaled properly and they don't
 	-- clip. They show up as a rotating rectangle. So we manually rescale and clip them.
@@ -143,14 +121,6 @@ function CDM.OnFrameAdded(frame)
 	state.Recharge:SetEdgeColor(0.6, 1, 0, 1)
 	state.Recharge:SetHideCountdownNumbers(true)
 
-	-- GCD swipe
-	state.GCD = CreateFrame("Cooldown", nil, frame)
-	state.GCD:SetAllPoints(state.Cooldown)
-	state.GCD:SetFrameLevel(level + 3)
-	state.GCD:SetSwipeTexture("Interface\\BUTTONS\\WHITE8X8")
-	state.GCD:SetSwipeColor(0, 0, 0, 0.6)
-	state.GCD:SetHideCountdownNumbers(true)
-
 	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
 
 	-- Bling
@@ -163,6 +133,7 @@ function CDM.OnFrameAdded(frame)
 	state.Bling:SetDrawBling(true)
 	state.Bling:SetBlingTexture("Interface\\Cooldown\\star4", 0.3, 0.6, 1, 0.64)
 	state.Bling:SetHideCountdownNumbers(true)
+	state.Bling:SetScript("OnCooldownDone", function(cooldown) state.hasBling = nil end)
 
 	-- Press highlight
 	state.Press = CreateFrame("Frame", nil, frame)
@@ -173,10 +144,6 @@ function CDM.OnFrameAdded(frame)
 	state.Press.Texture:SetAllPoints()
 	state.Press.Texture:SetColorTexture(unpack(CDM.cfg.pressColor))
 	state.Press.Texture:SetBlendMode("ADD")
-
-	-- TODO: Swap to SPELL_ACTIVATION_OVERLAY_GLOW_SHOW/HIDE
-	-- Proc glow
-	hooksecurefunc(frame, "RefreshOverlayGlow", CDM.ProcGlow)
 
 	-- Zoom & aspect ratio
 	local z = CDM.cfg.iconZoom
@@ -206,16 +173,25 @@ function CDM.OnFrameAdded(frame)
 	Inset(frame.Icon)
 	Inset(frame.OutOfRange)
 	Inset(state.Cooldown)
+
+	-- Reuse allocation for item durations
+	state.itemDuration = C_DurationUtil.CreateDuration()
+
+	-- TODO: Swap to SPELL_ACTIVATION_OVERLAY_GLOW_SHOW/HIDE
+	-- Proc glow
+	hooksecurefunc(frame, "RefreshOverlayGlow", CDM.ProcGlow)
+
+	-- Don't desaturate trinkets on GCD
+	hooksecurefunc(frame, "RefreshIconDesaturation", CDM.OnDesaturate)
 end
 
 function CDM.OnFrameRemoved(frame)
 	local state = frame.Kami
 
-	state.onCD = nil
+	state.hasBling = nil
 	state.Cooldown:Clear()
-	state.Bling:Clear()
 	state.Recharge:Clear()
-	state.GCD:Clear()
+	state.Bling:Clear()
 	state.Press:Hide()
 
 	if frame == CDM.activeGlow then
@@ -225,45 +201,49 @@ function CDM.OnFrameRemoved(frame)
 	end
 end
 
--- TODO: Combine Cooldown and GCD
-function CDM.RefreshCooldowns()
+function CDM.RefreshSpells()
 	-- NOTE: To show the GCD swipe we run on all frames, regardless of which spell the event is for.
 
 	for spellID, frame in pairs(CDM.frames) do
 		local state = frame.Kami
 
-		local cdInfo = C_Spell.GetSpellCooldown(spellID) -- SpellCooldownInfo
-		local onSpellCD = cdInfo.isActive and not cdInfo.isOnGCD
+		local onCD     = false
+		local onGCD    = false
+		local duration = nil
 
+		-- TODO: Cache equipSlot?
+		-- TODO: Change onCD to not be a super set
 		local cd = frame:GetCooldownInfo() -- CooldownViewerCooldown
-		local startTime, duration, enable = GetInventoryItemCooldown("player", cd.equipSlot)
-		local onItemCD = enable and enable ~= 0 and duration ~= 0 and duration > 1.5
+		if cd.equipSlot then
+			local start, dur, enable = GetInventoryItemCooldown("player", cd.equipSlot)
+			state.itemDuration:SetTimeFromStart(start, dur)
+			onCD     = enable and enable ~= 0 and dur ~= 0
+			onGCD    = onCD and dur <= 1.5
+			duration = state.itemDuration
+		else
+			spellID = cd.overrideSpellID or spellID
+			local cdInfo = C_Spell.GetSpellCooldown(spellID) -- SpellCooldownInfo
+			onCD     = cdInfo.isActive
+			onGCD    = cdInfo.isOnGCD
+			duration = C_Spell.GetSpellCooldownDuration(spellID)
+		end
 
-		if onItemCD then
-			state.onCD = true
-			state.Cooldown:SetCooldown(startTime, duration)
-			state.Bling:SetCooldown(startTime, duration)
-		elseif onSpellCD then
-			local duration = C_Spell.GetSpellCooldownDuration(spellID, true)
-			state.onCD = true
+		if onCD then
 			state.Cooldown:SetCooldownFromDurationObject(duration)
-			state.Bling:SetCooldownFromDurationObject(duration)
-		elseif state.onCD then
-			state.onCD = nil
+		else
 			state.Cooldown:Clear()
+		end
+
+		if onCD and not onGCD then
+			state.hasBling = true
+			state.Bling:SetCooldownFromDurationObject(duration, true)
+		elseif state.hasBling then
+			state.hasBling = nil
 			state.Bling:SetCooldownDuration(1e-3)
 		end
 
-		local onGCD = cdInfo.isOnGCD and not onItemCD
-		if onGCD then
-			local duration = C_Spell.GetSpellCooldownDuration(spellID, false)
-			state.GCD:SetCooldownFromDurationObject(duration)
-		else
-			state.GCD:Clear()
-		end
-
 		local chargeInfo = C_Spell.GetSpellCharges(spellID) -- SpellChargeInfo
-		local recharging = chargeInfo and chargeInfo.isActive and not state.onCD
+		local recharging = chargeInfo and chargeInfo.isActive and (not onCD or onGCD)
 		if recharging then
 			local duration = C_Spell.GetSpellChargeDuration(spellID)
 			state.Recharge:SetCooldownFromDurationObject(duration)
@@ -273,6 +253,7 @@ function CDM.RefreshCooldowns()
 	end
 end
 
+-- TODO: Should this use the passed-in show?
 function CDM.ProcGlow(frame, show)
 	local state = frame.Kami
 	local show = frame.SpellActivationAlert and frame.SpellActivationAlert:IsShown()
@@ -316,8 +297,17 @@ function CDM.AssistantGlow(mgr, spellID)
 	end
 end
 
+function CDM.OnDesaturate(frame)
+	local cd = frame:GetCooldownInfo()
+	if cd and cd.equipSlot then
+		local start, dur, enable = GetInventoryItemCooldown("player", cd.equipSlot)
+		local onCD  = enable and enable ~= 0 and dur ~= 0
+		local onGCD = onCD and dur <= 1.5
+		frame.Icon:SetDesaturated(onCD and not onGCD)
+	end
+end
+
 -- TODO: We don't always get paired down/up events. Might want to do more robust cleanup
--- TODO: Test mouse 3-5
 function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 	local actionType = SecureButton_GetModifiedAttribute(button, "type", mouseButton)
 	if actionType == "action" then
@@ -354,9 +344,9 @@ end
 
 function CDM.OnEvent(frame, event, ...)
 	if event == "SPELL_UPDATE_COOLDOWN" then
-		CDM.RefreshCooldowns()
+		CDM.RefreshSpells()
 	elseif event == "BAG_UPDATE_COOLDOWN" then
-		CDM.RefreshCooldowns()
+		CDM.RefreshSpells()
 	end
 end
 

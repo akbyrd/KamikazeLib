@@ -22,6 +22,41 @@ Track any item
 Track any spell
 
 
+Items
+-----
+spellID         +spell +trinket -pot -stone
+spellCategoryID -spell -trinket +pot +stone
+cooldownID      +spell +trinket +pot +stone
+{ Name = "cooldownID",             Type = "number",                      Nilable = false },
+{ Name = "spellID",                Type = "number",                      Nilable = true },
+{ Name = "spellCategoryID",        Type = "number",                      Nilable = true },
+{ Name = "overrideSpellID",        Type = "number",                      Nilable = true },
+{ Name = "overrideTooltipSpellID", Type = "number",                      Nilable = true },
+{ Name = "equipSlot",              Type = "luaIndex",                    Nilable = true },
+{ Name = "buffSlot",               Type = "luaIndex",                    Nilable = true },
+{ Name = "linkedSpellIDs",         Type = "table", InnerType = "number", Nilable = false },
+{ Name = "selfAura",               Type = "bool",                        Nilable = false },
+{ Name = "hasAura",                Type = "bool",                        Nilable = false },
+{ Name = "charges",                Type = "bool",                        Nilable = false },
+{ Name = "isKnown",                Type = "bool",                        Nilable = false },
+{ Name = "isInvisible",            Type = "bool",                        Nilable = false },
+{ Name = "flags",                  Type = "CooldownSetSpellFlags",       Nilable = false },
+{ Name = "category",               Type = "CooldownViewerCategory",      Nilable = false },
+
+CDM.spellFrames = {}
+CDM.equipFrames = {}
+
+CDM.frameMapData = {
+	spellID   = CDM.spellFrames,
+	equipSlot = CDM.equipFrames,
+}
+
+for keyName, map in pairs(CDM.frameMapData) do
+	for key, frame in pairs(map) do
+	end
+end
+
+
 
 Cooldown Manager Control
 ------------------------
