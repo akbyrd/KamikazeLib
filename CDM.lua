@@ -40,26 +40,33 @@ function CDM.Load()
 end
 
 function CDM.ReconcileFrames(viewer, cooldownIDs, forceSet)
+	-- NOTE: This can run in combat in a couple of potentially common cases:
+	-- Pet summon/dismiss/death
+	-- Some procs?
+
 	for spellID, frame in pairs(CDM.frames) do
 		local cd = frame:GetCooldownInfo() -- CooldownViewerCooldown
 		local unbound = cd == nil
 		local rebound = cd ~= nil and spellID ~= cd.spellID
 
 		if unbound or rebound then
+			local state = frame.Kami
+			state.equipSlot = nil
 			CDM.frames[spellID] = nil
+
 			CDM.OnFrameRemoved(frame)
 		end
 	end
 
+	-- NOTE: This re-adds / updates without necessarily removing first.
 	for frame in viewer.itemFramePool:EnumerateActive() do
+		CDM.OnFrameAdded(frame)
+
 		local cd = frame:GetCooldownInfo() -- CooldownViewerCooldown
 		if cd and cd.spellID then
+			local state = frame.Kami
+			state.equipSlot = cd.equipSlot
 			CDM.frames[cd.spellID] = frame
-		end
-
-		if not frame.Kami then
-			frame.Kami = {}
-			CDM.OnFrameAdded(frame)
 		end
 	end
 
@@ -67,6 +74,8 @@ function CDM.ReconcileFrames(viewer, cooldownIDs, forceSet)
 end
 
 function CDM.OnFrameAdded(frame)
+	if frame.Kami then return end
+	frame.Kami = {}
 	local state = frame.Kami
 
 	-- Remove mask (reveals the silver border)
@@ -201,6 +210,8 @@ function CDM.OnFrameRemoved(frame)
 	end
 end
 
+-- TODO: Set assistant glow
+-- TODO: Set press overlay
 function CDM.RefreshSpells()
 	-- NOTE: To show the GCD swipe we run on all frames, regardless of which spell the event is for.
 
@@ -211,17 +222,17 @@ function CDM.RefreshSpells()
 		local onGCD    = false
 		local duration = nil
 
-		-- TODO: Cache equipSlot?
 		-- TODO: Change onCD to not be a super set
-		local cd = frame:GetCooldownInfo() -- CooldownViewerCooldown
-		if cd.equipSlot then
-			local start, dur, enable = GetInventoryItemCooldown("player", cd.equipSlot)
+		if state.equipSlot then
+			local start, dur, enable = GetInventoryItemCooldown("player", state.equipSlot)
 			state.itemDuration:SetTimeFromStart(start, dur)
 			onCD     = enable and enable ~= 0 and dur ~= 0
 			onGCD    = onCD and dur <= 1.5
 			duration = state.itemDuration
 		else
+			local cd = frame:GetCooldownInfo() -- CooldownViewerCooldown
 			spellID = cd.overrideSpellID or spellID
+
 			local cdInfo = C_Spell.GetSpellCooldown(spellID) -- SpellCooldownInfo
 			onCD     = cdInfo.isActive
 			onGCD    = cdInfo.isOnGCD
@@ -298,9 +309,9 @@ function CDM.AssistantGlow(mgr, spellID)
 end
 
 function CDM.OnDesaturate(frame)
-	local cd = frame:GetCooldownInfo()
-	if cd and cd.equipSlot then
-		local start, dur, enable = GetInventoryItemCooldown("player", cd.equipSlot)
+	local state = frame.Kami
+	if state.equipSlot then
+		local start, dur, enable = GetInventoryItemCooldown("player", state.equipSlot)
 		local onCD  = enable and enable ~= 0 and dur ~= 0
 		local onGCD = onCD and dur <= 1.5
 		frame.Icon:SetDesaturated(onCD and not onGCD)
