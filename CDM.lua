@@ -2,7 +2,6 @@ local Kami = select(2, ...)
 local CDM = {}
 Kami.CDM = CDM
 
--- TODO: What is LibStub?
 local LCG = LibStub("LibCustomGlow-1.0")
 
 -- TODO: Look for hex conversion utility
@@ -30,9 +29,10 @@ function CDM.Load()
 	CDM.frame = CreateFrame("Frame", "KL_CDM")
 	CDM.frame:SetScript("OnEvent", CDM.OnEvent)
 	CDM.frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+	CDM.frame:RegisterEvent("BAG_UPDATE_COOLDOWN")
 
 	hooksecurefunc(AssistedCombatManager, "UpdateAllAssistedHighlightFramesForSpell", CDM.AssistantGlow)
-	hooksecurefunc("SecureActionButton_OnClick", CDM.OnSecureActionButtonClick)
+	hooksecurefunc("SecureActionButton_OnClick", CDM.OnClick)
 
 	for iViewer, viewer in ipairs(CDM.viewers) do
 		hooksecurefunc(viewer, "RefreshData", CDM.ReconcileFrames)
@@ -225,6 +225,7 @@ function CDM.OnFrameRemoved(frame)
 	end
 end
 
+-- TODO: Combine Cooldown and GCD
 function CDM.RefreshCooldowns()
 	-- NOTE: To show the GCD swipe we run on all frames, regardless of which spell the event is for.
 
@@ -232,8 +233,17 @@ function CDM.RefreshCooldowns()
 		local state = frame.Kami
 
 		local cdInfo = C_Spell.GetSpellCooldown(spellID) -- SpellCooldownInfo
-		local onCooldown = cdInfo.isActive and not cdInfo.isOnGCD
-		if onCooldown then
+		local onSpellCD = cdInfo.isActive and not cdInfo.isOnGCD
+
+		local cd = frame:GetCooldownInfo() -- CooldownViewerCooldown
+		local startTime, duration, enable = GetInventoryItemCooldown("player", cd.equipSlot)
+		local onItemCD = enable and enable ~= 0 and duration ~= 0 and duration > 1.5
+
+		if onItemCD then
+			state.onCD = true
+			state.Cooldown:SetCooldown(startTime, duration)
+			state.Bling:SetCooldown(startTime, duration)
+		elseif onSpellCD then
 			local duration = C_Spell.GetSpellCooldownDuration(spellID, true)
 			state.onCD = true
 			state.Cooldown:SetCooldownFromDurationObject(duration)
@@ -244,7 +254,8 @@ function CDM.RefreshCooldowns()
 			state.Bling:SetCooldownDuration(1e-3)
 		end
 
-		if cdInfo.isOnGCD then
+		local onGCD = cdInfo.isOnGCD and not onItemCD
+		if onGCD then
 			local duration = C_Spell.GetSpellCooldownDuration(spellID, false)
 			state.GCD:SetCooldownFromDurationObject(duration)
 		else
@@ -266,17 +277,19 @@ function CDM.ProcGlow(frame, show)
 	local state = frame.Kami
 	local show = frame.SpellActivationAlert and frame.SpellActivationAlert:IsShown()
 	if show then
+		frame.SpellActivationAlert:SetAlpha(0)
+
 		if not state.hasProcGlow then
-			frame.SpellActivationAlert:SetAlpha(0)
+			state.hasProcGlow = true
 			local ppScale = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
 			LCG.PixelGlow_Start(frame, CDM.cfg.procColor, nil, CDM.cfg.procSpeed, nil, CDM.cfg.procWidth * ppScale, nil, nil, false)
 		end
 	else
 		if state.hasProcGlow then
+			state.hasProcGlow = false
 			LCG.PixelGlow_Stop(frame)
 		end
 	end
-	state.hasProcGlow = show
 end
 
 -- TODO: How do we handle overlapping borders?
@@ -305,7 +318,7 @@ end
 
 -- TODO: We don't always get paired down/up events. Might want to do more robust cleanup
 -- TODO: Test mouse 3-5
-function CDM.OnSecureActionButtonClick(button, mouseButton, down, isKeyPress, isSecureAction)
+function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 	local actionType = SecureButton_GetModifiedAttribute(button, "type", mouseButton)
 	if actionType == "action" then
 		local slot = button:CalculateAction(mouseButton)
@@ -341,6 +354,8 @@ end
 
 function CDM.OnEvent(frame, event, ...)
 	if event == "SPELL_UPDATE_COOLDOWN" then
+		CDM.RefreshCooldowns()
+	elseif event == "BAG_UPDATE_COOLDOWN" then
 		CDM.RefreshCooldowns()
 	end
 end

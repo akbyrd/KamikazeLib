@@ -1,27 +1,25 @@
 To Do
 -----
--[x] Non-square icons
--[x] Ability highlight
--[x] Button press flash/overlay
--[x] Rotation assistant
--[ ] Handle trinket
--[ ] Handle healthstone
--[ ] Handle combat potion
--[ ] Handle health potion
--[ ] Center row
--[ ] Custom row wrapping
--[ ] Track any item
--[ ] Track any spell
--[ ] Disable ability highlight on specific spells
--[ ] Cooldown text
--[ ] Edit mode support
--[ ] Anchoring
--[ ] Separate settings for each viewer
+Pixel perfect
+Center row
+Custom row wrapping
+Cooldown text
+Handle healthstone
+Handle combat potion
+Handle health potion
 ----
--[ ] Custom spell color (classify?)
--[ ] Settings work in combat
--[ ] Hide pip
--[ ] Show permanent buff bars as full
+Custom spell color (classify?)
+Settings work in combat
+Hide pip
+Show permanent buff bars as full
+----
+Edit mode support
+Anchoring
+Disable ability highlight on specific spells
+Separate settings for each viewer
+----
+Track any item
+Track any spell
 
 
 
