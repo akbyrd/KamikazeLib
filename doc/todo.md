@@ -1,9 +1,13 @@
-Requirements
-------------
+To Do
+-----
 -[x] Non-square icons
 -[x] Ability highlight
 -[x] Button press flash/overlay
--[ ] Rotation assistant
+-[x] Rotation assistant
+-[ ] Handle trinket
+-[ ] Handle healthstone
+-[ ] Handle combat potion
+-[ ] Handle health potion
 -[ ] Center row
 -[ ] Custom row wrapping
 -[ ] Track any item
@@ -12,6 +16,7 @@ Requirements
 -[ ] Cooldown text
 -[ ] Edit mode support
 -[ ] Anchoring
+-[ ] Separate settings for each viewer
 ----
 -[ ] Custom spell color (classify?)
 -[ ] Settings work in combat
@@ -20,18 +25,9 @@ Requirements
 
 
 
-To Do
------
-Separate settings for each viewer
-Hide proc glow on Rampage
-Set cooldown text font
-Split into one-time and every-time parts
-
-
-
 Cooldown Manager Control
 ------------------------
-Abandoned
+Mostly abandoned
 Can't control row wrapping well
 No button press overlay
 No assistant highlight
