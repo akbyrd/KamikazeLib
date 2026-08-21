@@ -106,6 +106,7 @@ Use unit frame aura bars for buff bars?
 
 Maybe Useful
 ------------
+SPELL_ACTIVATION_OVERLAY_GLOW_SHOW/HIDE
 EssentialCooldownViewer:MarkDirty()
 SetBlingTexture("Interface\\Cooldown\\star4", 0.3, 0.6, 1, 0.64)
 SetBlingTexture("Interface\\Cooldown\\starburst", 0.3, 0.6, 1, 0.64)

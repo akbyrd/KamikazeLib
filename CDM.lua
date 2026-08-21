@@ -20,7 +20,10 @@ function CDM.Load()
 		assistColor = { 0.2, 0.6, 0.95, 1 },
 	}
 
+	-- TODO: Simplify these lookups
 	CDM.frames = {}
+	CDM.overrides = {}
+
 	CDM.viewers = {
 		EssentialCooldownViewer,
 		UtilityCooldownViewer,
@@ -51,8 +54,13 @@ function CDM.ReconcileFrames(viewer, cooldownIDs, forceSet)
 
 		if unbound or rebound then
 			local state = frame.Kami
-			state.equipSlot = nil
 			CDM.frames[spellID] = nil
+			state.equipSlot = nil
+
+			if state.overrideSpellID then
+				CDM.overrides[state.overrideSpellID] = nil
+				state.overrideSpellID = nil
+			end
 
 			CDM.OnFrameRemoved(frame)
 		end
@@ -65,8 +73,13 @@ function CDM.ReconcileFrames(viewer, cooldownIDs, forceSet)
 		local cd = frame:GetCooldownInfo() -- CooldownViewerCooldown
 		if cd and cd.spellID then
 			local state = frame.Kami
-			state.equipSlot = cd.equipSlot
 			CDM.frames[cd.spellID] = frame
+			state.equipSlot = cd.equipSlot
+
+			if cd.overrideSpellID then
+				CDM.overrides[cd.overrideSpellID] = frame
+				state.overrideSpellID = cd.overrideSpellID
+			end
 		end
 	end
 
@@ -186,7 +199,6 @@ function CDM.OnFrameAdded(frame)
 	-- Reuse allocation for item durations
 	state.itemDuration = C_DurationUtil.CreateDuration()
 
-	-- TODO: Swap to SPELL_ACTIVATION_OVERLAY_GLOW_SHOW/HIDE
 	-- Proc glow
 	hooksecurefunc(frame, "RefreshOverlayGlow", CDM.ProcGlow)
 
@@ -264,10 +276,11 @@ function CDM.RefreshSpells()
 	end
 end
 
--- TODO: Should this use the passed-in show?
-function CDM.ProcGlow(frame, show)
+function CDM.ProcGlow(frame, showFromEvent)
+	-- NOTE: showFromEvent can be nil, in which case we have to derive it anyway.
+
 	local state = frame.Kami
-	local show = frame.SpellActivationAlert and frame.SpellActivationAlert:IsShown()
+	local show = ActionButtonSpellAlertManager:HasAlert(frame)
 	if show then
 		frame.SpellActivationAlert:SetAlpha(0)
 
@@ -285,8 +298,7 @@ function CDM.ProcGlow(frame, show)
 end
 
 -- TODO: How do we handle overlapping borders?
--- TODO: Does this send the base or override spell id?
-function CDM.AssistantGlow(mgr, spellID)
+function CDM.AssistantGlow(mgr, oSpellID)
 	-- Hide old glow
 	if CDM.activeGlow then
 		local frame = CDM.activeGlow
@@ -298,13 +310,15 @@ function CDM.AssistantGlow(mgr, spellID)
 	end
 
 	-- Show new glow
-	if spellID and CDM.frames[spellID] then
-		local frame = CDM.frames[spellID]
-		local state = frame.Kami
+	if oSpellID then
+		local frame = CDM.frames[oSpellID] or CDM.overrides[oSpellID]
+		if frame then
+			local state = frame.Kami
 
-		CDM.activeGlow = frame
-		state.Border1:SetColorTexture(unpack(CDM.cfg.assistColor))
-		state.Border2:SetColorTexture(unpack(CDM.cfg.assistColor))
+			CDM.activeGlow = frame
+			state.Border1:SetColorTexture(unpack(CDM.cfg.assistColor))
+			state.Border2:SetColorTexture(unpack(CDM.cfg.assistColor))
+		end
 	end
 end
 
