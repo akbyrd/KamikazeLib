@@ -1,7 +1,6 @@
 To Do
 -----
-Pixel perfect
-Center row
+Fine tune borders
 Custom row wrapping
 Cooldown text
 Handle healthstone
@@ -13,13 +12,15 @@ Settings work in combat
 Hide pip
 Show permanent buff bars as full
 ----
-Edit mode support
+Edit mode support (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
 Anchoring
 Disable ability highlight on specific spells
 Separate settings for each viewer
+Profile performance
 ----
 Track any item
 Track any spell
+Replace LibCustomGlow. It sucks
 
 
 Items
@@ -111,3 +112,5 @@ EssentialCooldownViewer:MarkDirty()
 SetBlingTexture("Interface\\Cooldown\\star4", 0.3, 0.6, 1, 0.64)
 SetBlingTexture("Interface\\Cooldown\\starburst", 0.3, 0.6, 1, 0.64)
 SetBlingTexture("Interface\\BUTTONS\\WHITE8X8", 1, 1, 1, 1)
+viewer.orientationSetting
+viewer.iconDirection, Enum.CooldownViewerIconDirection.Right

@@ -25,20 +25,25 @@ function CDM.Load()
 	CDM.overrides = {}
 
 	CDM.viewers = {
-		EssentialCooldownViewer,
-		UtilityCooldownViewer,
+		[EssentialCooldownViewer] = {},
+		[UtilityCooldownViewer]   = {},
 	}
 
+	CDM.handlers = {}
 	CDM.frame = CreateFrame("Frame", "KL_CDM")
-	CDM.frame:SetScript("OnEvent", CDM.OnEvent)
-	CDM.frame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
-	CDM.frame:RegisterEvent("BAG_UPDATE_COOLDOWN")
+	CDM.frame:SetScript("OnEvent", CDM.DispatchEvent)
+
+	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN", CDM.RefreshSpells)
+	CDM.RegisterEvent("BAG_UPDATE_COOLDOWN",   CDM.RefreshSpells)
+	CDM.RegisterEvent("UI_SCALE_CHANGED",      CDM.RefreshSizesAndPositions)
+	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",  CDM.RefreshSizesAndPositions)
 
 	hooksecurefunc(AssistedCombatManager, "UpdateAllAssistedHighlightFramesForSpell", CDM.AssistantGlow)
 	hooksecurefunc("SecureActionButton_OnClick", CDM.OnClick)
 
-	for iViewer, viewer in ipairs(CDM.viewers) do
+	for viewer, vState in pairs(CDM.viewers) do
 		hooksecurefunc(viewer, "RefreshData", CDM.ReconcileFrames)
+		hooksecurefunc(viewer, "Layout",      CDM.RefreshPositions)
 	end
 end
 
@@ -46,6 +51,8 @@ function CDM.ReconcileFrames(viewer, cooldownIDs, forceSet)
 	-- NOTE: This can run in combat in a couple of potentially common cases:
 	-- Pet summon/dismiss/death
 	-- Some procs?
+
+	local vState = CDM.viewers[viewer]
 
 	for spellID, frame in pairs(CDM.frames) do
 		local cd = frame:GetCooldownInfo() -- CooldownViewerCooldown
@@ -62,13 +69,13 @@ function CDM.ReconcileFrames(viewer, cooldownIDs, forceSet)
 				state.overrideSpellID = nil
 			end
 
-			CDM.OnFrameRemoved(frame)
+			CDM.OnFrameRemoved(viewer, vState, frame)
 		end
 	end
 
 	-- NOTE: This re-adds / updates without necessarily removing first.
 	for frame in viewer.itemFramePool:EnumerateActive() do
-		CDM.OnFrameAdded(frame)
+		CDM.OnFrameAdded(viewer, vState, frame)
 
 		local cd = frame:GetCooldownInfo() -- CooldownViewerCooldown
 		if cd and cd.spellID then
@@ -83,13 +90,33 @@ function CDM.ReconcileFrames(viewer, cooldownIDs, forceSet)
 		end
 	end
 
+	-- TODO: Remove this once we confirm it doesn't fire in combat too often
+	--print(string.format("%.3f %s %s", GetTime(), tostring(viewer), "ReconcileFrames"))
+
 	CDM.RefreshSpells()
+	CDM.RefreshSizes(viewer, vState)
 end
 
-function CDM.OnFrameAdded(frame)
+function CDM.OnFrameAdded(viewer, vState, frame)
 	if frame.Kami then return end
 	frame.Kami = {}
 	local state = frame.Kami
+
+	-- Frame stack:
+	-- Built-in
+	-- - Frame
+	-- - Icon
+	-- - Cooldown
+	-- - CooldownFlash
+	-- - OutOfRange
+	--
+	-- Added                   (Parent   Anchor    Inset)
+	-- - (Frame)   Cooldown -> Frame     Frame     Yes
+	-- - (Frame)   Recharge -> Cooldown  Cooldown  Yes
+	-- - (Frame)   Bling    -> Cooldown  Cooldown  Yes
+	-- - (Frame)   Press    -> Cooldown  Cooldown  Yes
+	-- - (Texture) Border1  -> ----      Frame?    No
+	-- - (Texture) Border2  -> ----      Frame?    Special
 
 	-- Remove mask (reveals the silver border)
 	for i = 1, frame.Icon:GetNumMaskTextures() do
@@ -109,33 +136,24 @@ function CDM.OnFrameAdded(frame)
 	frame.Cooldown:SetAlpha(0)
 	frame.CooldownFlash:SetAlpha(0)
 
-	-- Cooldown animations
-	local level = frame.Cooldown:GetFrameLevel()
-	local a = CDM.cfg.iconAspect
-	local b = CDM.cfg.iconBorder
-	local size = sqrt(1 + min(a, 1/a)^2) * frame:GetWidth() - 2*b
-
 	-- NOTE: The CD swipe is replaced because we don't want the active aura highlight
 
 	-- Cooldown swipe
+	local level = frame.Cooldown:GetFrameLevel()
 	state.Cooldown = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
-	state.Cooldown:SetAllPoints(frame.Cooldown)
 	state.Cooldown:SetFrameLevel(level + 1)
 	state.Cooldown:SetDrawEdge(false)
 	state.Cooldown:SetSwipeColor(0, 0, 0, 0.6)
 	state.Cooldown:SetDrawBling(false)
-	state.Cooldown:SetHideCountdownNumbers(false) -- TODO: Use edit mode setting
+	state.Cooldown:SetHideCountdownNumbers(not viewer.timerShown) -- TODO: Update
 
 	-- BUG: Edge and bling are broken in 12.1 They aren't scaled properly and they don't
 	-- clip. They show up as a rotating rectangle. So we manually rescale and clip them.
-	state.Clip = CreateFrame("Frame", nil, frame)
-	state.Clip:SetAllPoints(state.Cooldown)
-	state.Clip:SetClipsChildren(true)
+	state.Cooldown:SetClipsChildren(true)
 
 	-- Recharge edge
-	state.Recharge = CreateFrame("Cooldown", nil, state.Clip)
+	state.Recharge = CreateFrame("Cooldown", nil, state.Cooldown)
 	state.Recharge:SetPoint("CENTER")
-	state.Recharge:SetSize(size, size)
 	state.Recharge:SetFrameLevel(level + 2)
 	state.Recharge:SetDrawSwipe(false)
 	state.Recharge:SetDrawEdge(true)
@@ -146,10 +164,9 @@ function CDM.OnFrameAdded(frame)
 	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
 
 	-- Bling
-	state.Bling = CreateFrame("Cooldown", nil, state.Clip, "CooldownFrameTemplate")
+	state.Bling = CreateFrame("Cooldown", nil, state.Cooldown, "CooldownFrameTemplate")
 	state.Bling:SetPoint("CENTER")
-	state.Bling:SetSize(size, size)
-	state.Bling:SetFrameLevel(level + 4)
+	state.Bling:SetFrameLevel(level + 3)
 	state.Bling:SetDrawSwipe(false)
 	state.Bling:SetDrawEdge(false)
 	state.Bling:SetDrawBling(true)
@@ -158,9 +175,9 @@ function CDM.OnFrameAdded(frame)
 	state.Bling:SetScript("OnCooldownDone", function(cooldown) state.hasBling = nil end)
 
 	-- Press highlight
-	state.Press = CreateFrame("Frame", nil, frame)
-	state.Press:SetAllPoints(state.Cooldown)
-	state.Press:SetFrameLevel(level + 5)
+	state.Press = CreateFrame("Frame", nil, state.Cooldown)
+	state.Press:SetAllPoints()
+	state.Press:SetFrameLevel(level + 4)
 	state.Press:Hide()
 	state.Press.Texture = state.Press:CreateTexture(nil, "OVERLAY")
 	state.Press.Texture:SetAllPoints()
@@ -170,31 +187,25 @@ function CDM.OnFrameAdded(frame)
 	-- Zoom & aspect ratio
 	local z = CDM.cfg.iconZoom
 	local a = CDM.cfg.iconAspect
-	local s = max(frame:GetSize())
-	Kami.Util.RectIcon(frame, frame.Icon, s, z, a)
+	Kami.Util.RectIcon(frame, frame.Icon, z, a)
 
 	-- TODO: Try a 9-slice
 	-- Add border
-	local ppScale = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
 	state.Border1 = frame:CreateTexture(nil, "BACKGROUND", nil, 0)
 	state.Border1:SetAllPoints()
 	state.Border1:SetColorTexture(unpack(CDM.cfg.borderColor))
 
 	state.Border2 = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
-	state.Border2:SetPoint("TOPLEFT", ppScale, -ppScale)
-	state.Border2:SetPoint("BOTTOMRIGHT", -ppScale, ppScale)
 	state.Border2:SetColorTexture(unpack(CDM.cfg.borderColor))
 
-	-- Shrink all content to fit inside border
-	local function Inset(f)
-		local s = CDM.cfg.iconBorder * ppScale
-		f:ClearAllPoints()
-		f:SetPoint("TOPLEFT", s, -s)
-		f:SetPoint("BOTTOMRIGHT", -s, s)
-	end
-	Inset(frame.Icon)
-	Inset(frame.OutOfRange)
-	Inset(state.Cooldown)
+	-- NOTE: We round the frame size to make it pixel perfect. If the ui scale changes between frames
+	-- being added we can end up rounding to a different size. I think this happens due to floating
+	-- point rounding in "effective scale". If we don't scale the frame, we probably end up with
+	-- subsequent frames not being positioned on pixel boundaries. Seems like it'll be more of a
+	-- fight that way. So we cache the size of the most recent frame and use that for size
+	-- calculations later.
+	vState.xSize = frame:GetWidth()
+	vState.ySize = frame:GetHeight()
 
 	-- Reuse allocation for item durations
 	state.itemDuration = C_DurationUtil.CreateDuration()
@@ -206,7 +217,7 @@ function CDM.OnFrameAdded(frame)
 	hooksecurefunc(frame, "RefreshIconDesaturation", CDM.OnDesaturate)
 end
 
-function CDM.OnFrameRemoved(frame)
+function CDM.OnFrameRemoved(viewer, vState, frame)
 	local state = frame.Kami
 
 	state.hasBling = nil
@@ -286,8 +297,14 @@ function CDM.ProcGlow(frame, showFromEvent)
 
 		if not state.hasProcGlow then
 			state.hasProcGlow = true
-			local ppScale = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
-			LCG.PixelGlow_Start(frame, CDM.cfg.procColor, nil, CDM.cfg.procSpeed, nil, CDM.cfg.procWidth * ppScale, nil, nil, false)
+			-- NOTE: The math here is correcting for the glow not actually being pixel perfect.
+			local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
+			local thickness  = CDM.cfg.procWidth * pixelsToUI
+			local xSizeEff   = frame:GetWidth()  - thickness - 0.05
+			local ySizeEff   = frame:GetHeight() - thickness - 0.00
+			local xOffset    = (Round(xSizeEff) - xSizeEff) / 2
+			local yOffset    = (Round(ySizeEff) - ySizeEff) / 2
+			LCG.PixelGlow_Start(frame, CDM.cfg.procColor, nil, CDM.cfg.procSpeed, nil, thickness, xOffset, yOffset, false)
 		end
 	else
 		if state.hasProcGlow then
@@ -367,12 +384,101 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 	end
 end
 
-function CDM.OnEvent(frame, event, ...)
-	if event == "SPELL_UPDATE_COOLDOWN" then
-		CDM.RefreshSpells()
-	elseif event == "BAG_UPDATE_COOLDOWN" then
-		CDM.RefreshSpells()
+-- TODO: Orientation and direction
+function CDM.RefreshPositions(viewer)
+	local frames = viewer:GetLayoutChildren()
+	if #frames == 0 then return end
+
+	local vPixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / viewer:GetEffectiveScale()
+	local fPixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / frames[1]:GetEffectiveScale()
+
+	local vxSize = viewer:GetWidth()     / vPixelsToUI
+	local vxPos  = viewer:GetLeft()      / vPixelsToUI
+	local vyPos  = viewer:GetTop()       / vPixelsToUI
+	local xSize  = frames[1]:GetWidth()  / fPixelsToUI
+	local ySize  = frames[1]:GetHeight() / fPixelsToUI
+
+	local pad   = viewer.iconPadding
+	local limit = viewer.iconLimit
+
+	vxPos = Round(vxPos) - vxPos
+	vyPos = Round(vyPos) - vyPos
+
+	for iFrame, frame in ipairs(frames) do
+		local iCol = (iFrame - 1) % limit
+		local iRow = floor((iFrame - 1) / limit)
+
+		local nRow    = min(limit, #frames - (iRow * limit))
+		local rxSize  = nRow * (xSize + pad) - pad
+		local xCenter = Round((vxSize - rxSize) / 2)
+
+		local xPos = vxPos + iCol * (xSize + pad) + xCenter
+		local yPos = vyPos - iRow * (ySize + pad)
+
+		frame:ClearAllPoints()
+		frame:SetPoint("TOPLEFT", viewer, "TOPLEFT", xPos * fPixelsToUI, yPos * fPixelsToUI)
 	end
+end
+
+-- TODO: Handle position changes through Edit Mode
+function CDM.RefreshSizesAndPositions()
+	-- NOTE: This can get called during login before the viewers have been anchored
+	for viewer, vState in pairs(CDM.viewers) do
+		if viewer:IsRectValid() then
+			CDM.RefreshSizes(viewer, vState)
+			CDM.RefreshPositions(viewer)
+		end
+	end
+end
+
+function CDM.RefreshSizes(viewer, vState)
+	-- NOTE: Our icon ends up visually larger than the built-in. The built in has transparent edges
+	-- and an additional padding offset of -4 (viewer:GetAdditionalPaddingOffset()). The base size is
+	-- 50px, the ui-to-pixel scale comes out to 1.687 with my current settings. At 100%, the built-in
+	-- ends up with a frame size of 84
+
+	local frames = viewer:GetLayoutChildren()
+	if #frames == 0 then return end
+
+	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / frames[1]:GetEffectiveScale()
+	local xSize = Round(vState.xSize / pixelsToUI) * pixelsToUI
+	local ySize = Round(vState.ySize / pixelsToUI) * pixelsToUI
+
+	for frame in viewer.itemFramePool:EnumerateActive() do
+		if frame.Kami then
+			local state = frame.Kami
+			frame:SetSize(xSize, ySize)
+
+			local onePx = 1 * pixelsToUI
+			CDM.Inset(state.Border2, onePx)
+
+			local borderSize = CDM.cfg.iconBorder * pixelsToUI
+			CDM.Inset(frame.Icon,       borderSize)
+			CDM.Inset(frame.OutOfRange, borderSize)
+			CDM.Inset(state.Cooldown,   borderSize)
+
+			local inset = 2 * borderSize
+			local diagSize = sqrt((xSize - inset)^2 + (ySize - inset)^2)
+			state.Recharge:SetSize(diagSize, diagSize)
+			state.Bling:SetSize(diagSize, diagSize)
+		end
+	end
+end
+
+function CDM.Inset(frame, amount)
+	frame:ClearAllPoints()
+	frame:SetPoint("TOPLEFT",      amount, -amount)
+	frame:SetPoint("BOTTOMRIGHT", -amount,  amount)
+end
+
+function CDM.RegisterEvent(event, func)
+	CDM.frame:RegisterEvent(event)
+	CDM.handlers[event] = func
+end
+
+function CDM.DispatchEvent(frame, event, ...)
+	local func = CDM.handlers[event]
+	func(...)
 end
 
 CDM.Load()
