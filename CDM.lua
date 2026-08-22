@@ -23,30 +23,33 @@ function CDM.Load()
 		pressColor  = { 1, 1, 1, 0.25 },
 	}
 
-	-- TODO: Simplify these lookups
 	CDM.frames = {}
+	CDM.spells = {}
 	CDM.overrides = {}
 
 	CDM.viewers = {
-		[EssentialCooldownViewer] = {},
-		[UtilityCooldownViewer]   = {},
+		[EssentialCooldownViewer] = { viewer = EssentialCooldownViewer },
+		[UtilityCooldownViewer]   = { viewer = UtilityCooldownViewer },
 	}
 
 	CDM.handlers = {}
-	CDM.frame = CreateFrame("Frame", "KL_CDM")
-	CDM.frame:SetScript("OnEvent", CDM.DispatchEvent)
+	CDM.eventFrame = CreateFrame("Frame", "KL_CDM")
+	CDM.eventFrame:SetScript("OnEvent", CDM.DispatchEvent)
 
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN", CDM.RefreshSpells)
 	CDM.RegisterEvent("BAG_UPDATE_COOLDOWN",   CDM.RefreshSpells)
 	CDM.RegisterEvent("UI_SCALE_CHANGED",      CDM.RefreshSizesAndPositions)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",  CDM.RefreshSizesAndPositions)
 
-	hooksecurefunc(AssistedCombatManager, "UpdateAllAssistedHighlightFramesForSpell", CDM.AssistantGlow)
+	-- Assist glow
+	hooksecurefunc(AssistedCombatManager, "UpdateAllAssistedHighlightFramesForSpell", CDM.AssistGlow)
+
+	-- Press overlay
 	hooksecurefunc("SecureActionButton_OnClick", CDM.OnClick)
 
 	for viewer, vState in pairs(CDM.viewers) do
-		hooksecurefunc(viewer, "RefreshData", CDM.ReconcileFrames)
-		hooksecurefunc(viewer, "Layout",      CDM.RefreshPositions)
+		hooksecurefunc(viewer, "RefreshData", CDM.ReconcileFrames)  -- Frames added/removed
+		hooksecurefunc(viewer, "Layout",      CDM.RefreshPositions) -- Frame positions changed
 	end
 end
 
@@ -57,38 +60,41 @@ function CDM.ReconcileFrames(viewer, cooldownIDs, forceSet)
 
 	local vState = CDM.viewers[viewer]
 
-	for spellID, frame in pairs(CDM.frames) do
-		local cd = frame:GetCooldownInfo() -- CooldownViewerCooldown
+	for spellID, fState in pairs(CDM.spells) do
+		local cd = fState.frame:GetCooldownInfo() -- CooldownViewerCooldown
 		local unbound = cd == nil
 		local rebound = cd ~= nil and spellID ~= cd.spellID
 
 		if unbound or rebound then
-			local state = frame.Kami
-			CDM.frames[spellID] = nil
-			state.equipSlot = nil
+			CDM.spells[spellID] = nil
+			fState.equipSlot = nil
 
-			if state.overrideSpellID then
-				CDM.overrides[state.overrideSpellID] = nil
-				state.overrideSpellID = nil
+			if fState.overrideSpellID then
+				CDM.overrides[fState.overrideSpellID] = nil
+				fState.overrideSpellID = nil
 			end
 
-			CDM.OnFrameRemoved(viewer, vState, frame)
+			CDM.OnFrameRemoved(vState, fState)
 		end
 	end
 
 	-- NOTE: This re-adds / updates without necessarily removing first.
-	for frame in viewer.itemFramePool:EnumerateActive() do
-		CDM.OnFrameAdded(viewer, vState, frame)
+	for frame in vState.viewer.itemFramePool:EnumerateActive() do
+		local fState = CDM.frames[frame]
+		if not fState then
+			fState = { frame = frame }
+			CDM.frames[frame] = fState
+			CDM.OnFrameAdded(vState, fState)
+		end
 
-		local cd = frame:GetCooldownInfo() -- CooldownViewerCooldown
+		local cd = fState.frame:GetCooldownInfo() -- CooldownViewerCooldown
 		if cd and cd.spellID then
-			local state = frame.Kami
-			CDM.frames[cd.spellID] = frame
-			state.equipSlot = cd.equipSlot
+			CDM.spells[cd.spellID] = fState
+			fState.equipSlot = cd.equipSlot
 
 			if cd.overrideSpellID then
-				CDM.overrides[cd.overrideSpellID] = frame
-				state.overrideSpellID = cd.overrideSpellID
+				CDM.overrides[cd.overrideSpellID] = fState
+				fState.overrideSpellID = cd.overrideSpellID
 			end
 		end
 	end
@@ -97,14 +103,10 @@ function CDM.ReconcileFrames(viewer, cooldownIDs, forceSet)
 	--print(string.format("%.3f %s %s", GetTime(), tostring(viewer), "ReconcileFrames"))
 
 	CDM.RefreshSpells()
-	CDM.RefreshSizes(viewer, vState)
+	CDM.RefreshSizes(vState)
 end
 
-function CDM.OnFrameAdded(viewer, vState, frame)
-	if frame.Kami then return end
-	frame.Kami = {}
-	local state = frame.Kami
-
+function CDM.OnFrameAdded(vState, fState)
 	-- Frame stack:
 	-- Built-in
 	-- - Frame
@@ -124,97 +126,97 @@ function CDM.OnFrameAdded(viewer, vState, frame)
 	-- - (Frame)   Bling     -> Clip      Clip      Yes
 
 	-- Remove mask (reveals the silver border)
-	for i = 1, frame.Icon:GetNumMaskTextures() do
-		local mask = frame.Icon:GetMaskTexture(i)
-		frame.Icon:RemoveMaskTexture(mask)
+	for i = 1, fState.frame.Icon:GetNumMaskTextures() do
+		local mask = fState.frame.Icon:GetMaskTexture(i)
+		fState.frame.Icon:RemoveMaskTexture(mask)
 	end
 
 	-- Hide the overlay
-	for _, region in ipairs({ frame:GetRegions() }) do
+	for _, region in ipairs({ fState.frame:GetRegions() }) do
 		if region.GetAtlas and region:GetAtlas() == "UI-HUD-CoolDownManager-IconOverlay" then
 			region:Hide()
 		end
 	end
 
 	-- Hide the out of range overlay and built-in cooldown
-	frame.OutOfRange:SetAlpha(0)
-	frame.Cooldown:SetAlpha(0)
-	frame.CooldownFlash:SetAlpha(0)
+	fState.frame.OutOfRange:SetAlpha(0)
+	fState.frame.Cooldown:SetAlpha(0)
+	fState.frame.CooldownFlash:SetAlpha(0)
 
 	-- Add border
-	state.Border = frame:CreateTexture(nil, "OVERLAY")
-	state.Border:SetAllPoints()
-	state.Border:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
-	state.Border:SetTextureSliceMargins(1, 1, 1, 1)
-	state.Border:SetVertexColor(unpack(CDM.cfg.borderColor))
+	fState.Border = fState.frame:CreateTexture(nil, "OVERLAY")
+	fState.Border:SetAllPoints()
+	fState.Border:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
+	fState.Border:SetTextureSliceMargins(1, 1, 1, 1)
+	fState.Border:SetVertexColor(unpack(CDM.cfg.borderColor))
 
 	-- NOTE: The CD swipe is replaced because we don't want the active aura highlight
 	-- NOTE: Cooldown frames hide themselves when they aren't active (and thus textures & children)
 
 	-- Cooldown swipe
-	local level = frame:GetFrameLevel()
-	state.Cooldown = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
-	state.Cooldown:ClearAllPoints()
-	state.Cooldown:SetFrameLevel(level + 2)
-	state.Cooldown:SetDrawEdge(false)
-	state.Cooldown:SetSwipeColor(0, 0, 0, 0.6)
-	state.Cooldown:SetDrawBling(false)
-	state.Cooldown:SetHideCountdownNumbers(not viewer.timerShown) -- TODO: Update
+	local level = fState.frame:GetFrameLevel()
+	fState.Cooldown = CreateFrame("Cooldown", nil, fState.frame, "CooldownFrameTemplate")
+	fState.Cooldown:ClearAllPoints()
+	fState.Cooldown:SetFrameLevel(level + 2)
+	fState.Cooldown:SetDrawEdge(false)
+	fState.Cooldown:SetSwipeColor(0, 0, 0, 0.6)
+	fState.Cooldown:SetDrawBling(false)
+	fState.Cooldown:SetHideCountdownNumbers(not vState.viewer.timerShown) -- TODO: Update
 
 	-- BUG: Edge and bling are broken in 12.1 They aren't scaled properly and they don't
 	-- clip. They show up as a rotating rectangle. So we manually rescale and clip them.
-	state.Clip = CreateFrame("Frame", nil, frame)
-	state.Clip:SetAllPoints(state.Cooldown)
-	state.Clip:SetFrameLevel(level + 3)
-	state.Clip:SetClipsChildren(true)
+	fState.Clip = CreateFrame("Frame", nil, fState.frame)
+	fState.Clip:SetAllPoints(fState.Cooldown)
+	fState.Clip:SetFrameLevel(level + 3)
+	fState.Clip:SetClipsChildren(true)
 
 	-- Recharge edge
-	state.Recharge = CreateFrame("Cooldown", nil, state.Clip)
-	state.Recharge:SetPoint("CENTER")
-	state.Recharge:SetFrameLevel(level + 1)
-	state.Recharge:SetDrawSwipe(false)
-	state.Recharge:SetDrawEdge(true)
-	state.Recharge:SetEdgeTexture("Interface\\AddOns\\KamikazeLib\\Media\\CD-Swipe-Edge.tga")
-	state.Recharge:SetEdgeColor(0.6, 1, 0, 1)
-	state.Recharge:SetHideCountdownNumbers(true)
+	fState.Recharge = CreateFrame("Cooldown", nil, fState.Clip)
+	fState.Recharge:SetPoint("CENTER")
+	fState.Recharge:SetFrameLevel(level + 1)
+	fState.Recharge:SetDrawSwipe(false)
+	fState.Recharge:SetDrawEdge(true)
+	fState.Recharge:SetEdgeTexture("Interface\\AddOns\\KamikazeLib\\Media\\CD-Swipe-Edge.tga")
+	fState.Recharge:SetEdgeColor(0.6, 1, 0, 1)
+	fState.Recharge:SetHideCountdownNumbers(true)
 
-	state.Container = CreateFrame("Frame", nil, frame)
-	state.Container:SetAllPoints()
-	state.Container:SetFrameLevel(level + 4)
+	fState.Container = CreateFrame("Frame", nil, fState.frame)
+	fState.Container:SetAllPoints()
+	fState.Container:SetFrameLevel(level + 4)
 
 	-- Press highlight
-	state.Press = state.Container:CreateTexture(nil, "OVERLAY", nil, 0)
-	state.Press:SetAllPoints(state.Cooldown)
-	state.Press:SetColorTexture(unpack(CDM.cfg.pressColor))
-	state.Press:SetBlendMode("ADD")
-	state.Press:Hide()
+	fState.Press = fState.Container:CreateTexture(nil, "OVERLAY", nil, 0)
+	fState.Press:SetAllPoints(fState.Cooldown)
+	fState.Press:SetColorTexture(unpack(CDM.cfg.pressColor))
+	fState.Press:SetBlendMode("ADD")
+	fState.Press:Hide()
 
 	-- Assist glow
-	state.Assist = state.Container:CreateTexture(nil, "OVERLAY", nil, 1)
-	state.Assist:SetAllPoints()
-	state.Assist:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
-	state.Assist:SetTextureSliceMargins(1, 1, 1, 1)
-	state.Assist:SetVertexColor(unpack(CDM.cfg.assistColor))
-	state.Assist:Hide()
+	fState.Assist = fState.Container:CreateTexture(nil, "OVERLAY", nil, 1)
+	fState.Assist:SetAllPoints()
+	fState.Assist:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
+	fState.Assist:SetTextureSliceMargins(1, 1, 1, 1)
+	fState.Assist:SetVertexColor(unpack(CDM.cfg.assistColor))
+	fState.Assist:Hide()
 
 	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
 
 	-- Bling
-	state.Bling = CreateFrame("Cooldown", nil, state.Clip, "CooldownFrameTemplate")
-	state.Bling:ClearAllPoints()
-	state.Bling:SetPoint("CENTER")
-	state.Bling:SetFrameLevel(level + 5)
-	state.Bling:SetDrawSwipe(false)
-	state.Bling:SetDrawEdge(false)
-	state.Bling:SetDrawBling(true)
-	state.Bling:SetBlingTexture("Interface\\Cooldown\\star4", 0.3, 0.6, 1, 0.64)
-	state.Bling:SetHideCountdownNumbers(true)
-	state.Bling:SetScript("OnCooldownDone", function(cooldown) state.hasBling = nil end)
+	fState.Bling = CreateFrame("Cooldown", nil, fState.Clip, "CooldownFrameTemplate")
+	fState.Bling:ClearAllPoints()
+	fState.Bling:SetPoint("CENTER")
+	fState.Bling:SetFrameLevel(level + 5)
+	fState.Bling:SetDrawSwipe(false)
+	fState.Bling:SetDrawEdge(false)
+	fState.Bling:SetDrawBling(true)
+	fState.Bling:SetBlingTexture("Interface\\Cooldown\\star4", 0.3, 0.6, 1, 0.64)
+	fState.Bling:SetHideCountdownNumbers(true)
+	fState.Bling:SetScript("OnCooldownDone", function(cooldown) fState.hasBling = nil end)
 
 	-- Zoom & aspect ratio
 	local z = CDM.cfg.iconZoom
 	local a = CDM.cfg.iconAspect
-	Kami.Util.RectIcon(frame, frame.Icon, z, a)
+	Kami.Util.RectIcon(fState.frame, fState.frame.Icon, z, a)
 
 	-- NOTE: We round the frame size to make it pixel perfect. If the ui scale changes between frames
 	-- being added we can end up rounding to a different size. I think this happens due to floating
@@ -222,36 +224,33 @@ function CDM.OnFrameAdded(viewer, vState, frame)
 	-- subsequent frames not being positioned on pixel boundaries. Seems like it'll be more of a
 	-- fight that way. So we cache the size of the most recent frame and use that for size
 	-- calculations later.
-	vState.xSize = frame:GetWidth()
-	vState.ySize = frame:GetHeight()
+	vState.xSize = fState.frame:GetWidth()
+	vState.ySize = fState.frame:GetHeight()
 
 	-- Reuse allocation for item durations
-	state.itemDuration = C_DurationUtil.CreateDuration()
+	fState.itemDuration = C_DurationUtil.CreateDuration()
 
 	-- Proc glow
-	hooksecurefunc(frame, "RefreshOverlayGlow", CDM.ProcGlow)
+	hooksecurefunc(fState.frame, "RefreshOverlayGlow", CDM.ProcGlow)
 
 	-- Don't desaturate trinkets on GCD
-	hooksecurefunc(frame, "RefreshIconDesaturation", CDM.OnDesaturate)
+	hooksecurefunc(fState.frame, "RefreshIconDesaturation", CDM.OnDesaturate)
 end
 
-function CDM.OnFrameRemoved(viewer, vState, frame)
-	local state = frame.Kami
+function CDM.OnFrameRemoved(vState, fState)
+	fState.hasBling = nil
+	fState.Cooldown:Clear()
+	fState.Recharge:Clear()
+	fState.Press:Hide()
+	fState.Assist:Hide()
+	fState.Bling:Clear()
 
-	state.hasBling = nil
-	state.Cooldown:Clear()
-	state.Recharge:Clear()
-	state.Press:Hide()
-	state.Assist:Hide()
-	state.Bling:Clear()
-
-	if CDM.assistGlow == frame then
-		CDM.assistGlow = nil
+	if CDM.assistGlow == fState then
+		CDM.AssistGlow(nil, nil)
 	end
 
-	if state.hasProcGlow then
-		state.hasProcGlow = nil
-		LCG.PixelGlow_Stop(frame)
+	if fState.hasProcGlow then
+		CDM.ProcGlow(fState.frame, nil, false)
 	end
 end
 
@@ -260,22 +259,20 @@ end
 function CDM.RefreshSpells()
 	-- NOTE: To show the GCD swipe we run on all frames, regardless of which spell the event is for.
 
-	for spellID, frame in pairs(CDM.frames) do
-		local state = frame.Kami
-
+	for spellID, fState in pairs(CDM.spells) do
 		local onCD     = false
 		local onGCD    = false
 		local duration = nil
 
 		-- TODO: Change onCD to not be a super set
-		if state.equipSlot then
-			local start, dur, enable = GetInventoryItemCooldown("player", state.equipSlot)
-			state.itemDuration:SetTimeFromStart(start, dur)
+		if fState.equipSlot then
+			local start, dur, enable = GetInventoryItemCooldown("player", fState.equipSlot)
+			fState.itemDuration:SetTimeFromStart(start, dur)
 			onCD     = enable and enable ~= 0 and dur ~= 0
 			onGCD    = onCD and dur <= 1.5
-			duration = state.itemDuration
+			duration = fState.itemDuration
 		else
-			local cd = frame:GetCooldownInfo() -- CooldownViewerCooldown
+			local cd = fState.frame:GetCooldownInfo() -- CooldownViewerCooldown
 			spellID = cd.overrideSpellID or spellID
 
 			local cdInfo = C_Spell.GetSpellCooldown(spellID) -- SpellCooldownInfo
@@ -285,84 +282,81 @@ function CDM.RefreshSpells()
 		end
 
 		if onCD then
-			state.Cooldown:SetCooldownFromDurationObject(duration)
+			fState.Cooldown:SetCooldownFromDurationObject(duration)
 		else
-			state.Cooldown:Clear()
+			fState.Cooldown:Clear()
 		end
 
 		if onCD and not onGCD then
-			state.hasBling = true
-			state.Bling:SetCooldownFromDurationObject(duration, true)
-		elseif state.hasBling then
-			state.hasBling = nil
-			state.Bling:SetCooldownDuration(1e-3)
+			fState.hasBling = true
+			fState.Bling:SetCooldownFromDurationObject(duration, true)
+		elseif fState.hasBling then
+			fState.hasBling = nil
+			fState.Bling:SetCooldownDuration(1e-3)
 		end
 
 		local chargeInfo = C_Spell.GetSpellCharges(spellID) -- SpellChargeInfo
 		local recharging = chargeInfo and chargeInfo.isActive and (not onCD or onGCD)
 		if recharging then
 			local duration = C_Spell.GetSpellChargeDuration(spellID)
-			state.Recharge:SetCooldownFromDurationObject(duration)
+			fState.Recharge:SetCooldownFromDurationObject(duration)
 		else
-			state.Recharge:Clear()
+			fState.Recharge:Clear()
 		end
 	end
 end
 
-function CDM.ProcGlow(frame, showFromEvent)
-	-- NOTE: showFromEvent can be nil, in which case we have to derive it anyway.
+function CDM.ProcGlow(frame, showFromEvent, show)
+-- NOTE: showFromEvent can be nil, in which case we have to derive it anyway.
 
-	local state = frame.Kami
-	local show = ActionButtonSpellAlertManager:HasAlert(frame)
+	local fState = CDM.frames[frame]
+	if show == nil then
+		show = ActionButtonSpellAlertManager:HasAlert(fState.frame)
+	end
+
 	if show then
-		frame.SpellActivationAlert:SetAlpha(0)
+		fState.frame.SpellActivationAlert:SetAlpha(0)
 
-		if not state.hasProcGlow then
-			state.hasProcGlow = true
+		if not fState.hasProcGlow then
+			fState.hasProcGlow = true
 			-- NOTE: The math here is correcting for the glow not actually being pixel perfect.
-			local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
+			local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / fState.frame:GetEffectiveScale()
 			local thickness  = CDM.cfg.procSize * pixelsToUI
 			local offset     = 0
-			local xSizeEff   = frame:GetWidth()  - thickness + (2 * offset) - 0.05
-			local ySizeEff   = frame:GetHeight() - thickness + (2 * offset) - 0.00
+			local xSizeEff   = fState.frame:GetWidth()  - thickness + (2 * offset) - 0.05
+			local ySizeEff   = fState.frame:GetHeight() - thickness + (2 * offset) - 0.00
 			local xOffset    = (Round(xSizeEff) - xSizeEff) / 2 + offset
 			local yOffset    = (Round(ySizeEff) - ySizeEff) / 2 + offset
-			LCG.PixelGlow_Start(frame, CDM.cfg.procColor, nil, CDM.cfg.procSpeed, nil, thickness, xOffset, yOffset, false)
+			LCG.PixelGlow_Start(fState.frame, CDM.cfg.procColor, nil, CDM.cfg.procSpeed, nil, thickness, xOffset, yOffset, false)
 		end
 	else
-		if state.hasProcGlow then
-			state.hasProcGlow = nil
-			LCG.PixelGlow_Stop(frame)
+		if fState.hasProcGlow then
+			fState.hasProcGlow = nil
+			LCG.PixelGlow_Stop(fState.frame)
 		end
 	end
 end
 
-function CDM.AssistantGlow(mgr, oSpellID)
+function CDM.AssistGlow(mgr, oSpellID)
+
 	-- Hide old glow
 	if CDM.assistGlow then
-		local frame = CDM.assistGlow
-		local state = frame.Kami
-
+		CDM.assistGlow.Assist:Hide()
 		CDM.assistGlow = nil
-		state.Assist:Hide()
 	end
 
 	-- Show new glow
-	if oSpellID then
-		local frame = CDM.frames[oSpellID] or CDM.overrides[oSpellID]
-		if frame then
-			local state = frame.Kami
-
-			CDM.assistGlow = frame
-			state.Assist:Show()
-		end
+	local fState = oSpellID and (CDM.spells[oSpellID] or CDM.overrides[oSpellID])
+	if fState then
+		CDM.assistGlow = fState
+		fState.Assist:Show()
 	end
 end
 
 function CDM.OnDesaturate(frame)
-	local state = frame.Kami
-	if state.equipSlot then
-		local start, dur, enable = GetInventoryItemCooldown("player", state.equipSlot)
+	local fState = CDM.frames[frame]
+	if fState.equipSlot then
+		local start, dur, enable = GetInventoryItemCooldown("player", fState.equipSlot)
 		local onCD  = enable and enable ~= 0 and dur ~= 0
 		local onGCD = onCD and dur <= 1.5
 		frame.Icon:SetDesaturated(onCD and not onGCD)
@@ -390,36 +384,36 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 			spellID = C_ActionBar.GetSpell(slot)
 		end
 
-		if spellID and CDM.frames[spellID] then
-			local frame = CDM.frames[spellID]
-			local state = frame.Kami
+		if spellID and CDM.spells[spellID] then
+			local fState = CDM.spells[spellID]
 
 			-- TODO: There can be multiple active presses
-			if CDM.activePress and CDM.activePress ~= state.Press then
+			if CDM.activePress and CDM.activePress ~= fState.Press then
 				CDM.activePress:Hide()
 			end
-			CDM.activePress = state.Press
-			state.Press:SetShown(down)
+			CDM.activePress = fState.Press
+			fState.Press:SetShown(down)
 		end
 	end
 end
 
--- TODO: Orientation and direction
 function CDM.RefreshPositions(viewer)
-	local frames = viewer:GetLayoutChildren()
+	local vState = CDM.viewers[viewer]
+
+	local frames = vState.viewer:GetLayoutChildren()
 	if #frames == 0 then return end
 
-	local vPixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / viewer:GetEffectiveScale()
+	local vPixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / vState.viewer:GetEffectiveScale()
 	local fPixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / frames[1]:GetEffectiveScale()
 
-	local vxSize = viewer:GetWidth()     / vPixelsToUI
-	local vxPos  = viewer:GetLeft()      / vPixelsToUI
-	local vyPos  = viewer:GetTop()       / vPixelsToUI
-	local xSize  = frames[1]:GetWidth()  / fPixelsToUI
-	local ySize  = frames[1]:GetHeight() / fPixelsToUI
+	local vxSize = vState.viewer:GetWidth() / vPixelsToUI
+	local vxPos  = vState.viewer:GetLeft()  / vPixelsToUI
+	local vyPos  = vState.viewer:GetTop()   / vPixelsToUI
+	local xSize  = frames[1]:GetWidth()     / fPixelsToUI
+	local ySize  = frames[1]:GetHeight()    / fPixelsToUI
 
-	local pad   = viewer.iconPadding
-	local limit = viewer.iconLimit
+	local pad   = vState.viewer.iconPadding
+	local limit = vState.viewer.iconLimit
 
 	vxPos = Round(vxPos) - vxPos
 	vyPos = Round(vyPos) - vyPos
@@ -436,64 +430,62 @@ function CDM.RefreshPositions(viewer)
 		local yPos = vyPos - iRow * (ySize + pad)
 
 		frame:ClearAllPoints()
-		frame:SetPoint("TOPLEFT", viewer, "TOPLEFT", xPos * fPixelsToUI, yPos * fPixelsToUI)
+		frame:SetPoint("TOPLEFT", vState.viewer, "TOPLEFT", xPos * fPixelsToUI, yPos * fPixelsToUI)
 	end
 end
 
--- TODO: Handle position changes through Edit Mode
 function CDM.RefreshSizesAndPositions()
 	-- NOTE: This can get called during login before the viewers have been anchored
 	for viewer, vState in pairs(CDM.viewers) do
-		if viewer:IsRectValid() then
-			CDM.RefreshSizes(viewer, vState)
-			CDM.RefreshPositions(viewer)
+		if vState.viewer:IsRectValid() then
+			CDM.RefreshSizes(vState)
+			CDM.RefreshPositions(vState)
 		end
 	end
 end
 
 -- TODO: Pixel perfect is broken after a scale change
-
 -- TODO: Could we set frame scale so local space is pixels? We would only need to update the frame
 -- scale here, which is presumably a faster path.
-function CDM.RefreshSizes(viewer, vState)
+function CDM.RefreshSizes(vState)
 	-- NOTE: Our icon ends up visually larger than the built-in. The built in has transparent edges
 	-- and an additional padding offset of -4 (viewer:GetAdditionalPaddingOffset()). The base size is
 	-- 50px, the ui-to-pixel scale comes out to 1.687 with my current settings. At 100%, the built-in
 	-- ends up with a frame size of 85 but a visual size 77. Ours, without the transparent
 	-- edges/padding, is visually the full 85px.
 
-	local frames = viewer:GetLayoutChildren()
+	local frames = vState.viewer:GetLayoutChildren()
 	if #frames == 0 then return end
 
 	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / frames[1]:GetEffectiveScale()
 	local xSize = Round(vState.xSize / pixelsToUI) * pixelsToUI
 	local ySize = Round(vState.ySize / pixelsToUI) * pixelsToUI
 
-	for frame in viewer.itemFramePool:EnumerateActive() do
-		if frame.Kami then
-			local state = frame.Kami
+	for frame in vState.viewer.itemFramePool:EnumerateActive() do
+		local fState = CDM.frames[frame]
+		if fState then
 			frame:SetSize(xSize, ySize)
 
 			local borderSize = CDM.cfg.borderSize * pixelsToUI
-			Kami.Util.SetSliceScale(state.Border, borderSize)
+			Kami.Util.SetSliceScale(fState.Border, borderSize)
 
 			local assistSize = CDM.cfg.assistSize * pixelsToUI
-			Kami.Util.SetSliceScale(state.Assist, assistSize)
+			Kami.Util.SetSliceScale(fState.Assist, assistSize)
 
 			Kami.Util.Inset(frame.Icon,       borderSize)
 			Kami.Util.Inset(frame.OutOfRange, borderSize)
-			Kami.Util.Inset(state.Cooldown,   borderSize)
+			Kami.Util.Inset(fState.Cooldown,   borderSize)
 
 			local inset = 2 * borderSize
 			local diagSize = sqrt((xSize - inset)^2 + (ySize - inset)^2)
-			state.Recharge:SetSize(diagSize, diagSize)
-			state.Bling:SetSize(diagSize, diagSize)
+			fState.Recharge:SetSize(diagSize, diagSize)
+			fState.Bling:SetSize(diagSize, diagSize)
 		end
 	end
 end
 
 function CDM.RegisterEvent(event, func)
-	CDM.frame:RegisterEvent(event)
+	CDM.eventFrame:RegisterEvent(event)
 	CDM.handlers[event] = func
 end
 

@@ -1,6 +1,6 @@
 To Do
 -----
-Add fState
+Name callbacks differently
 Custom row wrapping
 Cooldown text
 Handle healthstone
@@ -13,7 +13,10 @@ Settings work in combat
 Hide pip
 Show permanent buff bars as full
 ----
-Edit mode support (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
+Edit mode support
+	C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED
+	position changes
+	Orientation and direction
 Anchoring
 Disable ability highlight on specific spells
 Separate settings for each viewer
