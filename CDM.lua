@@ -113,12 +113,15 @@ function CDM.OnFrameAdded(viewer, vState, frame)
 	-- - CooldownFlash
 	-- - OutOfRange
 	--
-	-- Added                 (Parent   Anchor    Inset)
-	-- - (Frame) Border   -> Frame     Frame     No
-	-- - (Frame) Cooldown -> Frame     Frame     Yes
-	-- - (Frame) Recharge -> Cooldown  Cooldown  Yes
-	-- - (Frame) Press    -> Cooldown  Cooldown  Yes
-	-- - (Frame) Bling    -> Cooldown  Cooldown  Yes
+	-- Added                   (Parent    Anchor    Inset)
+	-- - (Texture) Border    -> Frame     Frame     No
+	-- - (Frame)   Cooldown  -> Frame     Frame     Yes
+	-- - (Frame)   Clip      -> Frame     Frame     Yes
+	-- - (Frame)   Recharge  -> Clip      Clip      Yes
+	-- - (Frame)   Container -> Frame     Frame     No
+	-- - (Texture) Press     -> Container Cooldown  Yes
+	-- - (Texture) Assist    -> Container Container No
+	-- - (Frame)   Bling     -> Clip      Clip      Yes
 
 	-- Remove mask (reveals the silver border)
 	for i = 1, frame.Icon:GetNumMaskTextures() do
@@ -138,12 +141,21 @@ function CDM.OnFrameAdded(viewer, vState, frame)
 	frame.Cooldown:SetAlpha(0)
 	frame.CooldownFlash:SetAlpha(0)
 
+	-- Add border
+	state.Border = frame:CreateTexture(nil, "OVERLAY")
+	state.Border:SetAllPoints()
+	state.Border:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
+	state.Border:SetTextureSliceMargins(1, 1, 1, 1)
+	state.Border:SetVertexColor(unpack(CDM.cfg.borderColor))
+
 	-- NOTE: The CD swipe is replaced because we don't want the active aura highlight
+	-- NOTE: Cooldown frames hide themselves when they aren't active (and thus textures & children)
 
 	-- Cooldown swipe
-	local level = frame.Cooldown:GetFrameLevel()
+	local level = frame:GetFrameLevel()
 	state.Cooldown = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
-	state.Cooldown:SetFrameLevel(level + 1)
+	state.Cooldown:ClearAllPoints()
+	state.Cooldown:SetFrameLevel(level + 2)
 	state.Cooldown:SetDrawEdge(false)
 	state.Cooldown:SetSwipeColor(0, 0, 0, 0.6)
 	state.Cooldown:SetDrawBling(false)
@@ -151,44 +163,45 @@ function CDM.OnFrameAdded(viewer, vState, frame)
 
 	-- BUG: Edge and bling are broken in 12.1 They aren't scaled properly and they don't
 	-- clip. They show up as a rotating rectangle. So we manually rescale and clip them.
-	state.Cooldown:SetClipsChildren(true)
+	state.Clip = CreateFrame("Frame", nil, frame)
+	state.Clip:SetAllPoints(state.Cooldown)
+	state.Clip:SetFrameLevel(level + 3)
+	state.Clip:SetClipsChildren(true)
 
 	-- Recharge edge
-	state.Recharge = CreateFrame("Cooldown", nil, state.Cooldown)
+	state.Recharge = CreateFrame("Cooldown", nil, state.Clip)
 	state.Recharge:SetPoint("CENTER")
-	state.Recharge:SetFrameLevel(level + 2)
+	state.Recharge:SetFrameLevel(level + 1)
 	state.Recharge:SetDrawSwipe(false)
 	state.Recharge:SetDrawEdge(true)
 	state.Recharge:SetEdgeTexture("Interface\\AddOns\\KamikazeLib\\Media\\CD-Swipe-Edge.tga")
 	state.Recharge:SetEdgeColor(0.6, 1, 0, 1)
 	state.Recharge:SetHideCountdownNumbers(true)
 
-	-- TODO: Can this be a texture?
-	-- Press highlight
-	state.Press = CreateFrame("Frame", nil, state.Cooldown)
-	state.Press:SetAllPoints()
-	state.Press:SetFrameLevel(level + 3)
-	state.Press:Hide()
-	state.Press.Texture = state.Press:CreateTexture(nil, "OVERLAY")
-	state.Press.Texture:SetAllPoints()
-	state.Press.Texture:SetColorTexture(unpack(CDM.cfg.pressColor))
-	state.Press.Texture:SetBlendMode("ADD")
+	state.Container = CreateFrame("Frame", nil, frame)
+	state.Container:SetAllPoints()
+	state.Container:SetFrameLevel(level + 4)
 
-	-- Add border
-	state.Border = CreateFrame("Frame", nil, frame)
-	state.Border:SetAllPoints()
-	state.Border:SetFrameLevel(level + 4)
-	state.Border.Texture = state.Border:CreateTexture(nil, "OVERLAY")
-	state.Border.Texture:SetAllPoints()
-	state.Border.Texture:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
-	state.Border.Texture:SetTextureSliceMargins(1, 1, 1, 1)
-	state.Border.Texture:SetVertexColor(unpack(CDM.cfg.borderColor))
-	state.borderSize = CDM.cfg.borderSize
+	-- Press highlight
+	state.Press = state.Container:CreateTexture(nil, "OVERLAY", nil, 0)
+	state.Press:SetAllPoints(state.Cooldown)
+	state.Press:SetColorTexture(unpack(CDM.cfg.pressColor))
+	state.Press:SetBlendMode("ADD")
+	state.Press:Hide()
+
+	-- Assist glow
+	state.Assist = state.Container:CreateTexture(nil, "OVERLAY", nil, 1)
+	state.Assist:SetAllPoints()
+	state.Assist:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
+	state.Assist:SetTextureSliceMargins(1, 1, 1, 1)
+	state.Assist:SetVertexColor(unpack(CDM.cfg.assistColor))
+	state.Assist:Hide()
 
 	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
 
 	-- Bling
-	state.Bling = CreateFrame("Cooldown", nil, state.Cooldown, "CooldownFrameTemplate")
+	state.Bling = CreateFrame("Cooldown", nil, state.Clip, "CooldownFrameTemplate")
+	state.Bling:ClearAllPoints()
 	state.Bling:SetPoint("CENTER")
 	state.Bling:SetFrameLevel(level + 5)
 	state.Bling:SetDrawSwipe(false)
@@ -228,13 +241,17 @@ function CDM.OnFrameRemoved(viewer, vState, frame)
 	state.hasBling = nil
 	state.Cooldown:Clear()
 	state.Recharge:Clear()
-	state.Bling:Clear()
 	state.Press:Hide()
+	state.Assist:Hide()
+	state.Bling:Clear()
 
-	if frame == CDM.activeGlow then
-		CDM.activeGlow = nil
-		state.borderSize = CDM.cfg.borderSize
-		state.Border.Texture:SetVertexColor(unpack(CDM.cfg.borderColor))
+	if CDM.assistGlow == frame then
+		CDM.assistGlow = nil
+	end
+
+	if state.hasProcGlow then
+		state.hasProcGlow = nil
+		LCG.PixelGlow_Stop(frame)
 	end
 end
 
@@ -314,7 +331,7 @@ function CDM.ProcGlow(frame, showFromEvent)
 		end
 	else
 		if state.hasProcGlow then
-			state.hasProcGlow = false
+			state.hasProcGlow = nil
 			LCG.PixelGlow_Stop(frame)
 		end
 	end
@@ -322,17 +339,12 @@ end
 
 function CDM.AssistantGlow(mgr, oSpellID)
 	-- Hide old glow
-	if CDM.activeGlow then
-		local frame = CDM.activeGlow
+	if CDM.assistGlow then
+		local frame = CDM.assistGlow
 		local state = frame.Kami
 
-		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
-
-		CDM.activeGlow = nil
-		state.borderSize = CDM.cfg.borderSize
-		local scale = state.borderSize * pixelsToUI
-		CDM.SetSliceScale(state.Border, scale)
-		state.Border.Texture:SetVertexColor(unpack(CDM.cfg.borderColor))
+		CDM.assistGlow = nil
+		state.Assist:Hide()
 	end
 
 	-- Show new glow
@@ -341,13 +353,8 @@ function CDM.AssistantGlow(mgr, oSpellID)
 		if frame then
 			local state = frame.Kami
 
-			local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
-
-			CDM.activeGlow = frame
-			state.borderSize = CDM.cfg.assistSize
-			local scale = state.borderSize * pixelsToUI
-			CDM.SetSliceScale(state.Border, scale)
-			state.Border.Texture:SetVertexColor(unpack(CDM.cfg.assistColor))
+			CDM.assistGlow = frame
+			state.Assist:Show()
 		end
 	end
 end
@@ -444,13 +451,16 @@ function CDM.RefreshSizesAndPositions()
 	end
 end
 
+-- TODO: Pixel perfect is broken after a scale change
+
 -- TODO: Could we set frame scale so local space is pixels? We would only need to update the frame
 -- scale here, which is presumably a faster path.
 function CDM.RefreshSizes(viewer, vState)
 	-- NOTE: Our icon ends up visually larger than the built-in. The built in has transparent edges
 	-- and an additional padding offset of -4 (viewer:GetAdditionalPaddingOffset()). The base size is
 	-- 50px, the ui-to-pixel scale comes out to 1.687 with my current settings. At 100%, the built-in
-	-- ends up with a frame size of 84
+	-- ends up with a frame size of 85 but a visual size 77. Ours, without the transparent
+	-- edges/padding, is visually the full 85px.
 
 	local frames = viewer:GetLayoutChildren()
 	if #frames == 0 then return end
@@ -464,13 +474,15 @@ function CDM.RefreshSizes(viewer, vState)
 			local state = frame.Kami
 			frame:SetSize(xSize, ySize)
 
-			local scale = state.borderSize * pixelsToUI
-			CDM.SetSliceScale(state.Border, scale)
-
 			local borderSize = CDM.cfg.borderSize * pixelsToUI
-			CDM.Inset(frame.Icon,       borderSize)
-			CDM.Inset(frame.OutOfRange, borderSize)
-			CDM.Inset(state.Cooldown,   borderSize)
+			Kami.Util.SetSliceScale(state.Border, borderSize)
+
+			local assistSize = CDM.cfg.assistSize * pixelsToUI
+			Kami.Util.SetSliceScale(state.Assist, assistSize)
+
+			Kami.Util.Inset(frame.Icon,       borderSize)
+			Kami.Util.Inset(frame.OutOfRange, borderSize)
+			Kami.Util.Inset(state.Cooldown,   borderSize)
 
 			local inset = 2 * borderSize
 			local diagSize = sqrt((xSize - inset)^2 + (ySize - inset)^2)
@@ -478,23 +490,6 @@ function CDM.RefreshSizes(viewer, vState)
 			state.Bling:SetSize(diagSize, diagSize)
 		end
 	end
-end
-
-function CDM.SetSliceScale(frame, scale)
-	-- NOTE: Changing the scale doesn't work without some coercion. The Hide/Show cycle works, but it
-	-- causes all borders using the same texture to change if the scale is set beforehand. A
-	-- SetTexture cycle breaks the shared state somehow. Various other things that don't work at all:
-	-- SetAllPoints, SetTexture(nil), ClearTextureSlice. It also matter whether you call these things
-	-- on the frame or the texture. Putting the SetScale last seems to work.
-	frame:Hide()
-	frame:SetScale(scale)
-	frame:Show()
-end
-
-function CDM.Inset(frame, amount)
-	frame:ClearAllPoints()
-	frame:SetPoint("TOPLEFT",      amount, -amount)
-	frame:SetPoint("BOTTOMRIGHT", -amount,  amount)
 end
 
 function CDM.RegisterEvent(event, func)

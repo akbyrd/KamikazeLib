@@ -6,6 +6,7 @@ Cooldown text
 Handle healthstone
 Handle combat potion
 Handle health potion
+Pandemic support
 ----
 Custom spell color (classify?)
 Settings work in combat
