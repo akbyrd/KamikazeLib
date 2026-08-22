@@ -300,10 +300,11 @@ function CDM.ProcGlow(frame, showFromEvent)
 			-- NOTE: The math here is correcting for the glow not actually being pixel perfect.
 			local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
 			local thickness  = CDM.cfg.procWidth * pixelsToUI
-			local xSizeEff   = frame:GetWidth()  - thickness - 0.05
-			local ySizeEff   = frame:GetHeight() - thickness - 0.00
-			local xOffset    = (Round(xSizeEff) - xSizeEff) / 2
-			local yOffset    = (Round(ySizeEff) - ySizeEff) / 2
+			local offset     = -1 * pixelsToUI
+			local xSizeEff   = frame:GetWidth()  - thickness + (2 * offset) - 0.05
+			local ySizeEff   = frame:GetHeight() - thickness + (2 * offset) - 0.00
+			local xOffset    = (Round(xSizeEff) - xSizeEff) / 2 + offset
+			local yOffset    = (Round(ySizeEff) - ySizeEff) / 2 + offset
 			LCG.PixelGlow_Start(frame, CDM.cfg.procColor, nil, CDM.cfg.procSpeed, nil, thickness, xOffset, yOffset, false)
 		end
 	else
