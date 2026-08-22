@@ -110,13 +110,12 @@ function CDM.OnFrameAdded(viewer, vState, frame)
 	-- - CooldownFlash
 	-- - OutOfRange
 	--
-	-- Added                   (Parent   Anchor    Inset)
-	-- - (Frame)   Cooldown -> Frame     Frame     Yes
-	-- - (Frame)   Recharge -> Cooldown  Cooldown  Yes
-	-- - (Frame)   Bling    -> Cooldown  Cooldown  Yes
-	-- - (Frame)   Press    -> Cooldown  Cooldown  Yes
-	-- - (Texture) Border1  -> ----      Frame?    No
-	-- - (Texture) Border2  -> ----      Frame?    Special
+	-- Added                 (Parent   Anchor    Inset)
+	-- - (Frame) Border   -> Frame     Frame     No
+	-- - (Frame) Cooldown -> Frame     Frame     Yes
+	-- - (Frame) Recharge -> Cooldown  Cooldown  Yes
+	-- - (Frame) Press    -> Cooldown  Cooldown  Yes
+	-- - (Frame) Bling    -> Cooldown  Cooldown  Yes
 
 	-- Remove mask (reveals the silver border)
 	for i = 1, frame.Icon:GetNumMaskTextures() do
@@ -136,12 +135,19 @@ function CDM.OnFrameAdded(viewer, vState, frame)
 	frame.Cooldown:SetAlpha(0)
 	frame.CooldownFlash:SetAlpha(0)
 
+	-- Add border
+	local level = frame.Cooldown:GetFrameLevel()
+	state.Border = CreateFrame("FRAME", nil, frame, "BackdropTemplate")
+	state.Border:SetAllPoints()
+	state.Border:SetFrameLevel(level + 1)
+	state.Border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+	state.Border:SetBackdropBorderColor(unpack(CDM.cfg.borderColor))
+
 	-- NOTE: The CD swipe is replaced because we don't want the active aura highlight
 
 	-- Cooldown swipe
-	local level = frame.Cooldown:GetFrameLevel()
 	state.Cooldown = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
-	state.Cooldown:SetFrameLevel(level + 1)
+	state.Cooldown:SetFrameLevel(level + 2)
 	state.Cooldown:SetDrawEdge(false)
 	state.Cooldown:SetSwipeColor(0, 0, 0, 0.6)
 	state.Cooldown:SetDrawBling(false)
@@ -154,25 +160,12 @@ function CDM.OnFrameAdded(viewer, vState, frame)
 	-- Recharge edge
 	state.Recharge = CreateFrame("Cooldown", nil, state.Cooldown)
 	state.Recharge:SetPoint("CENTER")
-	state.Recharge:SetFrameLevel(level + 2)
+	state.Recharge:SetFrameLevel(level + 3)
 	state.Recharge:SetDrawSwipe(false)
 	state.Recharge:SetDrawEdge(true)
 	state.Recharge:SetEdgeTexture("Interface\\AddOns\\KamikazeLib\\Media\\CD-Swipe-Edge.tga")
 	state.Recharge:SetEdgeColor(0.6, 1, 0, 1)
 	state.Recharge:SetHideCountdownNumbers(true)
-
-	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
-
-	-- Bling
-	state.Bling = CreateFrame("Cooldown", nil, state.Cooldown, "CooldownFrameTemplate")
-	state.Bling:SetPoint("CENTER")
-	state.Bling:SetFrameLevel(level + 3)
-	state.Bling:SetDrawSwipe(false)
-	state.Bling:SetDrawEdge(false)
-	state.Bling:SetDrawBling(true)
-	state.Bling:SetBlingTexture("Interface\\Cooldown\\star4", 0.3, 0.6, 1, 0.64)
-	state.Bling:SetHideCountdownNumbers(true)
-	state.Bling:SetScript("OnCooldownDone", function(cooldown) state.hasBling = nil end)
 
 	-- Press highlight
 	state.Press = CreateFrame("Frame", nil, state.Cooldown)
@@ -184,19 +177,23 @@ function CDM.OnFrameAdded(viewer, vState, frame)
 	state.Press.Texture:SetColorTexture(unpack(CDM.cfg.pressColor))
 	state.Press.Texture:SetBlendMode("ADD")
 
+	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
+
+	-- Bling
+	state.Bling = CreateFrame("Cooldown", nil, state.Cooldown, "CooldownFrameTemplate")
+	state.Bling:SetPoint("CENTER")
+	state.Bling:SetFrameLevel(level + 5)
+	state.Bling:SetDrawSwipe(false)
+	state.Bling:SetDrawEdge(false)
+	state.Bling:SetDrawBling(true)
+	state.Bling:SetBlingTexture("Interface\\Cooldown\\star4", 0.3, 0.6, 1, 0.64)
+	state.Bling:SetHideCountdownNumbers(true)
+	state.Bling:SetScript("OnCooldownDone", function(cooldown) state.hasBling = nil end)
+
 	-- Zoom & aspect ratio
 	local z = CDM.cfg.iconZoom
 	local a = CDM.cfg.iconAspect
 	Kami.Util.RectIcon(frame, frame.Icon, z, a)
-
-	-- TODO: Try a 9-slice
-	-- Add border
-	state.Border1 = frame:CreateTexture(nil, "BACKGROUND", nil, 0)
-	state.Border1:SetAllPoints()
-	state.Border1:SetColorTexture(unpack(CDM.cfg.borderColor))
-
-	state.Border2 = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
-	state.Border2:SetColorTexture(unpack(CDM.cfg.borderColor))
 
 	-- NOTE: We round the frame size to make it pixel perfect. If the ui scale changes between frames
 	-- being added we can end up rounding to a different size. I think this happens due to floating
@@ -228,8 +225,7 @@ function CDM.OnFrameRemoved(viewer, vState, frame)
 
 	if frame == CDM.activeGlow then
 		CDM.activeGlow = nil
-		state.Border1:SetColorTexture(unpack(CDM.cfg.borderColor))
-		state.Border2:SetColorTexture(unpack(CDM.cfg.borderColor))
+		state.Border:SetBackdropBorderColor(unpack(CDM.cfg.borderColor))
 	end
 end
 
@@ -315,7 +311,6 @@ function CDM.ProcGlow(frame, showFromEvent)
 	end
 end
 
--- TODO: How do we handle overlapping borders?
 function CDM.AssistantGlow(mgr, oSpellID)
 	-- Hide old glow
 	if CDM.activeGlow then
@@ -323,8 +318,7 @@ function CDM.AssistantGlow(mgr, oSpellID)
 		local state = frame.Kami
 
 		CDM.activeGlow = nil
-		state.Border1:SetColorTexture(unpack(CDM.cfg.borderColor))
-		state.Border2:SetColorTexture(unpack(CDM.cfg.borderColor))
+		state.Border:SetBackdropBorderColor(unpack(CDM.cfg.borderColor))
 	end
 
 	-- Show new glow
@@ -334,8 +328,7 @@ function CDM.AssistantGlow(mgr, oSpellID)
 			local state = frame.Kami
 
 			CDM.activeGlow = frame
-			state.Border1:SetColorTexture(unpack(CDM.cfg.assistColor))
-			state.Border2:SetColorTexture(unpack(CDM.cfg.assistColor))
+			state.Border:SetBackdropBorderColor(unpack(CDM.cfg.assistColor))
 		end
 	end
 end
@@ -432,6 +425,8 @@ function CDM.RefreshSizesAndPositions()
 	end
 end
 
+-- TODO: Could we set frame scale so local space is pixels? We would only need to update the frame
+-- scale here, which is presumably a faster path.
 function CDM.RefreshSizes(viewer, vState)
 	-- NOTE: Our icon ends up visually larger than the built-in. The built in has transparent edges
 	-- and an additional padding offset of -4 (viewer:GetAdditionalPaddingOffset()). The base size is
@@ -450,10 +445,11 @@ function CDM.RefreshSizes(viewer, vState)
 			local state = frame.Kami
 			frame:SetSize(xSize, ySize)
 
-			local onePx = 1 * pixelsToUI
-			CDM.Inset(state.Border2, onePx)
-
 			local borderSize = CDM.cfg.iconBorder * pixelsToUI
+			local r, g, b, a = state.Border:GetBackdropBorderColor()
+			state.Border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = borderSize })
+			state.Border:SetBackdropBorderColor(r, g, b, a)
+
 			CDM.Inset(frame.Icon,       borderSize)
 			CDM.Inset(frame.OutOfRange, borderSize)
 			CDM.Inset(state.Cooldown,   borderSize)

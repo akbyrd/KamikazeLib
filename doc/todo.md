@@ -1,6 +1,6 @@
 To Do
 -----
-Fine tune borders
+Add fState
 Custom row wrapping
 Cooldown text
 Handle healthstone
