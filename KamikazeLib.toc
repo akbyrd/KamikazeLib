@@ -16,3 +16,4 @@ WorldMarkers.lua
 MouseCursor.lua
 CombatText.lua
 CDM.lua
+CDM2.lua

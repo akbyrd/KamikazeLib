@@ -56,7 +56,7 @@ function CDM.Load()
 	})
 
 	CDM.handlers = {}
-	CDM.eventFrame = CreateFrame("Frame", "KL_CDM")
+	CDM.eventFrame = CreateFrame("Frame", "KL_CDM_EVENT")
 	CDM.eventFrame:SetScript("OnEvent", CDM.DispatchEvent)
 
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN", CDM.SPELL_UPDATE_COOLDOWN)
