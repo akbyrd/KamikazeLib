@@ -23,7 +23,6 @@ Buff Bars
 	Pandemic support
 Profile performance
 Replace LibCustomGlow. It sucks
-Use item id to support older potions?
 
 
 

@@ -35,78 +35,25 @@ function CDM.Load()
 		[UtilityCooldownViewer]   = { viewer = UtilityCooldownViewer },
 	}
 
-	-- Always 1 unit: 1m, not 1m 10s
-	-- Two digits of precision if possible: 1.6m, 16m
-	-- Show seconds when <3 digits: 99s, not 2m
-	-- Don't units for seconds: 6, not 6s
-	-- Units are a single letter
-	-- Units are localized
-	-- No space before units
-	-- Support seconds, minutes, hours, and days
+	local round = Enum.NumericRuleFormatRounding.Up
 
-	local pick = 2
-	if pick == 1 then
-		-- <1s shows up as 0.xxx, ore truncated to 0
+	local units = CreateFromMixins(SecondsFormatterMixin)
+	units:SetStripIntervalWhitespace(true)
 
-		local units = CreateFromMixins(SecondsFormatterMixin)
-		units:Init(0, SecondsFormatter.Abbreviation.OneLetter)
-		units:SetStripIntervalWhitespace(true)
+	local mFmt = units:GetFormatString(SecondsFormatter.Interval.Minutes, SecondsFormatter.Abbreviation.OneLetter, true)
+	local hFmt = units:GetFormatString(SecondsFormatter.Interval.Hours,   SecondsFormatter.Abbreviation.OneLetter, true)
+	local dFmt = units:GetFormatString(SecondsFormatter.Interval.Days,    SecondsFormatter.Abbreviation.OneLetter, true)
 
-		local function UnitFormat(interval, spec)
-			return (units:GetFormatString(interval, SecondsFormatter.Abbreviation.OneLetter, false):gsub("%%d", spec))
-		end
-
-		local m = UnitFormat(SecondsFormatter.Interval.Minutes, "")
-		local h = UnitFormat(SecondsFormatter.Interval.Hours, "")
-
-		CDM.formatter = C_StringUtil.CreateAbbreviatedNumberFormatter()
-		CDM.formatter:SetBreakpoints({
-			{ breakpoint = 0.001, abbreviation = "", significandDivisor =    1, fractionDivisor =  1, abbreviationIsGlobal = false },
-			{ breakpoint =   100, abbreviation = m,  significandDivisor =    6, fractionDivisor = 10, abbreviationIsGlobal = false },
-			{ breakpoint =   600, abbreviation = m,  significandDivisor =   60, fractionDivisor =  1, abbreviationIsGlobal = false },
-			{ breakpoint =  6000, abbreviation = h,  significandDivisor =  360, fractionDivisor = 10, abbreviationIsGlobal = false },
-			{ breakpoint = 36000, abbreviation = h,  significandDivisor = 3600, fractionDivisor =  1, abbreviationIsGlobal = false },
-		})
-
-	elseif pick == 2 then
-		local round = Enum.NumericRuleFormatRounding.Up
-
-		local units = CreateFromMixins(SecondsFormatterMixin)
-		units:SetStripIntervalWhitespace(true)
-
-		local mFmt = units:GetFormatString(SecondsFormatter.Interval.Minutes, SecondsFormatter.Abbreviation.OneLetter, true)
-		local hFmt = units:GetFormatString(SecondsFormatter.Interval.Hours,   SecondsFormatter.Abbreviation.OneLetter, true)
-		local dFmt = units:GetFormatString(SecondsFormatter.Interval.Days,    SecondsFormatter.Abbreviation.OneLetter, true)
-
-		CDM.formatter = C_StringUtil.CreateNumericRuleFormatter()
-		CDM.formatter:SetBreakpoints({
-			{ threshold = 0,                     format = "%d",                      components = {{ div = 1,                step = 1,   rounding = round }} },
-			{ threshold = 99,                    format = mFmt:gsub("%%d", "%%.1f"), components = {{ div = SECONDS_PER_MIN,  step = 0.1, rounding = round }} },
-			{ threshold = 2  * SECONDS_PER_MIN,  format = mFmt,                      components = {{ div = SECONDS_PER_MIN,  step = 1,   rounding = round }} },
-			{ threshold = 99 * SECONDS_PER_MIN,  format = hFmt:gsub("%%d", "%%.1f"), components = {{ div = SECONDS_PER_HOUR, step = 0.1, rounding = round }} },
-			{ threshold = 2  * SECONDS_PER_HOUR, format = hFmt,                      components = {{ div = SECONDS_PER_HOUR, step = 1,   rounding = round }} },
-			{ threshold = 1  * SECONDS_PER_DAY,  format = dFmt:gsub("%%d", "%%.1f"), components = {{ div = SECONDS_PER_DAY,  step = 0.1, rounding = round }} },
-			{ threshold = 2  * SECONDS_PER_DAY,  format = dFmt,                      components = {{ div = SECONDS_PER_DAY,  step = 1,   rounding = round }} },
-		})
-
-	elseif pick == 3 then
-		-- Can't hide seconds unit
-		-- Can't do fractional minutes
-
-		local band = C_CurveUtil.CreateCurve()
-		band:SetType(Enum.LuaCurveType.Step)
-		band:AddPoint(0,   Enum.SecondsFormatterInterval.Seconds)
-		band:AddPoint(100, Enum.SecondsFormatterInterval.Minutes)
-
-		CDM.formatter = C_StringUtil.CreateSecondsFormatter()
-		CDM.formatter:SetDesiredUnitCount(1)
-		CDM.formatter:SetMinInterval(Enum.SecondsFormatterInterval.Seconds)
-		CDM.formatter:SetMaxIntervalCurve(band)
-		CDM.formatter:SetDefaultAbbreviation(Enum.SecondsFormatterAbbreviation.OneLetter)
-		CDM.formatter:SetStripIntervalWhitespace(Enum.SecondsFormatterIntervalWhitespace.StripIgnoreLocale)
-		CDM.formatter:SetRounding(Enum.SecondsFormatterRounding.RoundUp)
-		CDM.formatter:SetCanRoundUpLastUnit(true)
-	end
+	CDM.formatter = C_StringUtil.CreateNumericRuleFormatter()
+	CDM.formatter:SetBreakpoints({
+		{ threshold = 0,                     format = "%d",                      components = {{ div = 1,                step = 1,   rounding = round }} },
+		{ threshold = 99,                    format = mFmt:gsub("%%d", "%%.1f"), components = {{ div = SECONDS_PER_MIN,  step = 0.1, rounding = round }} },
+		{ threshold = 2  * SECONDS_PER_MIN,  format = mFmt,                      components = {{ div = SECONDS_PER_MIN,  step = 1,   rounding = round }} },
+		{ threshold = 99 * SECONDS_PER_MIN,  format = hFmt:gsub("%%d", "%%.1f"), components = {{ div = SECONDS_PER_HOUR, step = 0.1, rounding = round }} },
+		{ threshold = 2  * SECONDS_PER_HOUR, format = hFmt,                      components = {{ div = SECONDS_PER_HOUR, step = 1,   rounding = round }} },
+		{ threshold = 1  * SECONDS_PER_DAY,  format = dFmt:gsub("%%d", "%%.1f"), components = {{ div = SECONDS_PER_DAY,  step = 0.1, rounding = round }} },
+		{ threshold = 2  * SECONDS_PER_DAY,  format = dFmt,                      components = {{ div = SECONDS_PER_DAY,  step = 1,   rounding = round }} },
+	})
 
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame", "KL_CDM")
