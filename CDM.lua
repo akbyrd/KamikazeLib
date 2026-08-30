@@ -3,6 +3,7 @@ local CDM = {}
 Kami.CDM = CDM
 
 local LCG = LibStub("LibCustomGlow-1.0")
+local LSM = LibStub("LibSharedMedia-3.0")
 
 -- TODO: Look for hex conversion utility
 function CDM.Load()
@@ -21,22 +22,97 @@ function CDM.Load()
 		assistSize  = 3,
 
 		pressColor  = { 1, 1, 1, 0.25 },
+		cdFontScale = 0.75,
 	}
 
 	CDM.frames = {}
 	CDM.spells = {}
 	CDM.overrides = {}
+	CDM.categories = {}
 
 	CDM.viewers = {
 		[EssentialCooldownViewer] = { viewer = EssentialCooldownViewer },
 		[UtilityCooldownViewer]   = { viewer = UtilityCooldownViewer },
 	}
 
+	-- Always 1 unit: 1m, not 1m 10s
+	-- Two digits of precision if possible: 1.6m, 16m
+	-- Show seconds when <3 digits: 99s, not 2m
+	-- Don't units for seconds: 6, not 6s
+	-- Units are a single letter
+	-- Units are localized
+	-- No space before units
+	-- Support seconds, minutes, hours, and days
+
+	local pick = 2
+	if pick == 1 then
+		-- <1s shows up as 0.xxx, ore truncated to 0
+
+		local units = CreateFromMixins(SecondsFormatterMixin)
+		units:Init(0, SecondsFormatter.Abbreviation.OneLetter)
+		units:SetStripIntervalWhitespace(true)
+
+		local function UnitFormat(interval, spec)
+			return (units:GetFormatString(interval, SecondsFormatter.Abbreviation.OneLetter, false):gsub("%%d", spec))
+		end
+
+		local m = UnitFormat(SecondsFormatter.Interval.Minutes, "")
+		local h = UnitFormat(SecondsFormatter.Interval.Hours, "")
+
+		CDM.formatter = C_StringUtil.CreateAbbreviatedNumberFormatter()
+		CDM.formatter:SetBreakpoints({
+			{ breakpoint = 0.001, abbreviation = "", significandDivisor =    1, fractionDivisor =  1, abbreviationIsGlobal = false },
+			{ breakpoint =   100, abbreviation = m,  significandDivisor =    6, fractionDivisor = 10, abbreviationIsGlobal = false },
+			{ breakpoint =   600, abbreviation = m,  significandDivisor =   60, fractionDivisor =  1, abbreviationIsGlobal = false },
+			{ breakpoint =  6000, abbreviation = h,  significandDivisor =  360, fractionDivisor = 10, abbreviationIsGlobal = false },
+			{ breakpoint = 36000, abbreviation = h,  significandDivisor = 3600, fractionDivisor =  1, abbreviationIsGlobal = false },
+		})
+
+	elseif pick == 2 then
+		local round = Enum.NumericRuleFormatRounding.Up
+
+		local units = CreateFromMixins(SecondsFormatterMixin)
+		units:SetStripIntervalWhitespace(true)
+
+		local mFmt = units:GetFormatString(SecondsFormatter.Interval.Minutes, SecondsFormatter.Abbreviation.OneLetter, true)
+		local hFmt = units:GetFormatString(SecondsFormatter.Interval.Hours,   SecondsFormatter.Abbreviation.OneLetter, true)
+		local dFmt = units:GetFormatString(SecondsFormatter.Interval.Days,    SecondsFormatter.Abbreviation.OneLetter, true)
+
+		CDM.formatter = C_StringUtil.CreateNumericRuleFormatter()
+		CDM.formatter:SetBreakpoints({
+			{ threshold = 0,                     format = "%d",                      components = {{ div = 1,                step = 1,   rounding = round }} },
+			{ threshold = 99,                    format = mFmt:gsub("%%d", "%%.1f"), components = {{ div = SECONDS_PER_MIN,  step = 0.1, rounding = round }} },
+			{ threshold = 2  * SECONDS_PER_MIN,  format = mFmt,                      components = {{ div = SECONDS_PER_MIN,  step = 1,   rounding = round }} },
+			{ threshold = 99 * SECONDS_PER_MIN,  format = hFmt:gsub("%%d", "%%.1f"), components = {{ div = SECONDS_PER_HOUR, step = 0.1, rounding = round }} },
+			{ threshold = 2  * SECONDS_PER_HOUR, format = hFmt,                      components = {{ div = SECONDS_PER_HOUR, step = 1,   rounding = round }} },
+			{ threshold = 1  * SECONDS_PER_DAY,  format = dFmt:gsub("%%d", "%%.1f"), components = {{ div = SECONDS_PER_DAY,  step = 0.1, rounding = round }} },
+			{ threshold = 2  * SECONDS_PER_DAY,  format = dFmt,                      components = {{ div = SECONDS_PER_DAY,  step = 1,   rounding = round }} },
+		})
+
+	elseif pick == 3 then
+		-- Can't hide seconds unit
+		-- Can't do fractional minutes
+
+		local band = C_CurveUtil.CreateCurve()
+		band:SetType(Enum.LuaCurveType.Step)
+		band:AddPoint(0,   Enum.SecondsFormatterInterval.Seconds)
+		band:AddPoint(100, Enum.SecondsFormatterInterval.Minutes)
+
+		CDM.formatter = C_StringUtil.CreateSecondsFormatter()
+		CDM.formatter:SetDesiredUnitCount(1)
+		CDM.formatter:SetMinInterval(Enum.SecondsFormatterInterval.Seconds)
+		CDM.formatter:SetMaxIntervalCurve(band)
+		CDM.formatter:SetDefaultAbbreviation(Enum.SecondsFormatterAbbreviation.OneLetter)
+		CDM.formatter:SetStripIntervalWhitespace(Enum.SecondsFormatterIntervalWhitespace.StripIgnoreLocale)
+		CDM.formatter:SetRounding(Enum.SecondsFormatterRounding.RoundUp)
+		CDM.formatter:SetCanRoundUpLastUnit(true)
+	end
+
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame", "KL_CDM")
 	CDM.eventFrame:SetScript("OnEvent", CDM.DispatchEvent)
 
-	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN", CDM.RefreshSpells)
+	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN", CDM.SPELL_UPDATE_COOLDOWN)
 	CDM.RegisterEvent("BAG_UPDATE_COOLDOWN",   CDM.RefreshSpells)
 	CDM.RegisterEvent("UI_SCALE_CHANGED",      CDM.RefreshSizesAndPositions)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",  CDM.RefreshSizesAndPositions)
@@ -47,9 +123,15 @@ function CDM.Load()
 	-- Press overlay
 	hooksecurefunc("SecureActionButton_OnClick", CDM.OnClick)
 
+	local cdTypeface = LSM:Fetch("font", "PT Sans Narrow")
 	for viewer, vState in pairs(CDM.viewers) do
 		hooksecurefunc(viewer, "RefreshData", CDM.ReconcileFrames)  -- Frames added/removed
 		hooksecurefunc(viewer, "Layout",      CDM.RefreshPositions) -- Frame positions changed
+
+		-- CD font
+		vState.cdFontName = string.format("Kami.CDM.Font.%s", viewer:GetName())
+		vState.cdFont = CreateFont(vState.cdFontName)
+		vState.cdFont:SetFont(cdTypeface, 18, "OUTLINE")
 	end
 end
 
@@ -59,6 +141,23 @@ function CDM.ReconcileFrames(viewer, cooldownIDs, forceSet)
 	-- Some procs?
 
 	local vState = CDM.viewers[viewer]
+
+	for categoryID, fState in pairs(CDM.categories) do
+		local cd = fState.frame:GetCooldownInfo() -- CooldownViewerCooldown
+		local unbound = cd == nil
+		local rebound = cd ~= nil and categoryID ~= cd.spellCategoryID
+
+		if unbound or rebound then
+			CDM.categories[categoryID] = nil
+			fState.categoryID = nil
+			if fState.spellID then
+				CDM.spells[fState.spellID] = nil
+				fState.spellID = nil
+			end
+
+			CDM.OnFrameRemoved(vState, fState)
+		end
+	end
 
 	for spellID, fState in pairs(CDM.spells) do
 		local cd = fState.frame:GetCooldownInfo() -- CooldownViewerCooldown
@@ -88,19 +187,26 @@ function CDM.ReconcileFrames(viewer, cooldownIDs, forceSet)
 		end
 
 		local cd = fState.frame:GetCooldownInfo() -- CooldownViewerCooldown
-		if cd and cd.spellID then
-			CDM.spells[cd.spellID] = fState
-			fState.equipSlot = cd.equipSlot
+		if cd then
+			if cd.spellCategoryID then
+				CDM.categories[cd.spellCategoryID] = fState
+				fState.categoryID = cd.spellCategoryID
+				if cd.spellID then
+					fState.spellID = cd.spellID
+					CDM.spells[fState.spellID] = fState
+				end
 
-			if cd.overrideSpellID then
-				CDM.overrides[cd.overrideSpellID] = fState
-				fState.overrideSpellID = cd.overrideSpellID
+			elseif cd.spellID then
+				CDM.spells[cd.spellID] = fState
+				fState.equipSlot = cd.equipSlot
+
+				if cd.overrideSpellID then
+					CDM.overrides[cd.overrideSpellID] = fState
+					fState.overrideSpellID = cd.overrideSpellID
+				end
 			end
 		end
 	end
-
-	-- TODO: Remove this once we confirm it doesn't fire in combat too often
-	--print(string.format("%.3f %s %s", GetTime(), tostring(viewer), "ReconcileFrames"))
 
 	CDM.RefreshSpells()
 	CDM.RefreshSizes(vState)
@@ -155,13 +261,16 @@ function CDM.OnFrameAdded(vState, fState)
 
 	-- Cooldown swipe
 	local level = fState.frame:GetFrameLevel()
+	fState.showCDTime = vState.viewer.timerShown -- TODO: Update
 	fState.Cooldown = CreateFrame("Cooldown", nil, fState.frame, "CooldownFrameTemplate")
 	fState.Cooldown:ClearAllPoints()
 	fState.Cooldown:SetFrameLevel(level + 2)
 	fState.Cooldown:SetDrawEdge(false)
 	fState.Cooldown:SetSwipeColor(0, 0, 0, 0.6)
 	fState.Cooldown:SetDrawBling(false)
-	fState.Cooldown:SetHideCountdownNumbers(not vState.viewer.timerShown) -- TODO: Update
+	fState.Cooldown:SetHideCountdownNumbers(not fState.showCDTime)
+	fState.Cooldown:SetCountdownFormatter(CDM.formatter)
+	fState.Cooldown:SetCountdownFont(vState.cdFontName)
 
 	-- BUG: Edge and bling are broken in 12.1 They aren't scaled properly and they don't
 	-- clip. They show up as a rotating rectangle. So we manually rescale and clip them.
@@ -282,6 +391,8 @@ function CDM.RefreshSpells()
 		end
 
 		if onCD then
+			local showNumbers = fState.showCDTime and not onGCD
+			fState.Cooldown:SetHideCountdownNumbers(not showNumbers)
 			fState.Cooldown:SetCooldownFromDurationObject(duration)
 		else
 			fState.Cooldown:Clear()
@@ -365,34 +476,49 @@ end
 
 -- TODO: We don't always get paired down/up events. Might want to do more robust cleanup
 function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
-	local actionType = SecureButton_GetModifiedAttribute(button, "type", mouseButton)
-	if actionType == "action" then
+	-- NOTE: Macros can cast/use multiple spells/items but there doesn't appear to be a way to get
+	-- all of them. GetMacroSpell only returns one spellID.
+
+	-- NOTE: This doesn't fire when clicking items in bags. They don't use a secure frame. We could
+	-- hook button frames but it's a per-button hook instead of a global one. We could also use
+	-- UNIT_SPELLCAST_SENT/SUCCEEDED/FAILED. The events are better, but still more trouble than it's
+	-- worth.
+
+	local buttonType = SecureButton_GetModifiedAttribute(button, "type", mouseButton)
+	if buttonType == "action" then
 		local slot = button:CalculateAction(mouseButton)
-		local slotType, id, subType = GetActionInfo(slot)
+		local actionType, id, subType = GetActionInfo(slot)
 		local spellID
 
-		if slotType == "spell" then
+		-- plain spell
+		if actionType == "spell" then
 			spellID = id
 
-		elseif slotType == "macro" and subType == "spell" then
+		-- /cast macro
+		elseif actionType == "macro" and subType == "spell" then
 			spellID = id
 
-		elseif slotType == "macro" then
-			spellID = GetMacroSpell(id)
+		-- /use macro
+		elseif actionType == "macro" and subType == "item" then
+			-- BUG: https://github.com/Stanzilla/WoWUIBugs/issues/495
+			-- id seems to be slot - 1
+			spellID = C_ActionBar.GetSpell(slot)
 
-		elseif slotType == "item" then
+		-- plain item
+		elseif actionType == "item" then
 			spellID = C_ActionBar.GetSpell(slot)
 		end
 
-		if spellID and CDM.spells[spellID] then
-			local fState = CDM.spells[spellID]
-
-			-- TODO: There can be multiple active presses
-			if CDM.activePress and CDM.activePress ~= fState.Press then
-				CDM.activePress:Hide()
+		if spellID then
+			local fState = CDM.spells[spellID] or CDM.overrides[spellID]
+			if fState then
+				-- TODO: There can be multiple active presses
+				if CDM.activePress and CDM.activePress ~= fState.Press then
+					CDM.activePress:Hide()
+				end
+				CDM.activePress = fState.Press
+				fState.Press:SetShown(down)
 			end
-			CDM.activePress = fState.Press
-			fState.Press:SetShown(down)
 		end
 	end
 end
@@ -458,8 +584,11 @@ function CDM.RefreshSizes(vState)
 	if #frames == 0 then return end
 
 	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / frames[1]:GetEffectiveScale()
-	local xSize = Round(vState.xSize / pixelsToUI) * pixelsToUI
-	local ySize = Round(vState.ySize / pixelsToUI) * pixelsToUI
+	local xSize = Kami.Util.RoundToPixel(vState.xSize, pixelsToUI)
+	local ySize = Kami.Util.RoundToPixel(vState.ySize, pixelsToUI)
+
+	local cdFontSize = Kami.Util.RoundToPixel(CDM.cfg.cdFontScale * vState.ySize, pixelsToUI)
+	vState.cdFont:SetFontHeight(cdFontSize)
 
 	for frame in vState.viewer.itemFramePool:EnumerateActive() do
 		local fState = CDM.frames[frame]
@@ -474,7 +603,7 @@ function CDM.RefreshSizes(vState)
 
 			Kami.Util.Inset(frame.Icon,       borderSize)
 			Kami.Util.Inset(frame.OutOfRange, borderSize)
-			Kami.Util.Inset(fState.Cooldown,   borderSize)
+			Kami.Util.Inset(fState.Cooldown,  borderSize)
 
 			local inset = 2 * borderSize
 			local diagSize = sqrt((xSize - inset)^2 + (ySize - inset)^2)
@@ -482,6 +611,22 @@ function CDM.RefreshSizes(vState)
 			fState.Bling:SetSize(diagSize, diagSize)
 		end
 	end
+end
+
+function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
+	if category then
+		local fState = CDM.categories[category]
+		if fState then
+			-- NOTE: If/when we add arbitrary item support this will break when an item and category
+			-- resolve to the same spell
+			if fState.spellID then
+				CDM.spells[fState.spellID] = nil
+			end
+			fState.spellID = baseSpellID or spellID
+			CDM.spells[fState.spellID] = fState
+		end
+	end
+	CDM.RefreshSpells()
 end
 
 function CDM.RegisterEvent(event, func)

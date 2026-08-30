@@ -12,6 +12,11 @@ New-Item `
 /dump Kami.CDM.cfg
 ```
 
+```
+/dump C_Spell.GetSpellCooldown(spellID)
+/dump C_Spell.GetLastCategoryCooldownSource(4)
+```
+
 ```lua
 if LibStub then
 	local LSM = LibStub("LibSharedMedia-3.0")

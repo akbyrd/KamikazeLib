@@ -45,3 +45,7 @@ function Util.Inset(frame, amount)
 	frame:SetPoint("TOPLEFT",      amount, -amount)
 	frame:SetPoint("BOTTOMRIGHT", -amount,  amount)
 end
+
+function Util.RoundToPixel(size, pixelsToUI)
+	return Round(size / pixelsToUI) * pixelsToUI
+end

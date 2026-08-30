@@ -1,65 +1,40 @@
 To Do
 -----
-Name callbacks differently
-Custom row wrapping
-Cooldown text
-Handle healthstone
-Handle combat potion
-Handle health potion
-Pandemic support
-----
-Custom spell color (classify?)
-Settings work in combat
-Hide pip
-Show permanent buff bars as full
-----
-Edit mode support
-	C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED
-	position changes
-	Orientation and direction
-Anchoring
-Disable ability highlight on specific spells
-Separate settings for each viewer
-Profile performance
-----
+Test healthstone
+Rebuild
+	Update single buttons
 Track any item
 Track any spell
+Per-talent layout
+Disable ability highlight on specific spells
+Settings support
+	Don't use Blizz settings
+	Editable in combat
+	Edit mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
+	Default + inheritance + override based
+Custom row wrapping
+Orientation and direction
+Anchoring
+Buff Bars
+	Skin
+	Custom spell color (classify?)
+	Show permanent buff bars as full
+	Hide pip
+	Pandemic support
+Profile performance
 Replace LibCustomGlow. It sucks
+Use item id to support older potions?
 
 
-Items
------
-spellID         +spell +trinket -pot -stone
-spellCategoryID -spell -trinket +pot +stone
-cooldownID      +spell +trinket +pot +stone
-{ Name = "cooldownID",             Type = "number",                      Nilable = false },
-{ Name = "spellID",                Type = "number",                      Nilable = true },
-{ Name = "spellCategoryID",        Type = "number",                      Nilable = true },
-{ Name = "overrideSpellID",        Type = "number",                      Nilable = true },
-{ Name = "overrideTooltipSpellID", Type = "number",                      Nilable = true },
-{ Name = "equipSlot",              Type = "luaIndex",                    Nilable = true },
-{ Name = "buffSlot",               Type = "luaIndex",                    Nilable = true },
-{ Name = "linkedSpellIDs",         Type = "table", InnerType = "number", Nilable = false },
-{ Name = "selfAura",               Type = "bool",                        Nilable = false },
-{ Name = "hasAura",                Type = "bool",                        Nilable = false },
-{ Name = "charges",                Type = "bool",                        Nilable = false },
-{ Name = "isKnown",                Type = "bool",                        Nilable = false },
-{ Name = "isInvisible",            Type = "bool",                        Nilable = false },
-{ Name = "flags",                  Type = "CooldownSetSpellFlags",       Nilable = false },
-{ Name = "category",               Type = "CooldownViewerCategory",      Nilable = false },
 
-CDM.spellFrames = {}
-CDM.equipFrames = {}
-
-CDM.frameMapData = {
-	spellID   = CDM.spellFrames,
-	equipSlot = CDM.equipFrames,
-}
-
-for keyName, map in pairs(CDM.frameMapData) do
-	for key, frame in pairs(map) do
-	end
-end
+Custom Implementation
+---------------------
+Potions
+	Use item id to support older potions
+	Store C_Spell.GetLastCategoryCooldownSource across reloads
+	Initialize from first item in bags?
+Modularize
+	Each behavior gets an object with { init, enable, update, disable, deinit }
 
 
 
@@ -118,3 +93,6 @@ SetBlingTexture("Interface\\Cooldown\\starburst", 0.3, 0.6, 1, 0.64)
 SetBlingTexture("Interface\\BUTTONS\\WHITE8X8", 1, 1, 1, 1)
 viewer.orientationSetting
 viewer.iconDirection, Enum.CooldownViewerIconDirection.Right
+C_Spell.GetLastCategoryCooldownSource(categoryID
+Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY)
+SetUseAuraDisplayTime
