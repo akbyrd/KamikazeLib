@@ -35,14 +35,13 @@ function CDM.Load()
 		[UtilityCooldownViewer]   = { viewer = UtilityCooldownViewer },
 	}
 
-	local round = Enum.NumericRuleFormatRounding.Up
-
 	local units = CreateFromMixins(SecondsFormatterMixin)
 	units:SetStripIntervalWhitespace(true)
 
-	local mFmt = units:GetFormatString(SecondsFormatter.Interval.Minutes, SecondsFormatter.Abbreviation.OneLetter, true)
-	local hFmt = units:GetFormatString(SecondsFormatter.Interval.Hours,   SecondsFormatter.Abbreviation.OneLetter, true)
-	local dFmt = units:GetFormatString(SecondsFormatter.Interval.Days,    SecondsFormatter.Abbreviation.OneLetter, true)
+	local mFmt  = units:GetFormatString(SecondsFormatter.Interval.Minutes, SecondsFormatter.Abbreviation.OneLetter, true)
+	local hFmt  = units:GetFormatString(SecondsFormatter.Interval.Hours,   SecondsFormatter.Abbreviation.OneLetter, true)
+	local dFmt  = units:GetFormatString(SecondsFormatter.Interval.Days,    SecondsFormatter.Abbreviation.OneLetter, true)
+	local round = Enum.NumericRuleFormatRounding.Up
 
 	CDM.formatter = C_StringUtil.CreateNumericRuleFormatter()
 	CDM.formatter:SetBreakpoints({
@@ -272,7 +271,7 @@ function CDM.OnFrameAdded(vState, fState)
 	-- Zoom & aspect ratio
 	local z = CDM.cfg.iconZoom
 	local a = CDM.cfg.iconAspect
-	Kami.Util.RectIcon(fState.frame, fState.frame.Icon, z, a)
+	Kami.Util.RectIcon_OLD(fState.frame, fState.frame.Icon, z, a)
 
 	-- NOTE: We round the frame size to make it pixel perfect. If the ui scale changes between frames
 	-- being added we can end up rounding to a different size. I think this happens due to floating

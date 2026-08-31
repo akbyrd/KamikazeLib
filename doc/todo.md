@@ -1,7 +1,7 @@
 To Do
 -----
-Create basic frames
-Layout frames
+Modularity
+Migrate existing implementation
 Settings
 ----
 Track any item
@@ -14,7 +14,6 @@ Settings support
 	Edit mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
 	Default + inheritance + override based
 Custom row wrapping
-Orientation and direction
 Anchoring
 Buff Bars
 	Skin
