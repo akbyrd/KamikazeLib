@@ -5,7 +5,6 @@ Kami.CDM = CDM
 local LCG = LibStub("LibCustomGlow-1.0")
 local LSM = LibStub("LibSharedMedia-3.0")
 
--- TODO: Look for hex conversion utility
 function CDM.Load()
 	CDM.cfg = {
 		iconZoom   = 0.08,

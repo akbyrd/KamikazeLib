@@ -7,20 +7,34 @@ local LSM = LibStub("LibSharedMedia-3.0")
 
 function CDM.Load()
 	CDM.cfg = {
-		viewerXPos = 0,
-		viewerYPos = -288,
+		default = {
+			xPos = 0,
+			yPos = 0,
 
-		iconSize   = 50,
-		iconZoom   = 0.08,
-		iconAspect = 1.65,
-		iconPad    = 1,
-		iconLimit  = 5,
+			iconSize   = 50,
+			iconZoom   = 0.08,
+			iconAspect = 1.65,
+			iconPad    = 1,
+			iconLimit  = 5,
 
-		borderColor = { 0, 0, 0, 1 },
-		borderSize  = 2,
+			borderColor = "000000FF",
+			borderSize  = 2,
 
-		cdShow = true,
+			cdShow = true,
+		},
+
+		[Enum.CooldownViewerCategory.Essential] = {
+			yPos = -288,
+		},
+
+		[Enum.CooldownViewerCategory.Utility] = {
+			yPos = -344,
+			iconSize = 30,
+		},
 	}
+
+	setmetatable(CDM.cfg[Enum.CooldownViewerCategory.Essential], { __index = CDM.cfg.default })
+	setmetatable(CDM.cfg[Enum.CooldownViewerCategory.Utility],   { __index = CDM.cfg.default })
 
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame", "KL_CDM2_EVENT")
@@ -28,7 +42,7 @@ function CDM.Load()
 
 	local viewers = {
 		Enum.CooldownViewerCategory.Essential,
-		--Enum.CooldownViewerCategory.Utility, -- TODO: Enable
+		Enum.CooldownViewerCategory.Utility,
 	}
 	local categoryToName = EnumUtil.GenerateNameTranslation(Enum.CooldownViewerCategory)
 
@@ -44,14 +58,14 @@ function CDM.Load()
 		--Background:SetColorTexture(1, 0, 0, 0.5)
 
 		local vState = {
-			name       = name,
-			pool       = {},
-			cdInfos    = {},
-			cdFrames   = {},
-			Root       = Root,
-			--Background = Background,
-			xSize      = nil,
-			ySize      = nil,
+			name     = name,
+			cfg      = CDM.cfg[category],
+			pool     = {},
+			cdInfos  = {},
+			cdFrames = {},
+			Root     = Root,
+			xSize    = nil,
+			ySize    = nil,
 		}
 		CDM.viewers[category] = vState
 	end
@@ -176,7 +190,6 @@ function CDM.ConstructFrame(vState)
 	Border:SetAllPoints()
 	Border:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
 	Border:SetTextureSliceMargins(1, 1, 1, 1)
-	Border:SetVertexColor(unpack(CDM.cfg.borderColor))
 
 	local Cooldown = CreateFrame("Cooldown", nil, Frame, "CooldownFrameTemplate")
 	Cooldown:SetAllPoints()
@@ -195,19 +208,21 @@ function CDM.ConstructFrame(vState)
 	return fState
 end
 
-function CDM.EnableFrame(fState, cdInfo)
-	fState.cdInfo = cdInfo
-	fState.Frame:Show()
-
+function CDM.EnableFrame(fState, vState, cdInfo)
+	local texture
 	if cdInfo.spellID then
-		local texture = C_Spell.GetSpellTexture(cdInfo.spellID)
-		fState.Icon:SetTexture(texture)
+		texture = C_Spell.GetSpellTexture(cdInfo.spellID)
 	else
-		local texture = GetInventoryItemTexture("player", cdInfo.equipSlot)
-		fState.Icon:SetTexture(texture)
+		texture = GetInventoryItemTexture("player", cdInfo.equipSlot)
 	end
 
-	fState.Cooldown:SetHideCountdownNumbers(not CDM.cfg.cdShow)
+	local bColor = CreateColorFromRGBAHexString(vState.cfg.borderColor)
+
+	fState.cdInfo = cdInfo
+	fState.Frame:Show()
+	fState.Icon:SetTexture(texture)
+	fState.Border:SetVertexColor(bColor:GetRGBA())
+	fState.Cooldown:SetHideCountdownNumbers(not vState.cfg.cdShow)
 end
 
 function CDM.DisableFrame(fState)
@@ -236,7 +251,7 @@ function CDM.AssignFrames()
 		-- Enable new frames
 		for iInfo, cdInfo in ipairs(vState.cdInfos) do
 			local fState = table.remove(vState.pool)
-			CDM.EnableFrame(fState, cdInfo)
+			CDM.EnableFrame(fState, vState, cdInfo)
 			table.insert(vState.cdFrames, fState)
 		end
 	end
@@ -247,7 +262,7 @@ function CDM.RefreshSizes()
 		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / vState.Root:GetEffectiveScale()
 
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			Kami.Util.RectIcon(fState.Frame, fState.Icon, CDM.cfg.iconSize, CDM.cfg.iconZoom, CDM.cfg.iconAspect)
+			Kami.Util.RectIcon(fState.Frame, fState.Icon, vState.cfg.iconSize, vState.cfg.iconZoom, vState.cfg.iconAspect)
 			Kami.Util.RoundSize(fState.Frame, pixelsToUI)
 
 			vState.xSize = fState.Frame:GetWidth()  / pixelsToUI
@@ -262,8 +277,8 @@ function CDM.RefreshPositions()
 
 		local xSize = vState.xSize
 		local ySize = vState.ySize
-		local pad   = CDM.cfg.iconPad
-		local limit = CDM.cfg.iconLimit
+		local pad   = vState.cfg.iconPad
+		local limit = vState.cfg.iconLimit
 
 		local mxPos = 0
 		local myPos = 0
@@ -286,8 +301,8 @@ function CDM.RefreshPositions()
 			myPos = math.min(myPos, yPos - ySize)
 		end
 
-		local vxPos = Round(CDM.cfg.viewerXPos / pixelsToUI - mxPos / 2)
-		local vyPos = Round(CDM.cfg.viewerYPos / pixelsToUI - myPos / 2)
+		local vxPos = Round(vState.cfg.xPos / pixelsToUI - mxPos / 2)
+		local vyPos = Round(vState.cfg.yPos / pixelsToUI - myPos / 2)
 		vState.Root:SetPoint("TOPLEFT", UIParent, "CENTER", vxPos * pixelsToUI, vyPos * pixelsToUI)
 		vState.Root:SetSize(mxPos * pixelsToUI, -myPos * pixelsToUI)
 	end
