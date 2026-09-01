@@ -1,15 +1,14 @@
 To Do
 -----
 Migrate existing implementation
-	GCD
+	Out of range (SPELL_UPDATE_USABLE)
+	Resource darken (SPELL_UPDATE_USABLE)
 	Press
 	Assist
 	Proc
 	Spell overrides
 	Item categories
 	Charge text
-	Out of range (SPELL_UPDATE_USABLE)
-	Resource darken (SPELL_UPDATE_USABLE)
 	Saved vars
 Modularity
 Settings

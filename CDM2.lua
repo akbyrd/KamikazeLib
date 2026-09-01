@@ -404,8 +404,6 @@ function CDM.RefreshPositions()
 end
 
 -- TODO: Canonicalize spells
--- TODO: Confirm the nil case
--- TODO: Missing GCD
 function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
 	local function Impl(vState, fState)
 		local spellID  = fState.cdvInfo.spellID
@@ -446,13 +444,14 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 	end
 
 	for category, vState in pairs(CDM.viewers) do
-		if spellID then
-			local fState = vState.spells[spellID] or vState.spells[baseSpellID]
-			if fState then
+		local startGCD = startRecoveryCategory == Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY
+		if startGCD or not spellID then
+			for spellID, fState in pairs(vState.spells) do
 				Impl(vState, fState)
 			end
 		else
-			for spellID, fState in pairs(vState.spells) do
+			local fState = vState.spells[spellID] or vState.spells[baseSpellID]
+			if fState then
 				Impl(vState, fState)
 			end
 		end
