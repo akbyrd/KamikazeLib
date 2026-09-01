@@ -1,7 +1,18 @@
 To Do
 -----
-Modularity
 Migrate existing implementation
+	Desaturate
+	GCD
+	Press
+	Assist
+	Proc
+	Charge text
+	Out of range
+	Spell overrides
+	Item categories
+	Saved vars
+	UI Scale
+Modularity
 Settings
 ----
 Track any item

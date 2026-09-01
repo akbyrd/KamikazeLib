@@ -8,21 +8,14 @@ function Util.AspectScale(aspect)
 	return xScale, yScale
 end
 
--- TODO: Remove this
-function Util.RectIcon_OLD(frame, texture, zoom, aspect)
-	local xScale = 1 * min(1, aspect)
-	local yScale = 1 / max(1, aspect)
-
-	local xSize   = frame:GetWidth()
-	local ySize   = frame:GetHeight()
-	local maxSize = max(xSize, ySize)
-	xSize = maxSize * xScale
-	ySize = maxSize * yScale
-	frame:SetSize(xSize, ySize)
+function Util.TexCoords(zoom, xSize, ySize)
+	local mSize  = max(xSize, ySize)
+	local xScale = xSize / mSize
+	local yScale = ySize / mSize
 
 	local texXMin = 0.5 - (0.5 - zoom) * xScale
 	local texYMin = 0.5 - (0.5 - zoom) * yScale
-	texture:SetTexCoord(texXMin, 1 - texXMin, texYMin, 1 - texYMin)
+	return texXMin, texYMin
 end
 
 function Util.RectIcon(frame, texture, size, zoom, aspect)
@@ -38,12 +31,14 @@ function Util.RectIcon(frame, texture, size, zoom, aspect)
 	texture:SetTexCoord(texXMin, 1 - texXMin, texYMin, 1 - texYMin)
 end
 
-function Util.RoundSize(frame, pixelsToUI)
-	pixelsToUI = pixelsToUI or PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
+function Util.ZoomIcon(texture, zoom, xSize, ySize)
+	local mSize  = max(xSize, ySize)
+	local xScale = xSize / mSize
+	local yScale = ySize / mSize
 
-	local xSize = Round(frame:GetWidth()  / pixelsToUI) * pixelsToUI
-	local ySize = Round(frame:GetHeight() / pixelsToUI) * pixelsToUI
-	frame:SetSize(xSize, ySize)
+	local texXMin = 0.5 - (0.5 - zoom) * xScale
+	local texYMin = 0.5 - (0.5 - zoom) * yScale
+	texture:SetTexCoord(texXMin, 1 - texXMin, texYMin, 1 - texYMin)
 end
 
 function Util.SetSliceScale(texture, scale)
@@ -60,11 +55,6 @@ function Util.SetSliceScale(texture, scale)
 	else
 		texture:SetScale(scale)
 	end
-end
-
-function Util.Inset(frame, amount)
-	frame:SetPoint("TOPLEFT",      amount, -amount)
-	frame:SetPoint("BOTTOMRIGHT", -amount,  amount)
 end
 
 function Util.RoundToPixel(size, pixelsToUI)

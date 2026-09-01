@@ -139,7 +139,7 @@ function CT.CreateElement()
 	label:SetTextColor(1, 0.87, 0)
 
 	local icon = frame:CreateTexture(nil, "BACKGROUND")
-	Kami.Util.RectIcon_OLD(icon, icon, CT.cfg.iconSize, CT.cfg.iconZoom, CT.cfg.iconAspect)
+	Kami.Util.RectIcon(icon, icon, CT.cfg.iconSize, CT.cfg.iconZoom, CT.cfg.iconAspect)
 	icon:SetPoint("RIGHT", label, "LEFT", -6, -.0625 * CT.cfg.fontSize)
 
 	local elem = {

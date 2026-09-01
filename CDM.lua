@@ -270,7 +270,8 @@ function CDM.OnFrameAdded(vState, fState)
 	-- Zoom & aspect ratio
 	local z = CDM.cfg.iconZoom
 	local a = CDM.cfg.iconAspect
-	Kami.Util.RectIcon_OLD(fState.frame, fState.frame.Icon, z, a)
+	local s = frame:GetWidth()
+	Kami.Util.RectIcon(fState.frame, fState.frame.Icon, s, z, a)
 
 	-- NOTE: We round the frame size to make it pixel perfect. If the ui scale changes between frames
 	-- being added we can end up rounding to a different size. I think this happens due to floating
@@ -525,8 +526,16 @@ function CDM.RefreshSizes(vState)
 	-- ends up with a frame size of 85 but a visual size 77. Ours, without the transparent
 	-- edges/padding, is visually the full 85px.
 
+	local function Inset(frame, amount)
+		frame:SetPoint("TOPLEFT",      amount, -amount)
+		frame:SetPoint("BOTTOMRIGHT", -amount,  amount)
+	end
+
 	local frames = vState.viewer:GetLayoutChildren()
 	if #frames == 0 then return end
+
+	-- TODO: It's currently possible to hit this path before we've created any frames
+	if not vState.xSize then return end
 
 	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / frames[1]:GetEffectiveScale()
 	local xSize = Kami.Util.RoundToPixel(vState.xSize, pixelsToUI)
@@ -546,9 +555,9 @@ function CDM.RefreshSizes(vState)
 			local assistSize = CDM.cfg.assistSize * pixelsToUI
 			Kami.Util.SetSliceScale(fState.Assist, assistSize)
 
-			Kami.Util.Inset(frame.Icon,       borderSize)
-			Kami.Util.Inset(frame.OutOfRange, borderSize)
-			Kami.Util.Inset(fState.Cooldown,  borderSize)
+			Inset(frame.Icon,       borderSize)
+			Inset(frame.OutOfRange, borderSize)
+			Inset(fState.Cooldown,  borderSize)
 
 			local inset = 2 * borderSize
 			local diagSize = sqrt((xSize - inset)^2 + (ySize - inset)^2)
