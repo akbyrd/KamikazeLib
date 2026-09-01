@@ -5,8 +5,6 @@ Kami.CDM2 = CDM
 local LCG = LibStub("LibCustomGlow-1.0")
 local LSM = LibStub("LibSharedMedia-3.0")
 
--- TODO: Try making scale pixel perfect, the working around proc glow issue
-
 function CDM.Load()
 	CDM.cfg = {
 		default = {
@@ -20,7 +18,7 @@ function CDM.Load()
 			iconLimit  = 5,
 
 			borderColor = "000000FF",
-			borderSize  = 2,
+			borderSize  = 1,
 
 			cdShowTime  = true,
 			cdFontScale = 0.75,
@@ -43,7 +41,10 @@ function CDM.Load()
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
 	CDM.eventFrame:SetScript("OnEvent", CDM.DispatchEvent)
+	CDM.RegisterEvent("UI_SCALE_CHANGED",      CDM.RefreshScale)
+	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",  CDM.RefreshScale)
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN", CDM.SPELL_UPDATE_COOLDOWN)
+	hooksecurefunc(UIParent, "SetScale", CDM.RefreshScale)
 
 	local viewers = {
 		Enum.CooldownViewerCategory.Essential,
@@ -319,29 +320,46 @@ function CDM.AssignFrames()
 	end
 end
 
+function CDM.RefreshScale()
+	for category, vState in pairs(CDM.viewers) do
+		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / vState.Root:GetParent():GetEffectiveScale()
+		vState.Root:SetScale(pixelsToUI)
+
+		CDM.RefreshSizes()
+		CDM.RefreshPositions()
+	end
+end
+
 function CDM.RefreshSizes()
 	for category, vState in pairs(CDM.viewers) do
-		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / vState.Root:GetEffectiveScale()
+		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
+		local iconSize    = Round(vState.cfg.iconSize   / pixelsToUI)
+		local borderSize  = Round(vState.cfg.borderSize / pixelsToUI)
+		--local assistSize  = vState.cfg.assistSize  / pixelsToUI
+		local iconZoom    = vState.cfg.iconZoom
+		local iconAspect  = vState.cfg.iconAspect
+		local cdFontScale = vState.cfg.cdFontScale
 
-		local xScale, yScale = Kami.Util.AspectScale(vState.cfg.iconAspect)
-		vState.xSize = Round(xScale * vState.cfg.iconSize / pixelsToUI)
-		vState.ySize = Round(yScale * vState.cfg.iconSize / pixelsToUI)
+		local xScale, yScale = Kami.Util.AspectScale(iconAspect)
+		vState.xSize = Round(xScale * iconSize)
+		vState.ySize = Round(yScale * iconSize)
 
-		local cxSize   = vState.xSize - 2*vState.cfg.borderSize
-		local cySize   = vState.ySize - 2*vState.cfg.borderSize
+		local cxSize   = vState.xSize - 2*borderSize
+		local cySize   = vState.ySize - 2*borderSize
 		local diagSize = sqrt(cxSize^2 + cySize^2)
 
-		local cdFontSize = Round(vState.cfg.cdFontScale * cySize)
-		vState.cdFont:SetFontHeight(cdFontSize * pixelsToUI)
+		local cdFontSize = Round(cdFontScale * cySize)
+		vState.cdFont:SetFontHeight(cdFontSize)
 
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			fState.Root:SetSize(vState.xSize * pixelsToUI, vState.ySize * pixelsToUI)
-			Kami.Util.ZoomIcon(fState.Icon, vState.cfg.iconZoom, cxSize, cySize)
-			fState.Content:SetSize(cxSize * pixelsToUI, cySize * pixelsToUI)
-			Kami.Util.SetSliceScale(fState.Border, vState.cfg.borderSize * pixelsToUI)
-			--Kami.Util.SetSliceScale(fState.Assist, vState.cfg.assistSize * pixelsToUI)
-			fState.Recharge:SetSize(diagSize * pixelsToUI, diagSize * pixelsToUI)
-			fState.Bling:SetSize(diagSize * pixelsToUI, diagSize * pixelsToUI)
+			fState.Root:SetSize(vState.xSize, vState.ySize)
+			fState.Content:SetSize(cxSize, cySize)
+			fState.Recharge:SetSize(diagSize, diagSize)
+			fState.Bling:SetSize(diagSize, diagSize)
+
+			Kami.Util.ZoomIcon(fState.Icon, iconZoom, cxSize, cySize)
+			Kami.Util.SetSliceScale(fState.Border, borderSize)
+			--Kami.Util.SetSliceScale(fState.Assist, assistSize)
 		end
 	end
 end
@@ -349,38 +367,38 @@ end
 -- TODO: Fix root position for odd screen resolutions
 function CDM.RefreshPositions()
 	for category, vState in pairs(CDM.viewers) do
-		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / vState.Root:GetEffectiveScale()
-
-		local xSize = vState.xSize
-		local ySize = vState.ySize
-		local pad   = vState.cfg.iconPad
-		local limit = vState.cfg.iconLimit
+		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
+		local xPos      = Round(vState.cfg.xPos    / pixelsToUI)
+		local yPos      = Round(vState.cfg.yPos    / pixelsToUI)
+		local iconPad   = Round(vState.cfg.iconPad / pixelsToUI)
+		local iconLimit = vState.cfg.iconLimit
 
 		local mxPos = 0
 		local myPos = 0
 
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			local iCol = (iFrame - 1) % limit
-			local iRow = floor((iFrame - 1) / limit)
+			-- TODO: fmod/fdiv?
+			local iCol = (iFrame - 1) % iconLimit
+			local iRow = floor((iFrame - 1) / iconLimit)
 
-			local nRow    = min(limit, #vState.cdFrames - (iRow * limit))
-			local nMax    = min(limit, #vState.cdFrames)
-			local rxSize  = nRow * (xSize + pad) - pad
-			local lxSize  = nMax * (xSize + pad) - pad
-			local xCenter = Round((lxSize - rxSize) / 2)
+			local nRow   = min(iconLimit, #vState.cdFrames - (iRow * iconLimit))
+			local nMax   = min(iconLimit, #vState.cdFrames)
+			local rxSize = nRow * (vState.xSize + iconPad) - iconPad
+			local lxSize = nMax * (vState.xSize + iconPad) - iconPad
+			local cxPos  = Round((lxSize - rxSize) / 2)
 
-			local xPos = 0 + iCol * (xSize + pad) + xCenter
-			local yPos = 0 - iRow * (ySize + pad)
-			fState.Root:SetPoint("TOPLEFT", vState.Root, "TOPLEFT", xPos * pixelsToUI, yPos * pixelsToUI)
+			local xPos = 0 + iCol * (vState.xSize + iconPad) + cxPos
+			local yPos = 0 - iRow * (vState.ySize + iconPad)
+			fState.Root:SetPoint("TOPLEFT", vState.Root, "TOPLEFT", xPos, yPos)
 
-			mxPos = math.max(mxPos, xPos + xSize)
-			myPos = math.min(myPos, yPos - ySize)
+			mxPos = math.max(mxPos, xPos + vState.xSize)
+			myPos = math.min(myPos, yPos - vState.ySize)
 		end
 
-		local vxPos = Round(vState.cfg.xPos / pixelsToUI - mxPos / 2)
-		local vyPos = Round(vState.cfg.yPos / pixelsToUI - myPos / 2)
-		vState.Root:SetPoint("TOPLEFT", UIParent, "CENTER", vxPos * pixelsToUI, vyPos * pixelsToUI)
-		vState.Root:SetSize(mxPos * pixelsToUI, -myPos * pixelsToUI)
+		local vxPos = Round(xPos - mxPos / 2)
+		local vyPos = Round(yPos - myPos / 2)
+		vState.Root:SetPoint("TOPLEFT", UIParent, "CENTER", vxPos, vyPos)
+		vState.Root:SetSize(mxPos, -myPos)
 	end
 end
 

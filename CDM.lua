@@ -471,6 +471,7 @@ end
 
 function CDM.RefreshPositions(viewer)
 	local vState = CDM.viewers[viewer]
+	if not vState then return end -- TODO: Happened on scale change without ElvUI
 
 	local frames = vState.viewer:GetLayoutChildren()
 	if #frames == 0 then return end
