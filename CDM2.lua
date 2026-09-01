@@ -225,6 +225,7 @@ function CDM.ConstructFrame(vState)
 	fState.Cooldown:SetDrawBling(false)
 	fState.Cooldown:SetCountdownFormatter(CDM.cdFormatter)
 	fState.Cooldown:SetCountdownFont(vState.cdFontName)
+	fState.Cooldown:SetScript("OnCooldownDone", function() fState.Icon:SetDesaturated(false) end)
 
 	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
 
@@ -268,6 +269,7 @@ end
 -- TODO: We only need to clear the things EnableFrame and a CD update won't handle
 function CDM.DisableFrame(fState)
 	fState.Root:Hide()
+	fState.Icon:SetDesaturated(false)
 	fState.Cooldown:Clear()
 	fState.Recharge:Clear()
 	--fState.Press:Hide()
@@ -403,7 +405,6 @@ function CDM.RefreshPositions()
 end
 
 -- TODO: Canonicalize spells
--- TODO: Extract guts and split spell vs item
 -- TODO: Confirm the nil case
 -- TODO: Missing GCD
 function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)

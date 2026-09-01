@@ -1,17 +1,16 @@
 To Do
 -----
 Migrate existing implementation
-	Desaturate
 	GCD
 	Press
 	Assist
 	Proc
-	Charge text
-	Out of range
 	Spell overrides
 	Item categories
+	Charge text
+	Out of range (SPELL_UPDATE_USABLE)
+	Resource darken (SPELL_UPDATE_USABLE)
 	Saved vars
-	UI Scale
 Modularity
 Settings
 ----
