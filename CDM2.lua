@@ -366,7 +366,6 @@ function CDM.RefreshSizes()
 	end
 end
 
--- TODO: Fix root position for odd screen resolutions
 function CDM.RefreshPositions()
 	for category, vState in pairs(CDM.viewers) do
 		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
@@ -379,7 +378,6 @@ function CDM.RefreshPositions()
 		local myPos = 0
 
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			-- TODO: fmod/fdiv?
 			local iCol = (iFrame - 1) % iconLimit
 			local iRow = floor((iFrame - 1) / iconLimit)
 
@@ -397,9 +395,10 @@ function CDM.RefreshPositions()
 			myPos = math.min(myPos, yPos - vState.ySize)
 		end
 
-		local vxPos = Round(xPos - mxPos / 2)
-		local vyPos = Round(yPos - myPos / 2)
-		vState.Root:SetPoint("TOPLEFT", UIParent, "CENTER", vxPos, vyPos)
+		local pxSize, pySize = GetPhysicalScreenSize()
+		local vxPos = Round((0 + pxSize - mxPos) / 2 + xPos)
+		local vyPos = Round((0 - pySize - myPos) / 2 + yPos)
+		vState.Root:SetPoint("TOPLEFT", UIParent, "TOPLEFT", vxPos, vyPos)
 		vState.Root:SetSize(mxPos, -myPos)
 	end
 end
