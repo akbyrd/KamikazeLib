@@ -1,6 +1,5 @@
 To Do
 -----
-Out of range (SPELL_RANGE_CHECK_UPDATE)
 Press
 Assist
 Proc

@@ -42,10 +42,11 @@ function CDM.Load()
 	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
 	CDM.eventFrame:SetScript("OnEvent",  CDM.DispatchEvent)
 	CDM.eventFrame:SetScript("OnUpdate", CDM.Update)
-	CDM.RegisterEvent("UI_SCALE_CHANGED",      CDM.RefreshScale)
-	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",  CDM.RefreshScale)
-	CDM.RegisterEvent("SPELL_UPDATE_USABLE",   CDM.RefreshUsable)
-	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN", CDM.SPELL_UPDATE_COOLDOWN)
+	CDM.RegisterEvent("UI_SCALE_CHANGED",         CDM.RefreshScale)
+	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",     CDM.RefreshScale)
+	CDM.RegisterEvent("SPELL_UPDATE_USABLE",      CDM.RefreshAllUsable)
+	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",    CDM.SPELL_UPDATE_COOLDOWN)
+	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE", CDM.SPELL_RANGE_CHECK_UPDATE)
 	hooksecurefunc(UIParent, "SetScale", CDM.RefreshScale)
 
 	local viewers = {
@@ -99,7 +100,7 @@ function CDM.Load()
 	CDM.usableColor   = CreateColorFromHexString("FFFFFFFF")
 	CDM.noManaColor   = CreateColorFromHexString("FF8080FF")
 	CDM.noRangeColor  = CreateColorFromHexString("FFA32626")
-	CDM.unusableColor = CreateColorFromHexString("FF666666")
+	CDM.noUsableColor = CreateColorFromHexString("FF666666")
 	CDM.dirty = {
 		cooldown = false,
 	}
@@ -145,7 +146,7 @@ function CDM.Rebuild()
 	CDM.AssignFrames()
 	CDM.RefreshSizes()
 	CDM.RefreshPositions()
-	CDM.RefreshUsable()
+	CDM.RefreshAllUsable()
 	CDM.dirty.cooldown = true
 end
 
@@ -242,7 +243,7 @@ function CDM.ConstructFrame(vState)
 	fState.Cooldown:SetParentKey("Cooldown")
 	fState.Cooldown:SetAllPoints()
 	fState.Cooldown:SetDrawEdge(false)
-	fState.Cooldown:SetSwipeColor(0, 0, 0, 0.6)
+	fState.Cooldown:SetSwipeColor(0, 0, 0, 0.8)
 	fState.Cooldown:SetDrawBling(false)
 	fState.Cooldown:SetCountdownFormatter(CDM.cdFormatter)
 	fState.Cooldown:SetCountdownFont(vState.cdFontName)
@@ -262,12 +263,6 @@ function CDM.ConstructFrame(vState)
 	fState.Bling:SetHideCountdownNumbers(true)
 	fState.Bling:SetScript("OnCooldownDone", function() fState.hasBling = nil end)
 
-	--fState.Root    :SetFrameLevel(0)
-	--fState.Content :SetFrameLevel(1)
-	--fState.Recharge:SetFrameLevel(3)
-	--fState.Cooldown:SetFrameLevel(2)
-	--fState.Bling   :SetFrameLevel(4)
-
 	return fState
 end
 
@@ -275,6 +270,7 @@ function CDM.EnableFrame(fState, vState, cdvInfo)
 	local texture
 	if cdvInfo.spellID then
 		texture = C_Spell.GetSpellTexture(cdvInfo.spellID)
+		C_Spell.EnableSpellRangeCheck(cdvInfo.spellID, true)
 	else
 		texture = GetInventoryItemTexture("player", cdvInfo.equipSlot)
 	end
@@ -289,7 +285,14 @@ end
 
 -- TODO: We only need to clear the things EnableFrame and a CD update won't handle
 function CDM.DisableFrame(fState)
+	if fState.cdvInfo then
+		if fState.cdvInfo.spellID then
+			C_Spell.EnableSpellRangeCheck(fState.cdvInfo.spellID, false)
+		end
+	end
+
 	fState.Root:Hide()
+	fState.Icon:SetTexture(nil)
 	fState.Icon:SetDesaturated(false)
 	fState.Cooldown:Clear()
 	fState.Recharge:Clear()
@@ -315,6 +318,7 @@ function CDM.AssignFrames()
 	for category, vState in pairs(CDM.viewers) do
 		-- Disable existing frames
 		for iFrame, fState in ipairs(vState.cdFrames) do
+			-- TODO: Not sure if this is a good idea
 			CDM.DisableFrame(fState)
 			table.insert(vState.pool, fState)
 		end
@@ -462,18 +466,33 @@ function CDM.RefreshCooldown(vState, fState)
 	end
 end
 
-function CDM.RefreshUsable()
+function CDM.RefreshUsable(fState)
+	local usable, noMana = C_Spell.IsSpellUsable(fState.cdvInfo.spellID)
+	local noRange = C_Spell.IsSpellInRange(fState.cdvInfo.spellID) == false -- nil is "no target" etc
+
+	local color
+	if     noRange then color = CDM.noRangeColor
+	elseif usable  then color = CDM.usableColor
+	elseif noMana  then color = CDM.noManaColor
+	else                color = CDM.noUsableColor
+	end
+
+	fState.Icon:SetVertexColor(color:GetRGBA())
+end
+
+function CDM.RefreshAllUsable()
 	for category, vState in pairs(CDM.viewers) do
 		for spellID, fState in pairs(vState.spells) do
-			local isUsable, noMana = C_Spell.IsSpellUsable(spellID)
+			CDM.RefreshUsable(fState)
+		end
+	end
+end
 
-			local color
-			if     isUsable then color = CDM.usableColor
-			elseif noMana   then color = CDM.noManaColor
-			else                 color = CDM.unusableColor
-			end
-
-			fState.Icon:SetVertexColor(color:GetRGBA())
+function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
+	for category, vState in pairs(CDM.viewers) do
+		local fState = vState.spells[spellID]
+		if fState then
+			CDM.RefreshUsable(fState)
 		end
 	end
 end
