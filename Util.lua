@@ -60,3 +60,26 @@ end
 function Util.RoundToPixel(size, pixelsToUI)
 	return Round(size / pixelsToUI) * pixelsToUI
 end
+
+function Util.TableAssign(table, key, value)
+	table[key] = value
+	return value
+end
+
+function Util.TableReplace(table, key, value)
+	local prevValue = table[key]
+	table[key] = value
+	return prevValue
+end
+
+function Util.TableAdd(table, key, add)
+	local value = table[key] + add
+	table[key] = value
+	return value
+end
+
+function Util.TableRefAdd(table, key, add)
+	local value = (table[key] or 0) + add
+	table[key] = value ~= 0 and value or nil
+	return value
+end

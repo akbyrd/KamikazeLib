@@ -1,16 +1,18 @@
 To Do
 -----
-Press
+Queued highlight
 Assist
 Proc
 spell overrides cause a rebuild during combat
 Spell overrides
 Item categories
 Charge text
-Saved vars
 Settings
+Saved vars
 ----
-Sweeping strikes
+Sweeping strikes bar
+Whirlwind bar
+Rage bar
 Potions
 	Use item id to support older potions
 	Store C_Spell.GetLastCategoryCooldownSource across reloads

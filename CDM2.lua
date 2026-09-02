@@ -22,6 +22,8 @@ function CDM.Load()
 
 			cdShowTime  = true,
 			cdFontScale = 0.75,
+
+			pressColor = "40FFFFFF",
 		},
 
 		[Enum.CooldownViewerCategory.Essential] = {
@@ -40,14 +42,17 @@ function CDM.Load()
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
-	CDM.eventFrame:SetScript("OnEvent",  CDM.DispatchEvent)
-	CDM.eventFrame:SetScript("OnUpdate", CDM.Update)
+	CDM.eventFrame:SetScript("OnEvent",           CDM.DispatchEvent)
+	CDM.eventFrame:SetScript("OnUpdate",          CDM.Update)
 	CDM.RegisterEvent("UI_SCALE_CHANGED",         CDM.RefreshScale)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",     CDM.RefreshScale)
 	CDM.RegisterEvent("SPELL_UPDATE_USABLE",      CDM.RefreshAllUsable)
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",    CDM.SPELL_UPDATE_COOLDOWN)
 	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE", CDM.SPELL_RANGE_CHECK_UPDATE)
-	hooksecurefunc(UIParent, "SetScale", CDM.RefreshScale)
+	CDM.RegisterEvent("GLOBAL_MOUSE_DOWN",        CDM.GLOBAL_MOUSE_DOWN)
+	CDM.RegisterEvent("GLOBAL_MOUSE_UP",          CDM.GLOBAL_MOUSE_UP)
+	hooksecurefunc(UIParent, "SetScale",          CDM.RefreshScale)
+	hooksecurefunc("SecureActionButton_OnClick",  CDM.OnClick)
 
 	local viewers = {
 		Enum.CooldownViewerCategory.Essential,
@@ -69,9 +74,11 @@ function CDM.Load()
 			pool       = {},
 			cdvInfos   = {},
 			cdFrames   = {},
+			-- TODO: try making this global. I think it will remove a bunch of viewer loops that aren't
+			-- really needed. The trade-off is that you're not allowed to have the same spell in
+			-- multiple viewers, which seems reasonable but may be fiddly to enforce with custom
+			-- spell/item additions.
 			spells     = {},
-			--items      = {},
-			--categories = {},
 			xSize      = nil,
 			ySize      = nil,
 		}
@@ -101,6 +108,9 @@ function CDM.Load()
 	CDM.noManaColor   = CreateColorFromHexString("FF8080FF")
 	CDM.noRangeColor  = CreateColorFromHexString("FFA32626")
 	CDM.noUsableColor = CreateColorFromHexString("FF666666")
+	CDM.mousePresses  = {}
+	CDM.spellPresses  = {}
+	CDM.pressCounts   = {}
 	CDM.dirty = {
 		cooldown = false,
 	}
@@ -147,6 +157,7 @@ function CDM.Rebuild()
 	CDM.RefreshSizes()
 	CDM.RefreshPositions()
 	CDM.RefreshAllUsable()
+	CDM.RefreshAllPress()
 	CDM.dirty.cooldown = true
 end
 
@@ -249,6 +260,13 @@ function CDM.ConstructFrame(vState)
 	fState.Cooldown:SetCountdownFont(vState.cdFontName)
 	fState.Cooldown:SetScript("OnCooldownDone", function() fState.Icon:SetDesaturated(false) end)
 
+	local pColor = CreateColorFromHexString(vState.cfg.pressColor)
+	fState.Press = fState.Content:CreateTexture(nil, "OVERLAY", nil, 0)
+	fState.Press:SetParentKey("Press")
+	fState.Press:SetAllPoints(fState.Cooldown)
+	fState.Press:SetColorTexture(pColor:GetRGBA())
+	fState.Press:SetBlendMode("ADD")
+
 	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
 
 	-- Bling
@@ -267,6 +285,11 @@ function CDM.ConstructFrame(vState)
 end
 
 function CDM.EnableFrame(fState, vState, cdvInfo)
+	-- NOTE: We don't rebuild "pressed" state here. Probably not a good way to do it and definitely
+	-- more trouble than it's worth.
+
+	fState.cdvInfo = cdvInfo
+
 	local texture
 	if cdvInfo.spellID then
 		texture = C_Spell.GetSpellTexture(cdvInfo.spellID)
@@ -275,9 +298,8 @@ function CDM.EnableFrame(fState, vState, cdvInfo)
 		texture = GetInventoryItemTexture("player", cdvInfo.equipSlot)
 	end
 
+	-- TODO: Want color caching?
 	local bColor = CreateColorFromHexString(vState.cfg.borderColor)
-
-	fState.cdvInfo = cdvInfo
 	fState.Root:Show()
 	fState.Icon:SetTexture(texture)
 	fState.Border:SetVertexColor(bColor:GetRGBA())
@@ -296,7 +318,7 @@ function CDM.DisableFrame(fState)
 	fState.Icon:SetDesaturated(false)
 	fState.Cooldown:Clear()
 	fState.Recharge:Clear()
-	--fState.Press:Hide()
+	fState.Press:Hide()
 	--fState.Assist:Hide()
 	fState.Bling:Clear()
 
@@ -488,6 +510,21 @@ function CDM.RefreshAllUsable()
 	end
 end
 
+function CDM.RefreshPress(spellID, pressed)
+	for category, vState in pairs(CDM.viewers) do
+		local fState = vState.spells[spellID]
+		if fState then
+			fState.Press:SetShown(pressed)
+		end
+	end
+end
+
+function CDM.RefreshAllPress()
+	for spellID, pressCount in pairs(CDM.pressCounts) do
+		CDM.RefreshPress(spellID, pressCount > 0)
+	end
+end
+
 function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
 	for category, vState in pairs(CDM.viewers) do
 		local fState = vState.spells[spellID]
@@ -507,6 +544,86 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 			if fState then
 				CDM.RefreshCooldown(vState, fState)
 			end
+		end
+	end
+end
+
+function CDM.GLOBAL_MOUSE_DOWN(mouseButton)
+	CDM.mousePresses[mouseButton] = {
+		time   = GetTime(),
+		button = nil,
+	}
+end
+
+function CDM.GLOBAL_MOUSE_UP(mouseButton)
+	local press = CDM.mousePresses[mouseButton]
+	CDM.mousePresses[mouseButton] = nil
+
+	if press and press.button then
+		CDM.OnClick(press.button, mouseButton, false, nil, nil)
+	end
+end
+
+function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
+	-- NOTE: We are not guaranteed to get a release after a press:
+	-- Mouse down, drag off, mouse release                - no event
+	-- Mouse down, drag off (far), drag on, mouse release - no event, was turned into a drag
+	-- Mouse down, drag spell off bar, mouse release      - no event
+	-- Key down, mouse down, mouse up, key up             - no event, any up cancels other events
+	-- Key down, disable action bar, key up               - no event
+	-- Maybe if keybinding is programmatically changed while held?
+
+	-- NOTE: Macros can cast/use multiple spells/items but there doesn't appear to be a way to get
+	-- all of them. GetMacroSpell only returns one spellID.
+
+	-- NOTE: This doesn't fire when clicking items in bags. They don't use a secure frame. We could
+	-- hook button frames but it's a per-button hook instead of a global one.
+
+	-- NOTE: Keybindings always send left mouse button.
+	-- NOTE: Addon synthesized events send isKeyPress = nil.
+	-- NOTE: When dragging a spell off a button it will no longer have an action.
+	-- NOTE: We choose not to handle the action bar disable and binding change edge cases.
+
+	local spellID = nil
+
+	if down then
+		local buttonType = SecureButton_GetModifiedAttribute(button, "type", mouseButton)
+		if buttonType == "action" then
+			-- TODO: Is is possible for slot to be invalid?
+			local slot = button:CalculateAction(mouseButton)
+			local actionType, id, subType = GetActionInfo(slot)
+
+			-- plain spell or /cast macro
+			if actionType == "spell" or (actionType == "macro" and subType == "spell") then
+				spellID = id
+
+			-- plain item or /use macro
+			elseif actionType == "item" or (actionType == "macro" and subType == "item") then
+				-- BUG: https://github.com/Stanzilla/WoWUIBugs/issues/495
+				spellID = C_ActionBar.GetSpell(slot)
+			end
+		end
+
+		if not isKeyPress then
+			local press = CDM.mousePresses[mouseButton]
+			if press and press.time == GetTime() and button:IsMouseMotionFocus() then
+				press.button = button
+			end
+		end
+	end
+
+	local prevSpellID = CDM.spellPresses[button]
+	if prevSpellID ~= spellID then
+		CDM.spellPresses[button] = spellID
+
+		if prevSpellID then
+			local pressCount = Kami.Util.TableRefAdd(CDM.pressCounts, prevSpellID, -1)
+			CDM.RefreshPress(prevSpellID, pressCount > 0)
+		end
+
+		if spellID then
+			local pressCount = Kami.Util.TableRefAdd(CDM.pressCounts, spellID, 1)
+			CDM.RefreshPress(spellID, pressCount > 0)
 		end
 	end
 end
