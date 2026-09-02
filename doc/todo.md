@@ -1,18 +1,23 @@
 To Do
 -----
-Migrate existing implementation
-	Out of range (SPELL_UPDATE_USABLE)
-	Resource darken (SPELL_UPDATE_USABLE)
-	Press
-	Assist
-	Proc
-	Spell overrides
-	Item categories
-	Charge text
-	Saved vars
-Modularity
+Out of range (SPELL_RANGE_CHECK_UPDATE)
+Press
+Assist
+Proc
+spell overrides cause a rebuild during combat
+Spell overrides
+Item categories
+Charge text
+Saved vars
 Settings
 ----
+Sweeping strikes
+Potions
+	Use item id to support older potions
+	Store C_Spell.GetLastCategoryCooldownSource across reloads
+	Initialize from first item in bags?
+Modularize
+	Each behavior gets an object with { init, enable, update, disable, deinit }
 Track any item
 Track any spell
 Per-talent layout
@@ -32,19 +37,6 @@ Buff Bars
 	Pandemic support
 Profile performance
 Replace LibCustomGlow. It sucks
-
-
-
-Custom Implementation
----------------------
-Potions
-	Use item id to support older potions
-	Store C_Spell.GetLastCategoryCooldownSource across reloads
-	Initialize from first item in bags?
-Modularize
-	Each behavior gets an object with { init, enable, update, disable, deinit }
-Optimize
-	Update single buttons
 
 
 

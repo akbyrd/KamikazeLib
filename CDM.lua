@@ -270,7 +270,7 @@ function CDM.OnFrameAdded(vState, fState)
 	-- Zoom & aspect ratio
 	local z = CDM.cfg.iconZoom
 	local a = CDM.cfg.iconAspect
-	local s = frame:GetWidth()
+	local s = fState.frame:GetWidth()
 	Kami.Util.RectIcon(fState.frame, fState.frame.Icon, s, z, a)
 
 	-- NOTE: We round the frame size to make it pixel perfect. If the ui scale changes between frames
@@ -594,4 +594,4 @@ function CDM.DispatchEvent(frame, event, ...)
 	func(...)
 end
 
-CDM.Load()
+--CDM.Load()

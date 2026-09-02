@@ -17,7 +17,7 @@ function CDM.Load()
 			iconPad    = 1,
 			iconLimit  = 5,
 
-			borderColor = "000000FF",
+			borderColor = "FF000000",
 			borderSize  = 1,
 
 			cdShowTime  = true,
@@ -40,9 +40,11 @@ function CDM.Load()
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
-	CDM.eventFrame:SetScript("OnEvent", CDM.DispatchEvent)
+	CDM.eventFrame:SetScript("OnEvent",  CDM.DispatchEvent)
+	CDM.eventFrame:SetScript("OnUpdate", CDM.Update)
 	CDM.RegisterEvent("UI_SCALE_CHANGED",      CDM.RefreshScale)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",  CDM.RefreshScale)
+	CDM.RegisterEvent("SPELL_UPDATE_USABLE",   CDM.RefreshUsable)
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN", CDM.SPELL_UPDATE_COOLDOWN)
 	hooksecurefunc(UIParent, "SetScale", CDM.RefreshScale)
 
@@ -94,11 +96,17 @@ function CDM.Load()
 		{ threshold = 2  * SECONDS_PER_DAY,  format = dFmt,                      components = {{ div = SECONDS_PER_DAY,  step = 1,   rounding = round }} },
 	})
 
-	-- TODO: Should we throttle this?
+	CDM.usableColor   = CreateColorFromHexString("FFFFFFFF")
+	CDM.noManaColor   = CreateColorFromHexString("FF8080FF")
+	CDM.noRangeColor  = CreateColorFromHexString("FFA32626")
+	CDM.unusableColor = CreateColorFromHexString("FF666666")
+	CDM.dirty = {
+		cooldown = false,
+	}
+
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.Rebuild)
 
-	-- CD fonts
 	local cdTypeface = LSM:Fetch("font", "PT Sans Narrow")
 	for category, vState in pairs(CDM.viewers) do
 		vState.cdFontName = ("Kami.CDM2.Font.%s"):format(vState.name)
@@ -117,6 +125,17 @@ function CDM.DispatchEvent(frame, event, ...)
 	func(...)
 end
 
+function CDM.Update()
+	if CDM.dirty.cooldown then
+		CDM.dirty.cooldown = false
+		for category, vState in pairs(CDM.viewers) do
+			for spellID, fState in pairs(vState.spells) do
+				CDM.RefreshCooldown(vState, fState)
+			end
+		end
+	end
+end
+
 function CDM.Rebuild()
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	if layoutMgr:AreNotificationsLocked() then return end
@@ -126,6 +145,8 @@ function CDM.Rebuild()
 	CDM.AssignFrames()
 	CDM.RefreshSizes()
 	CDM.RefreshPositions()
+	CDM.RefreshUsable()
+	CDM.dirty.cooldown = true
 end
 
 function CDM.GatherCDs()
@@ -258,7 +279,7 @@ function CDM.EnableFrame(fState, vState, cdvInfo)
 		texture = GetInventoryItemTexture("player", cdvInfo.equipSlot)
 	end
 
-	local bColor = CreateColorFromRGBAHexString(vState.cfg.borderColor)
+	local bColor = CreateColorFromHexString(vState.cfg.borderColor)
 
 	fState.cdvInfo = cdvInfo
 	fState.Root:Show()
@@ -326,10 +347,10 @@ function CDM.RefreshScale()
 	for category, vState in pairs(CDM.viewers) do
 		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / vState.Root:GetParent():GetEffectiveScale()
 		vState.Root:SetScale(pixelsToUI)
-
-		CDM.RefreshSizes()
-		CDM.RefreshPositions()
 	end
+
+	CDM.RefreshSizes()
+	CDM.RefreshPositions()
 end
 
 function CDM.RefreshSizes()
@@ -403,56 +424,69 @@ function CDM.RefreshPositions()
 	end
 end
 
--- TODO: Canonicalize spells
-function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
-	local function Impl(vState, fState)
-		local spellID  = fState.cdvInfo.spellID
-		local cdInfo   = C_Spell.GetSpellCooldown(spellID) -- SpellCooldownInfo
-		local onCD     = cdInfo.isActive and not cdInfo.isOnGCD
-		local onGCD    = cdInfo.isOnGCD
-		local duration = C_Spell.GetSpellCooldownDuration(spellID)
+function CDM.RefreshCooldown(vState, fState)
+	local spellID  = fState.cdvInfo.spellID
+	local cdInfo   = C_Spell.GetSpellCooldown(spellID) -- SpellCooldownInfo
+	local onCD     = cdInfo.isActive and not cdInfo.isOnGCD
+	local onGCD    = cdInfo.isOnGCD
+	local duration = C_Spell.GetSpellCooldownDuration(spellID)
 
-		if onCD then
-			fState.Cooldown:SetHideCountdownNumbers(not vState.cfg.cdShowTime)
-			fState.Cooldown:SetCooldownFromDurationObject(duration)
-			fState.Icon:SetDesaturated(true)
-		elseif onGCD then
-			fState.Cooldown:SetHideCountdownNumbers(true)
-			fState.Cooldown:SetCooldownFromDurationObject(duration)
-			fState.Icon:SetDesaturated(false)
-		else
-			fState.Cooldown:Clear()
-			fState.Icon:SetDesaturated(false)
-		end
-
-		if onCD then
-			fState.hasBling = true
-			fState.Bling:SetCooldownFromDurationObject(duration, true)
-		elseif fState.hasBling then
-			fState.hasBling = nil
-			fState.Bling:SetCooldownDuration(1e-3)
-		end
-
-		local chargeInfo = C_Spell.GetSpellCharges(spellID) -- SpellChargeInfo
-		local recharging = chargeInfo and chargeInfo.isActive and not onCD
-		if recharging then
-			local duration = C_Spell.GetSpellChargeDuration(spellID)
-			fState.Recharge:SetCooldownFromDurationObject(duration)
-		else
-			fState.Recharge:Clear()
-		end
+	if onCD then
+		fState.Cooldown:SetHideCountdownNumbers(not vState.cfg.cdShowTime)
+		fState.Cooldown:SetCooldownFromDurationObject(duration)
+		fState.Icon:SetDesaturated(true)
+	elseif onGCD then
+		fState.Cooldown:SetHideCountdownNumbers(true)
+		fState.Cooldown:SetCooldownFromDurationObject(duration)
+		fState.Icon:SetDesaturated(false)
+	else
+		fState.Cooldown:Clear()
+		fState.Icon:SetDesaturated(false)
 	end
 
+	if onCD then
+		fState.hasBling = true
+		fState.Bling:SetCooldownFromDurationObject(duration, true)
+	elseif fState.hasBling then
+		fState.hasBling = nil
+		fState.Bling:SetCooldownDuration(1e-3)
+	end
+
+	local chargeInfo = C_Spell.GetSpellCharges(spellID) -- SpellChargeInfo
+	local recharging = chargeInfo and chargeInfo.isActive and not onCD
+	if recharging then
+		local duration = C_Spell.GetSpellChargeDuration(spellID)
+		fState.Recharge:SetCooldownFromDurationObject(duration)
+	else
+		fState.Recharge:Clear()
+	end
+end
+
+function CDM.RefreshUsable()
 	for category, vState in pairs(CDM.viewers) do
-		local startGCD = startRecoveryCategory == Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY
-		if startGCD or not spellID then
-			for spellID, fState in pairs(vState.spells) do
-				Impl(vState, fState)
+		for spellID, fState in pairs(vState.spells) do
+			local isUsable, noMana = C_Spell.IsSpellUsable(spellID)
+
+			local color
+			if     isUsable then color = CDM.usableColor
+			elseif noMana   then color = CDM.noManaColor
+			else                 color = CDM.unusableColor
 			end
-		else
+
+			fState.Icon:SetVertexColor(color:GetRGBA())
+		end
+	end
+end
+
+function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
+	local startGCD = startRecoveryCategory == Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY
+	if startGCD or not spellID then
+		CDM.dirty.cooldown = true
+	else
+		for category, vState in pairs(CDM.viewers) do
 			local fState = vState.spells[spellID] or vState.spells[baseSpellID]
 			if fState then
-				Impl(vState, fState)
+				CDM.RefreshCooldown(vState, fState)
 			end
 		end
 	end
