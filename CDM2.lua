@@ -25,6 +25,9 @@ function CDM.Load()
 
 			pressColor  = "40FFFFFF",
 			queuedColor = "4DE6CC1A",
+
+			assistColor = "FF3399F2",
+			assistSize  = 1,
 		},
 
 		[Enum.CooldownViewerCategory.Essential] = {
@@ -55,6 +58,7 @@ function CDM.Load()
 	CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED", CDM.CURRENT_SPELL_CAST_CHANGED)
 	hooksecurefunc(UIParent, "SetScale",            CDM.RefreshScale)
 	hooksecurefunc("SecureActionButton_OnClick",    CDM.OnClick)
+	hooksecurefunc(AssistedCombatManager, "UpdateAllAssistedHighlightFramesForSpell", CDM.RefreshAssist)
 
 	local viewers = {
 		Enum.CooldownViewerCategory.Essential,
@@ -161,6 +165,7 @@ function CDM.Rebuild()
 	CDM.RefreshAllUsable()
 	CDM.RefreshAllPress()
 	CDM.RefreshAllQueued()
+	CDM.RefreshAssist(nil, AssistedCombatManager.lastNextCastSpellID)
 	CDM.dirty.cooldown = true
 end
 
@@ -223,6 +228,16 @@ end
 function CDM.ConstructFrame(vState)
 	local fState = {}
 
+	-- Frame        | Textures      | Purpose
+	-- -------------|---------------|--------
+	-- Root         | Border        | Size, Position
+	--   Content    | Icon          | Inset
+	--     Recharge |               | Cooldown
+	--     Cooldown |               | Cooldown
+	--     Overlay  | Press, Queued | Draw Order
+	--     Bling    |               | Cooldown
+	--   Outline    | Assist        | Draw Order
+
 	fState.Root = CreateFrame("Frame", nil, vState.Root)
 	fState.Root:SetParentKey("Root")
 
@@ -282,6 +297,7 @@ function CDM.ConstructFrame(vState)
 	fState.Queued:SetBlendMode("ADD")
 
 	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
+	-- Ideally it would be above the Outline / Assist, but it needs to be clipped by Content
 
 	-- Bling
 	fState.Bling = CreateFrame("Cooldown", nil, fState.Content, "CooldownFrameTemplate")
@@ -294,6 +310,18 @@ function CDM.ConstructFrame(vState)
 	fState.Bling:SetBlingTexture("Interface\\Cooldown\\star4", 0.3, 0.6, 1, 0.64)
 	fState.Bling:SetHideCountdownNumbers(true)
 	fState.Bling:SetScript("OnCooldownDone", function() fState.hasBling = nil end)
+
+	fState.Outline = CreateFrame("Frame", nil, fState.Root)
+	fState.Outline:SetParentKey("Outline")
+	fState.Outline:SetAllPoints()
+
+	local aColor = CreateColorFromHexString(vState.cfg.assistColor)
+	fState.Assist = fState.Outline:CreateTexture(nil, "OVERLAY", nil, 1)
+	fState.Assist:SetParentKey("Assist")
+	fState.Assist:SetAllPoints()
+	fState.Assist:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
+	fState.Assist:SetTextureSliceMargins(1, 1, 1, 1)
+	fState.Assist:SetVertexColor(aColor:GetRGBA())
 
 	return fState
 end
@@ -335,12 +363,12 @@ function CDM.DisableFrame(fState)
 	fState.Recharge:Clear()
 	fState.Press:Hide()
 	fState.Queued:Hide()
-	--fState.Assist:Hide()
+	fState.Assist:Hide()
 	fState.Bling:Clear()
 
-	--if CDM.assistGlow == fState then
-	--	CDM.AssistGlow(nil, nil)
-	--end
+	if CDM.assistGlow == fState then
+		CDM.assistGlow = nil
+	end
 
 	--if fState.hasProcGlow then
 	--	CDM.ProcGlow(fState.frame, nil, false)
@@ -349,7 +377,6 @@ function CDM.DisableFrame(fState)
 	fState.cdvInfo = nil
 	fState.hasBling = nil
 	--fState.hasProcGlow = nil
-	--fState.hasAssistGlow = nil
 end
 
 function CDM.AssignFrames()
@@ -400,7 +427,7 @@ function CDM.RefreshAllSizes()
 		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
 		local iconSize    = Round(vState.cfg.iconSize   / pixelsToUI)
 		local borderSize  = Round(vState.cfg.borderSize / pixelsToUI)
-		--local assistSize  = vState.cfg.assistSize  / pixelsToUI
+		local assistSize  = Round(vState.cfg.assistSize / pixelsToUI)
 		local iconZoom    = vState.cfg.iconZoom
 		local iconAspect  = vState.cfg.iconAspect
 		local cdFontScale = vState.cfg.cdFontScale
@@ -424,7 +451,7 @@ function CDM.RefreshAllSizes()
 
 			Kami.Util.ZoomIcon(fState.Icon, iconZoom, cxSize, cySize)
 			Kami.Util.SetSliceScale(fState.Border, borderSize)
-			--Kami.Util.SetSliceScale(fState.Assist, assistSize)
+			Kami.Util.SetSliceScale(fState.Assist, assistSize)
 		end
 	end
 end
@@ -550,6 +577,21 @@ function CDM.RefreshAllQueued()
 	end
 end
 
+function CDM.RefreshAssist(mgr, spellID)
+	if CDM.assistGlow then
+		CDM.assistGlow.Assist:Hide()
+		CDM.assistGlow = nil
+	end
+
+	for category, vState in pairs(CDM.viewers) do
+		local fState = spellID and vState.spells[spellID] -- CDM.overrides[oSpellID])
+		if fState then
+			CDM.assistGlow = fState
+			fState.Assist:Show()
+		end
+	end
+end
+
 function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
 	for category, vState in pairs(CDM.viewers) do
 		local fState = vState.spells[spellID]
@@ -587,6 +629,10 @@ function CDM.GLOBAL_MOUSE_UP(mouseButton)
 	if press and press.button then
 		CDM.OnClick(press.button, mouseButton, false, nil, nil)
 	end
+end
+
+function CDM.CURRENT_SPELL_CAST_CHANGED(cancelledCast)
+	CDM.RefreshAllQueued()
 end
 
 function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
@@ -651,10 +697,6 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 			CDM.RefreshPress(spellID, pressCount > 0)
 		end
 	end
-end
-
-function CDM.CURRENT_SPELL_CAST_CHANGED(cancelledCast)
-	CDM.RefreshAllQueued()
 end
 
 CDM.Load()

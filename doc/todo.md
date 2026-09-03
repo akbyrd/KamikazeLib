@@ -1,6 +1,5 @@
 To Do
 -----
-Assist
 Proc
 spell overrides cause a rebuild during combat
 Spell overrides
