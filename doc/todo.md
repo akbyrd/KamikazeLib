@@ -1,6 +1,5 @@
 To Do
 -----
-Queued highlight
 Assist
 Proc
 spell overrides cause a rebuild during combat

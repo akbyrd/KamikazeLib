@@ -23,7 +23,8 @@ function CDM.Load()
 			cdShowTime  = true,
 			cdFontScale = 0.75,
 
-			pressColor = "40FFFFFF",
+			pressColor  = "40FFFFFF",
+			queuedColor = "4DE6CC1A",
 		},
 
 		[Enum.CooldownViewerCategory.Essential] = {
@@ -42,17 +43,18 @@ function CDM.Load()
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
-	CDM.eventFrame:SetScript("OnEvent",           CDM.DispatchEvent)
-	CDM.eventFrame:SetScript("OnUpdate",          CDM.Update)
-	CDM.RegisterEvent("UI_SCALE_CHANGED",         CDM.RefreshScale)
-	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",     CDM.RefreshScale)
-	CDM.RegisterEvent("SPELL_UPDATE_USABLE",      CDM.RefreshAllUsable)
-	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",    CDM.SPELL_UPDATE_COOLDOWN)
-	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE", CDM.SPELL_RANGE_CHECK_UPDATE)
-	CDM.RegisterEvent("GLOBAL_MOUSE_DOWN",        CDM.GLOBAL_MOUSE_DOWN)
-	CDM.RegisterEvent("GLOBAL_MOUSE_UP",          CDM.GLOBAL_MOUSE_UP)
-	hooksecurefunc(UIParent, "SetScale",          CDM.RefreshScale)
-	hooksecurefunc("SecureActionButton_OnClick",  CDM.OnClick)
+	CDM.eventFrame:SetScript("OnEvent",             CDM.DispatchEvent)
+	CDM.eventFrame:SetScript("OnUpdate",            CDM.Update)
+	CDM.RegisterEvent("UI_SCALE_CHANGED",           CDM.RefreshScale)
+	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",       CDM.RefreshScale)
+	CDM.RegisterEvent("SPELL_UPDATE_USABLE",        CDM.RefreshAllUsable)
+	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",      CDM.SPELL_UPDATE_COOLDOWN)
+	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",   CDM.SPELL_RANGE_CHECK_UPDATE)
+	CDM.RegisterEvent("GLOBAL_MOUSE_DOWN",          CDM.GLOBAL_MOUSE_DOWN)
+	CDM.RegisterEvent("GLOBAL_MOUSE_UP",            CDM.GLOBAL_MOUSE_UP)
+	CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED", CDM.CURRENT_SPELL_CAST_CHANGED)
+	hooksecurefunc(UIParent, "SetScale",            CDM.RefreshScale)
+	hooksecurefunc("SecureActionButton_OnClick",    CDM.OnClick)
 
 	local viewers = {
 		Enum.CooldownViewerCategory.Essential,
@@ -154,10 +156,11 @@ function CDM.Rebuild()
 	print("Kami CDM Rebuild")
 	CDM.GatherCDs()
 	CDM.AssignFrames()
-	CDM.RefreshSizes()
-	CDM.RefreshPositions()
+	CDM.RefreshAllSizes()
+	CDM.RefreshAllPositions()
 	CDM.RefreshAllUsable()
 	CDM.RefreshAllPress()
+	CDM.RefreshAllQueued()
 	CDM.dirty.cooldown = true
 end
 
@@ -260,12 +263,23 @@ function CDM.ConstructFrame(vState)
 	fState.Cooldown:SetCountdownFont(vState.cdFontName)
 	fState.Cooldown:SetScript("OnCooldownDone", function() fState.Icon:SetDesaturated(false) end)
 
+	fState.Overlay = CreateFrame("Frame", nil, fState.Content)
+	fState.Overlay:SetParentKey("Overlay")
+	fState.Overlay:SetAllPoints()
+
 	local pColor = CreateColorFromHexString(vState.cfg.pressColor)
-	fState.Press = fState.Content:CreateTexture(nil, "OVERLAY", nil, 0)
+	fState.Press = fState.Overlay:CreateTexture(nil, "OVERLAY", nil, 0)
 	fState.Press:SetParentKey("Press")
-	fState.Press:SetAllPoints(fState.Cooldown)
+	fState.Press:SetAllPoints()
 	fState.Press:SetColorTexture(pColor:GetRGBA())
 	fState.Press:SetBlendMode("ADD")
+
+	local qColor = CreateColorFromHexString(vState.cfg.queuedColor)
+	fState.Queued = fState.Overlay:CreateTexture(nil, "OVERLAY", nil, 0)
+	fState.Queued:SetParentKey("Queued")
+	fState.Queued:SetAllPoints()
+	fState.Queued:SetColorTexture(qColor:GetRGBA())
+	fState.Queued:SetBlendMode("ADD")
 
 	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
 
@@ -285,6 +299,7 @@ function CDM.ConstructFrame(vState)
 end
 
 function CDM.EnableFrame(fState, vState, cdvInfo)
+	-- TODO: Revisit this. I think it's possible now?
 	-- NOTE: We don't rebuild "pressed" state here. Probably not a good way to do it and definitely
 	-- more trouble than it's worth.
 
@@ -319,6 +334,7 @@ function CDM.DisableFrame(fState)
 	fState.Cooldown:Clear()
 	fState.Recharge:Clear()
 	fState.Press:Hide()
+	fState.Queued:Hide()
 	--fState.Assist:Hide()
 	fState.Bling:Clear()
 
@@ -375,11 +391,11 @@ function CDM.RefreshScale()
 		vState.Root:SetScale(pixelsToUI)
 	end
 
-	CDM.RefreshSizes()
-	CDM.RefreshPositions()
+	CDM.RefreshAllSizes()
+	CDM.RefreshAllPositions()
 end
 
-function CDM.RefreshSizes()
+function CDM.RefreshAllSizes()
 	for category, vState in pairs(CDM.viewers) do
 		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
 		local iconSize    = Round(vState.cfg.iconSize   / pixelsToUI)
@@ -413,7 +429,7 @@ function CDM.RefreshSizes()
 	end
 end
 
-function CDM.RefreshPositions()
+function CDM.RefreshAllPositions()
 	for category, vState in pairs(CDM.viewers) do
 		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
 		local xPos      = Round(vState.cfg.xPos    / pixelsToUI)
@@ -525,6 +541,15 @@ function CDM.RefreshAllPress()
 	end
 end
 
+function CDM.RefreshAllQueued()
+	for category, vState in pairs(CDM.viewers) do
+		for spellID, fState in pairs(vState.spells) do
+			local isCurrent = C_Spell.IsCurrentSpell(spellID)
+			fState.Queued:SetShown(isCurrent)
+		end
+	end
+end
+
 function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
 	for category, vState in pairs(CDM.viewers) do
 		local fState = vState.spells[spellID]
@@ -626,6 +651,10 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 			CDM.RefreshPress(spellID, pressCount > 0)
 		end
 	end
+end
+
+function CDM.CURRENT_SPELL_CAST_CHANGED(cancelledCast)
+	CDM.RefreshAllQueued()
 end
 
 CDM.Load()
