@@ -2,38 +2,34 @@ To Do
 -----
 Spell overrides
 Item categories
-Charge text
-Settings
-Saved vars
-----
-Sweeping strikes bar
-Whirlwind bar
-Rage bar
-Potions
 	Use item id to support older potions
 	Store C_Spell.GetLastCategoryCooldownSource across reloads
 	Initialize from first item in bags?
-Modularize
-	Each behavior gets an object with { init, enable, update, disable, deinit }
-Track any item
-Track any spell
-Per-talent layout
-Disable ability highlight on specific spells
-Settings support
+Charge text
+Settings
 	Don't use Blizz settings
 	Editable in combat
 	Edit mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
-	Default + inheritance + override based
+	Cache colors / intermediates
+Saved vars
 Custom row wrapping
-Anchoring
+Profile performance
+----
 Buff Bars
 	Skin
 	Custom spell color (classify?)
 	Show permanent buff bars as full
 	Hide pip
 	Pandemic support
-Profile performance
-Replace LibCustomGlow. It sucks
+----
+Anchoring
+Disable ability highlight on specific spells
+Per-talent layout
+Track any item
+Track any spell
+Sweeping strikes bar
+Whirlwind bar
+Rage bar
 
 
 

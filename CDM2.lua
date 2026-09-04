@@ -84,19 +84,14 @@ function CDM.Load()
 		Root:SetParentKey(("Kami.CDM.%s.Root"):format(categoryName))
 
 		local vState = {
-			name       = categoryName,
-			cfg        = CDM.cfg[category],
-			Root       = Root,
-			pool       = {},
-			cdvInfos   = {},
-			cdFrames   = {},
-			-- TODO: try making this global. I think it will remove a bunch of viewer loops that aren't
-			-- really needed. The trade-off is that you're not allowed to have the same spell in
-			-- multiple viewers, which seems reasonable but may be fiddly to enforce with custom
-			-- spell/item additions.
-			spells     = {},
-			xSize      = nil,
-			ySize      = nil,
+			name     = categoryName,
+			cfg      = CDM.cfg[category],
+			Root     = Root,
+			pool     = {},
+			cdvInfos = {},
+			cdFrames = {},
+			xSize    = nil,
+			ySize    = nil,
 		}
 		CDM.viewers[category] = vState
 	end
@@ -120,6 +115,7 @@ function CDM.Load()
 		{ threshold = 2  * SECONDS_PER_DAY,  format = dFmt,                      components = {{ div = SECONDS_PER_DAY,  step = 1,   rounding = round }} },
 	})
 
+	CDM.spells        = {}
 	CDM.usableColor   = CreateColorFromHexString("FFFFFFFF")
 	CDM.noManaColor   = CreateColorFromHexString("FF8080FF")
 	CDM.noRangeColor  = CreateColorFromHexString("FFA32626")
@@ -236,6 +232,7 @@ end
 
 function CDM.ConstructFrame(vState)
 	local fState = {}
+	fState.cfg = vState.cfg
 
 	-- Frame        | Textures      | Purpose
 	-- -------------|---------------|--------
@@ -338,7 +335,7 @@ function CDM.ConstructFrame(vState)
 	return fState
 end
 
-function CDM.EnableFrame(vState, fState, cdvInfo)
+function CDM.EnableFrame(fState, cdvInfo)
 	-- TODO: Revisit this. I think it's possible now?
 	-- NOTE: We don't rebuild "pressed" state here. Probably not a good way to do it and definitely
 	-- more trouble than it's worth.
@@ -354,14 +351,14 @@ function CDM.EnableFrame(vState, fState, cdvInfo)
 	end
 
 	-- TODO: Want color caching?
-	local borderColor = CreateColorFromHexString(vState.cfg.borderColor)
+	local borderColor = CreateColorFromHexString(fState.cfg.borderColor)
 	fState.Root:Show()
 	fState.Icon:SetTexture(texture)
 	fState.Border:SetVertexColor(borderColor:GetRGBA())
 end
 
 -- TODO: We only need to clear the things EnableFrame and a CD update won't handle
-function CDM.DisableFrame(vState, fState)
+function CDM.DisableFrame(fState)
 	if fState.cdvInfo then
 		if fState.cdvInfo.spellID then
 			C_Spell.EnableSpellRangeCheck(fState.cdvInfo.spellID, false)
@@ -388,33 +385,34 @@ function CDM.DisableFrame(vState, fState)
 end
 
 function CDM.AssignFrames()
+	wipe(CDM.spells)
+
 	for category, vState in pairs(CDM.viewers) do
 		-- Disable existing frames
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			-- TODO: Not sure if this is a good idea
-			CDM.DisableFrame(vState, fState)
+			CDM.DisableFrame(fState)
 			table.insert(vState.pool, fState)
 		end
 		wipe(vState.cdFrames)
-		wipe(vState.spells)
 
 		-- Construct new frames (if needed)
 		local have = #vState.pool
 		local need = #vState.cdvInfos
 		for iNeed = have + 1, need do
 			local fState = CDM.ConstructFrame(vState)
-			CDM.DisableFrame(vState, fState)
+			CDM.DisableFrame(fState)
 			table.insert(vState.pool, fState)
 		end
 
 		-- Enable new frames
 		for iInfo, cdvInfo in ipairs(vState.cdvInfos) do
 			local fState = table.remove(vState.pool)
-			CDM.EnableFrame(vState, fState, cdvInfo)
+			CDM.EnableFrame(fState, cdvInfo)
 			table.insert(vState.cdFrames, fState)
 
 			if cdvInfo.spellID then
-				vState.spells[cdvInfo.spellID] = fState
+				CDM.spells[cdvInfo.spellID] = fState
 			end
 		end
 	end
@@ -502,7 +500,7 @@ function CDM.RefreshAllPositions()
 	end
 end
 
-function CDM.RefreshCooldown(vState, fState)
+function CDM.RefreshCooldown(fState)
 	local spellID  = fState.cdvInfo.spellID
 	local cdInfo   = C_Spell.GetSpellCooldown(spellID) -- SpellCooldownInfo
 	local onCD     = cdInfo.isActive and not cdInfo.isOnGCD
@@ -510,7 +508,7 @@ function CDM.RefreshCooldown(vState, fState)
 	local duration = C_Spell.GetSpellCooldownDuration(spellID)
 
 	if onCD then
-		fState.Cooldown:SetHideCountdownNumbers(not vState.cfg.cdShowTime)
+		fState.Cooldown:SetHideCountdownNumbers(not fState.cfg.cdShowTime)
 		fState.Cooldown:SetCooldownFromDurationObject(duration)
 		fState.Icon:SetDesaturated(true)
 	elseif onGCD then
@@ -541,10 +539,8 @@ function CDM.RefreshCooldown(vState, fState)
 end
 
 function CDM.RefreshAllCooldowns()
-	for category, vState in pairs(CDM.viewers) do
-		for spellID, fState in pairs(vState.spells) do
-			CDM.RefreshCooldown(vState, fState)
-		end
+	for spellID, fState in pairs(CDM.spells) do
+		CDM.RefreshCooldown(fState)
 	end
 end
 
@@ -563,19 +559,15 @@ function CDM.RefreshUsable(fState)
 end
 
 function CDM.RefreshAllUsable()
-	for category, vState in pairs(CDM.viewers) do
-		for spellID, fState in pairs(vState.spells) do
-			CDM.RefreshUsable(fState)
-		end
+	for spellID, fState in pairs(CDM.spells) do
+		CDM.RefreshUsable(fState)
 	end
 end
 
 function CDM.RefreshPress(spellID, pressed)
-	for category, vState in pairs(CDM.viewers) do
-		local fState = vState.spells[spellID]
-		if fState then
-			fState.Press:SetShown(pressed)
-		end
+	local fState = CDM.spells[spellID]
+	if fState then
+		fState.Press:SetShown(pressed)
 	end
 end
 
@@ -586,11 +578,9 @@ function CDM.RefreshAllPress()
 end
 
 function CDM.RefreshAllQueued()
-	for category, vState in pairs(CDM.viewers) do
-		for spellID, fState in pairs(vState.spells) do
-			local isCurrent = C_Spell.IsCurrentSpell(spellID)
-			fState.Queued:SetShown(isCurrent)
-		end
+	for spellID, fState in pairs(CDM.spells) do
+		local isCurrent = C_Spell.IsCurrentSpell(spellID)
+		fState.Queued:SetShown(isCurrent)
 	end
 end
 
@@ -600,21 +590,17 @@ function CDM.RefreshAssist(mgr, spellID)
 		CDM.assistGlow = nil
 	end
 
-	for category, vState in pairs(CDM.viewers) do
-		local fState = spellID and vState.spells[spellID] -- CDM.overrides[oSpellID])
-		if fState then
-			CDM.assistGlow = fState
-			fState.Assist:Show()
-		end
+	local fState = spellID and CDM.spells[spellID] -- CDM.overrides[oSpellID])
+	if fState then
+		CDM.assistGlow = fState
+		fState.Assist:Show()
 	end
 end
 
 function CDM.RefreshAllProcs()
-	for category, vState in pairs(CDM.viewers) do
-		for spellID, fState in pairs(vState.spells) do
-			local show = C_SpellActivationOverlay.IsSpellOverlayed(spellID)
-			fState.Proc:SetShown(show)
-		end
+	for spellID, fState in pairs(CDM.spells) do
+		local show = C_SpellActivationOverlay.IsSpellOverlayed(spellID)
+		fState.Proc:SetShown(show)
 	end
 end
 
@@ -623,11 +609,9 @@ function CDM.PLAYER_REGEN_ENABLED()
 end
 
 function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
-	for category, vState in pairs(CDM.viewers) do
-		local fState = vState.spells[spellID]
-		if fState then
-			CDM.RefreshUsable(fState)
-		end
+	local fState = CDM.spells[spellID]
+	if fState then
+		CDM.RefreshUsable(fState)
 	end
 end
 
@@ -636,11 +620,9 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 	if startGCD or not spellID then
 		CDM.dirty.cooldown = true
 	else
-		for category, vState in pairs(CDM.viewers) do
-			local fState = vState.spells[spellID] or vState.spells[baseSpellID]
-			if fState then
-				CDM.RefreshCooldown(vState, fState)
-			end
+		local fState = CDM.spells[spellID] or CDM.spells[baseSpellID]
+		if fState then
+			CDM.RefreshCooldown(fState)
 		end
 	end
 end
@@ -667,20 +649,16 @@ end
 
 -- TODO: Can spellID be nil?
 function CDM.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW(spellID)
-	for category, vState in pairs(CDM.viewers) do
-		local fState = vState.spells[spellID]
-		if fState then
-			fState.Proc:Show()
-		end
+	local fState = CDM.spells[spellID]
+	if fState then
+		fState.Proc:Show()
 	end
 end
 
 function CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE(spellID)
-	for category, vState in pairs(CDM.viewers) do
-		local fState = vState.spells[spellID]
-		if fState then
-			fState.Proc:Hide()
-		end
+	local fState = CDM.spells[spellID]
+	if fState then
+		fState.Proc:Hide()
 	end
 end
 
