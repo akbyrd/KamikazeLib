@@ -2,7 +2,6 @@ local Kami = select(2, ...)
 local CDM = {}
 Kami.CDM2 = CDM
 
-local LCG = LibStub("LibCustomGlow-1.0")
 local LSM = LibStub("LibSharedMedia-3.0")
 
 function CDM.Load()
@@ -28,6 +27,11 @@ function CDM.Load()
 
 			assistColor = "FF3399F2",
 			assistSize  = 1,
+
+			procColor = "FFFFFF00",
+			procSpeed = 0.30,
+			procSize  = 2,
+			procDuty  = 0.6,
 		},
 
 		[Enum.CooldownViewerCategory.Essential] = {
@@ -46,18 +50,20 @@ function CDM.Load()
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
-	CDM.eventFrame:SetScript("OnEvent",             CDM.DispatchEvent)
-	CDM.eventFrame:SetScript("OnUpdate",            CDM.Update)
-	CDM.RegisterEvent("UI_SCALE_CHANGED",           CDM.RefreshScale)
-	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",       CDM.RefreshScale)
-	CDM.RegisterEvent("SPELL_UPDATE_USABLE",        CDM.RefreshAllUsable)
-	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",      CDM.SPELL_UPDATE_COOLDOWN)
-	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",   CDM.SPELL_RANGE_CHECK_UPDATE)
-	CDM.RegisterEvent("GLOBAL_MOUSE_DOWN",          CDM.GLOBAL_MOUSE_DOWN)
-	CDM.RegisterEvent("GLOBAL_MOUSE_UP",            CDM.GLOBAL_MOUSE_UP)
-	CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED", CDM.CURRENT_SPELL_CAST_CHANGED)
-	hooksecurefunc(UIParent, "SetScale",            CDM.RefreshScale)
-	hooksecurefunc("SecureActionButton_OnClick",    CDM.OnClick)
+	CDM.eventFrame:SetScript("OnEvent",                     CDM.DispatchEvent)
+	CDM.eventFrame:SetScript("OnUpdate",                    CDM.Update)
+	CDM.RegisterEvent("UI_SCALE_CHANGED",                   CDM.RefreshScale)
+	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",               CDM.RefreshScale)
+	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                CDM.RefreshAllUsable)
+	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",              CDM.SPELL_UPDATE_COOLDOWN)
+	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",           CDM.SPELL_RANGE_CHECK_UPDATE)
+	CDM.RegisterEvent("GLOBAL_MOUSE_DOWN",                  CDM.GLOBAL_MOUSE_DOWN)
+	CDM.RegisterEvent("GLOBAL_MOUSE_UP",                    CDM.GLOBAL_MOUSE_UP)
+	CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",         CDM.CURRENT_SPELL_CAST_CHANGED)
+	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW", CDM.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
+	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE", CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
+	hooksecurefunc(UIParent, "SetScale",                    CDM.RefreshScale)
+	hooksecurefunc("SecureActionButton_OnClick",            CDM.OnClick)
 	hooksecurefunc(AssistedCombatManager, "UpdateAllAssistedHighlightFramesForSpell", CDM.RefreshAssist)
 
 	local viewers = {
@@ -145,15 +151,12 @@ end
 function CDM.Update()
 	if CDM.dirty.cooldown then
 		CDM.dirty.cooldown = false
-		for category, vState in pairs(CDM.viewers) do
-			for spellID, fState in pairs(vState.spells) do
-				CDM.RefreshCooldown(vState, fState)
-			end
-		end
+		CDM.RefreshAllCooldowns()
 	end
 end
 
 function CDM.Rebuild()
+	-- TODO: Document the branch
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	if layoutMgr:AreNotificationsLocked() then return end
 
@@ -162,11 +165,12 @@ function CDM.Rebuild()
 	CDM.AssignFrames()
 	CDM.RefreshAllSizes()
 	CDM.RefreshAllPositions()
+	CDM.RefreshAllCooldowns()
 	CDM.RefreshAllUsable()
 	CDM.RefreshAllPress()
 	CDM.RefreshAllQueued()
 	CDM.RefreshAssist(nil, AssistedCombatManager.lastNextCastSpellID)
-	CDM.dirty.cooldown = true
+	CDM.RefreshAllProcs()
 end
 
 function CDM.GatherCDs()
@@ -282,18 +286,18 @@ function CDM.ConstructFrame(vState)
 	fState.Overlay:SetParentKey("Overlay")
 	fState.Overlay:SetAllPoints()
 
-	local pColor = CreateColorFromHexString(vState.cfg.pressColor)
+	local pressColor = CreateColorFromHexString(vState.cfg.pressColor)
 	fState.Press = fState.Overlay:CreateTexture(nil, "OVERLAY", nil, 0)
 	fState.Press:SetParentKey("Press")
 	fState.Press:SetAllPoints()
-	fState.Press:SetColorTexture(pColor:GetRGBA())
+	fState.Press:SetColorTexture(pressColor:GetRGBA())
 	fState.Press:SetBlendMode("ADD")
 
-	local qColor = CreateColorFromHexString(vState.cfg.queuedColor)
+	local queuedColor = CreateColorFromHexString(vState.cfg.queuedColor)
 	fState.Queued = fState.Overlay:CreateTexture(nil, "OVERLAY", nil, 0)
 	fState.Queued:SetParentKey("Queued")
 	fState.Queued:SetAllPoints()
-	fState.Queued:SetColorTexture(qColor:GetRGBA())
+	fState.Queued:SetColorTexture(queuedColor:GetRGBA())
 	fState.Queued:SetBlendMode("ADD")
 
 	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
@@ -315,18 +319,21 @@ function CDM.ConstructFrame(vState)
 	fState.Outline:SetParentKey("Outline")
 	fState.Outline:SetAllPoints()
 
-	local aColor = CreateColorFromHexString(vState.cfg.assistColor)
+	local assistColor = CreateColorFromHexString(vState.cfg.assistColor)
 	fState.Assist = fState.Outline:CreateTexture(nil, "OVERLAY", nil, 1)
 	fState.Assist:SetParentKey("Assist")
 	fState.Assist:SetAllPoints()
 	fState.Assist:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
 	fState.Assist:SetTextureSliceMargins(1, 1, 1, 1)
-	fState.Assist:SetVertexColor(aColor:GetRGBA())
+	fState.Assist:SetVertexColor(assistColor:GetRGBA())
+
+	local procColor = CreateColorFromHexString(vState.cfg.procColor)
+	fState.Proc = Kami.PixelAnts.Create(fState.Outline, vState.cfg.procSize, 0, procColor, vState.cfg.procSpeed, 2, vState.cfg.procDuty)
 
 	return fState
 end
 
-function CDM.EnableFrame(fState, vState, cdvInfo)
+function CDM.EnableFrame(vState, fState, cdvInfo)
 	-- TODO: Revisit this. I think it's possible now?
 	-- NOTE: We don't rebuild "pressed" state here. Probably not a good way to do it and definitely
 	-- more trouble than it's worth.
@@ -342,14 +349,14 @@ function CDM.EnableFrame(fState, vState, cdvInfo)
 	end
 
 	-- TODO: Want color caching?
-	local bColor = CreateColorFromHexString(vState.cfg.borderColor)
+	local borderColor = CreateColorFromHexString(vState.cfg.borderColor)
 	fState.Root:Show()
 	fState.Icon:SetTexture(texture)
-	fState.Border:SetVertexColor(bColor:GetRGBA())
+	fState.Border:SetVertexColor(borderColor:GetRGBA())
 end
 
 -- TODO: We only need to clear the things EnableFrame and a CD update won't handle
-function CDM.DisableFrame(fState)
+function CDM.DisableFrame(vState, fState)
 	if fState.cdvInfo then
 		if fState.cdvInfo.spellID then
 			C_Spell.EnableSpellRangeCheck(fState.cdvInfo.spellID, false)
@@ -363,20 +370,16 @@ function CDM.DisableFrame(fState)
 	fState.Recharge:Clear()
 	fState.Press:Hide()
 	fState.Queued:Hide()
-	fState.Assist:Hide()
 	fState.Bling:Clear()
+	fState.Assist:Hide()
+	fState.Proc:Hide()
 
 	if CDM.assistGlow == fState then
 		CDM.assistGlow = nil
 	end
 
-	--if fState.hasProcGlow then
-	--	CDM.ProcGlow(fState.frame, nil, false)
-	--end
-
 	fState.cdvInfo = nil
 	fState.hasBling = nil
-	--fState.hasProcGlow = nil
 end
 
 function CDM.AssignFrames()
@@ -384,7 +387,7 @@ function CDM.AssignFrames()
 		-- Disable existing frames
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			-- TODO: Not sure if this is a good idea
-			CDM.DisableFrame(fState)
+			CDM.DisableFrame(vState, fState)
 			table.insert(vState.pool, fState)
 		end
 		wipe(vState.cdFrames)
@@ -395,14 +398,14 @@ function CDM.AssignFrames()
 		local need = #vState.cdvInfos
 		for iNeed = have + 1, need do
 			local fState = CDM.ConstructFrame(vState)
-			CDM.DisableFrame(fState)
+			CDM.DisableFrame(vState, fState)
 			table.insert(vState.pool, fState)
 		end
 
 		-- Enable new frames
 		for iInfo, cdvInfo in ipairs(vState.cdvInfos) do
 			local fState = table.remove(vState.pool)
-			CDM.EnableFrame(fState, vState, cdvInfo)
+			CDM.EnableFrame(vState, fState, cdvInfo)
 			table.insert(vState.cdFrames, fState)
 
 			if cdvInfo.spellID then
@@ -448,6 +451,7 @@ function CDM.RefreshAllSizes()
 			fState.Content:SetSize(cxSize, cySize)
 			fState.Recharge:SetSize(diagSize, diagSize)
 			fState.Bling:SetSize(diagSize, diagSize)
+			fState.Proc:RefreshSize()
 
 			Kami.Util.ZoomIcon(fState.Icon, iconZoom, cxSize, cySize)
 			Kami.Util.SetSliceScale(fState.Border, borderSize)
@@ -531,6 +535,14 @@ function CDM.RefreshCooldown(vState, fState)
 	end
 end
 
+function CDM.RefreshAllCooldowns()
+	for category, vState in pairs(CDM.viewers) do
+		for spellID, fState in pairs(vState.spells) do
+			CDM.RefreshCooldown(vState, fState)
+		end
+	end
+end
+
 function CDM.RefreshUsable(fState)
 	local usable, noMana = C_Spell.IsSpellUsable(fState.cdvInfo.spellID)
 	local noRange = C_Spell.IsSpellInRange(fState.cdvInfo.spellID) == false -- nil is "no target" etc
@@ -592,6 +604,15 @@ function CDM.RefreshAssist(mgr, spellID)
 	end
 end
 
+function CDM.RefreshAllProcs()
+	for category, vState in pairs(CDM.viewers) do
+		for spellID, fState in pairs(vState.spells) do
+			local show = C_SpellActivationOverlay.IsSpellOverlayed(spellID)
+			fState.Proc:SetShown(show)
+		end
+	end
+end
+
 function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
 	for category, vState in pairs(CDM.viewers) do
 		local fState = vState.spells[spellID]
@@ -633,6 +654,25 @@ end
 
 function CDM.CURRENT_SPELL_CAST_CHANGED(cancelledCast)
 	CDM.RefreshAllQueued()
+end
+
+-- TODO: Can spellID be nil?
+function CDM.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW(spellID)
+	for category, vState in pairs(CDM.viewers) do
+		local fState = vState.spells[spellID]
+		if fState then
+			fState.Proc:Show()
+		end
+	end
+end
+
+function CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE(spellID)
+	for category, vState in pairs(CDM.viewers) do
+		local fState = vState.spells[spellID]
+		if fState then
+			fState.Proc:Hide()
+		end
+	end
 end
 
 function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)

@@ -12,6 +12,7 @@ Lib\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
 
 KamikazeLib.lua
 Util.lua
+PixelAnts.lua
 WorldMarkers.lua
 MouseCursor.lua
 CombatText.lua

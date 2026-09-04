@@ -1,6 +1,5 @@
 To Do
 -----
-Proc
 spell overrides cause a rebuild during combat
 Spell overrides
 Item categories
