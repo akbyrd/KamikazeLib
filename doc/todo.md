@@ -1,6 +1,5 @@
 To Do
 -----
-spell overrides cause a rebuild during combat
 Spell overrides
 Item categories
 Charge text

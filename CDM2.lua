@@ -55,6 +55,7 @@ function CDM.Load()
 	CDM.RegisterEvent("UI_SCALE_CHANGED",                   CDM.RefreshScale)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",               CDM.RefreshScale)
 	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                CDM.RefreshAllUsable)
+	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",               CDM.PLAYER_REGEN_ENABLED)
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",              CDM.SPELL_UPDATE_COOLDOWN)
 	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",           CDM.SPELL_RANGE_CHECK_UPDATE)
 	CDM.RegisterEvent("GLOBAL_MOUSE_DOWN",                  CDM.GLOBAL_MOUSE_DOWN)
@@ -65,6 +66,9 @@ function CDM.Load()
 	hooksecurefunc(UIParent, "SetScale",                    CDM.RefreshScale)
 	hooksecurefunc("SecureActionButton_OnClick",            CDM.OnClick)
 	hooksecurefunc(AssistedCombatManager, "UpdateAllAssistedHighlightFramesForSpell", CDM.RefreshAssist)
+
+	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
+	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.Rebuild)
 
 	local viewers = {
 		Enum.CooldownViewerCategory.Essential,
@@ -127,9 +131,6 @@ function CDM.Load()
 		cooldown = false,
 	}
 
-	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
-	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.Rebuild)
-
 	local cdTypeface = LSM:Fetch("font", "PT Sans Narrow")
 	for category, vState in pairs(CDM.viewers) do
 		vState.cdFontName = ("Kami.CDM2.Font.%s"):format(vState.name)
@@ -156,9 +157,13 @@ function CDM.Update()
 end
 
 function CDM.Rebuild()
-	-- TODO: Document the branch
+	-- NOTE: Hook fires when events are being throttled. Wait for the unlock.
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	if layoutMgr:AreNotificationsLocked() then return end
+
+	-- NOTE: Spell overrides trigger NotifyListeners
+	if InCombatLockdown() and CDM.hasBuilt then return end
+	CDM.hasBuilt = true
 
 	print("Kami CDM Rebuild")
 	CDM.GatherCDs()
@@ -611,6 +616,10 @@ function CDM.RefreshAllProcs()
 			fState.Proc:SetShown(show)
 		end
 	end
+end
+
+function CDM.PLAYER_REGEN_ENABLED()
+	CDM.Rebuild()
 end
 
 function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
