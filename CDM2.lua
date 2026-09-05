@@ -729,6 +729,13 @@ function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
 end
 
 function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
+	-- NOTE: Combat potions from older expansions seem to have different categories even though they
+	-- share a cooldown with current combat potions. Draenic Versatility Potion is 99 instead of the
+	-- expected 4. It does update the value of C_Spell.GetLastCategoryCooldownSource(4). If we want
+	-- to support these older potions we'd need to either:
+	-- * Ignore the category parameter here, query each category's "last source", and do a refresh.
+	-- * Build up a mapping of these undocumented categories and register them in EnableFrame.
+
 	local fState = CDM.categoryLookup[category]
 	if fState then
 		if fState.spellID ~= spellID then

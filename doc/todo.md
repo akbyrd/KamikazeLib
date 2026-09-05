@@ -1,7 +1,5 @@
 To Do
 -----
-Item categories
-	Use item id to support older potions?
 Charge text
 Settings
 	Don't use Blizz settings
