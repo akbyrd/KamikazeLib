@@ -1,9 +1,7 @@
 To Do
 -----
 Item categories
-	Use item id to support older potions
-	Store C_Spell.GetLastCategoryCooldownSource across reloads
-	Initialize from first item in bags?
+	Use item id to support older potions?
 Charge text
 Settings
 	Don't use Blizz settings
@@ -11,6 +9,7 @@ Settings
 	Edit mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
 	Cache colors / intermediates
 Saved vars
+	Last used potion in category
 Custom row wrapping
 Profile performance
 ----

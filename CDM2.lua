@@ -35,11 +35,11 @@ function CDM.Load()
 		},
 
 		[Enum.CooldownViewerCategory.Essential] = {
-			yPos = -288,
+			yPos = -248,
 		},
 
 		[Enum.CooldownViewerCategory.Utility] = {
-			yPos = -344,
+			yPos = -324,
 			iconSize = 30,
 		},
 	}
@@ -116,15 +116,22 @@ function CDM.Load()
 		{ threshold = 2  * SECONDS_PER_DAY,  format = dFmt,                      components = {{ div = SECONDS_PER_DAY,  step = 1,   rounding = round }} },
 	})
 
-	CDM.usableColor   = CreateColorFromHexString("FFFFFFFF")
-	CDM.noManaColor   = CreateColorFromHexString("FF8080FF")
-	CDM.noRangeColor  = CreateColorFromHexString("FFA32626")
-	CDM.noUsableColor = CreateColorFromHexString("FF666666")
-	CDM.spellLookup   = {}
-	CDM.mousePresses  = {}
-	CDM.spellPresses  = {}
-	CDM.pressCounts   = {}
-	CDM.dirty = {
+	CDM.usableColor    = CreateColorFromHexString("FFFFFFFF")
+	CDM.noManaColor    = CreateColorFromHexString("FF8080FF")
+	CDM.noRangeColor   = CreateColorFromHexString("FFA32626")
+	CDM.noUsableColor  = CreateColorFromHexString("FF666666")
+	CDM.spellLookup    = {}
+	CDM.categoryLookup = {}
+	CDM.categoryIcons  = {
+		[4]    = "Interface/ICONS/INV_POTION_114",
+		[30]   = "Interface/ICONS/INV_POTION_54",
+		[1711] = "Interface/ICONS/Warlock_ Healthstone",
+		[2566] = "Interface/ICONS/Warlock_ Bloodstone",
+	}
+	CDM.mousePresses   = {}
+	CDM.spellPresses   = {}
+	CDM.pressCounts    = {}
+	CDM.dirty = { -- TODO: No longer needs to be a table
 		cooldown = false,
 	}
 
@@ -169,6 +176,7 @@ function CDM.Rebuild()
 	CDM.AssignFrames()
 	CDM.RefreshAllSizes()
 	CDM.RefreshAllPositions()
+	CDM.RefreshAllCategories()
 	CDM.RefreshAllOverrides()
 	CDM.RefreshAllCooldowns()
 	CDM.RefreshAllIcons()
@@ -252,11 +260,13 @@ function CDM.ConstructFrame(vState)
 	fState.Root = CreateFrame("Frame", nil, vState.Root)
 	fState.Root:SetParentKey("Root")
 
+	local borderColor = CreateColorFromHexString(fState.cfg.borderColor)
 	fState.Border = fState.Root:CreateTexture(nil, "OVERLAY")
 	fState.Border:SetParentKey("Border")
 	fState.Border:SetAllPoints()
 	fState.Border:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
 	fState.Border:SetTextureSliceMargins(1, 1, 1, 1)
+	fState.Border:SetVertexColor(borderColor:GetRGBA())
 
 	-- BUG: Edge and bling are broken in 12.1 They aren't scaled properly and they don't
 	-- clip. They show up as a rotating rectangle. So we manually rescale and clip them.
@@ -348,28 +358,33 @@ function CDM.EnableFrame(fState, cdvInfo)
 
 	fState.baseSpellID = cdvInfo.spellID
 	fState.spellID     = cdvInfo.spellID
+	fState.categoryID  = cdvInfo.spellCategoryID
+	fState.equipSlot   = cdvInfo.equipSlot
 
-	if fState.spellID then
+	if fState.categoryID then
+		CDM.categoryLookup[fState.categoryID] = fState
+
+	elseif fState.equipSlot then
+		-- TODO: Do equipped items ever need a range check?
+
+	elseif fState.spellID then
 		C_Spell.EnableSpellRangeCheck(fState.baseSpellID, true)
-	else
-		local texture = GetInventoryItemTexture("player", cdvInfo.equipSlot)
-		fState.Icon:SetTexture(texture)
 	end
 
-	local borderColor = CreateColorFromHexString(fState.cfg.borderColor)
 	fState.Root:Show()
-	fState.Border:SetVertexColor(borderColor:GetRGBA())
 end
 
--- TODO: We only need to clear the things EnableFrame and a CD update won't handle
 function CDM.DisableFrame(fState)
-	if fState.baseSpellID then
+	if fState.baseSpellID and not fState.categoryID then
 		C_Spell.EnableSpellRangeCheck(fState.baseSpellID, false)
 	end
+
+	local color = CDM.usableColor
 
 	fState.Root:Hide()
 	fState.Icon:SetTexture(nil)
 	fState.Icon:SetDesaturated(false)
+	fState.Icon:SetVertexColor(color:GetRGBA())
 	fState.Cooldown:Clear()
 	fState.Recharge:Clear()
 	fState.Press:Hide()
@@ -380,11 +395,14 @@ function CDM.DisableFrame(fState)
 
 	fState.spellID = nil
 	fState.baseSpellID = nil
+	fState.categoryID = nil
+	fState.equipSlot = nil
 	fState.hasBling = nil
 end
 
 function CDM.AssignFrames()
 	wipe(CDM.spellLookup)
+	wipe(CDM.categoryLookup)
 	CDM.assistSpellID = nil
 
 	for category, vState in pairs(CDM.viewers) do
@@ -572,41 +590,75 @@ function CDM.RefreshAllCooldowns()
 	end
 end
 
-function CDM.RefreshIcon(fState)
-	local texture = C_Spell.GetSpellTexture(fState.spellID)
-	fState.Icon:SetTexture(texture)
+function CDM.RefreshCategory(fState, spellID)
+	if fState.spellID then
+		CDM.spellLookup[fState.spellID] = nil
+	end
+
+	fState.baseSpellID = spellID
+	fState.spellID     = spellID
+	CDM.spellLookup[spellID] = fState
 end
 
-function CDM.RefreshAllIcons()
+function CDM.RefreshAllCategories()
 	for category, vState in pairs(CDM.viewers) do
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			if fState.spellID then
-				CDM.RefreshIcon(fState)
+			if fState.categoryID then
+				local spellID = C_Spell.GetLastCategoryCooldownSource(fState.categoryID)
+				if spellID then
+					CDM.RefreshCategory(fState, spellID)
+				end
 			end
 		end
 	end
 end
 
-function CDM.RefreshUsable(fState)
-	local usable, noMana = C_Spell.IsSpellUsable(fState.spellID)
-	local noRange = C_Spell.IsSpellInRange(fState.spellID) == false -- nil is "no target" etc
+function CDM.RefreshIcon(fState)
+	if fState.spellID then
+		local texture = C_Spell.GetSpellTexture(fState.spellID)
+		fState.Icon:SetTexture(texture)
 
-	local color
-	if     noRange then color = CDM.noRangeColor
-	elseif usable  then color = CDM.usableColor
-	elseif noMana  then color = CDM.noManaColor
-	else                color = CDM.noUsableColor
+	elseif fState.equipSlot then
+		local texture = GetInventoryItemTexture("player", fState.equipSlot)
+		fState.Icon:SetTexture(texture)
+
+	elseif fState.categoryID then
+		local texture = CDM.categoryIcons[fState.categoryID]
+		fState.Icon:SetTexture(texture)
 	end
+end
 
-	fState.Icon:SetVertexColor(color:GetRGBA())
+function CDM.RefreshAllIcons()
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			CDM.RefreshIcon(fState)
+		end
+	end
+end
+
+function CDM.RefreshUsable(fState)
+	if fState.spellID then
+		local usable, noMana = C_Spell.IsSpellUsable(fState.spellID)
+		local noRange = C_Spell.IsSpellInRange(fState.spellID) == false -- nil is "no target" etc
+
+		local color
+		if     noRange then color = CDM.noRangeColor
+		elseif usable  then color = CDM.usableColor
+		elseif noMana  then color = CDM.noManaColor
+		else                color = CDM.noUsableColor
+		end
+
+		fState.Icon:SetVertexColor(color:GetRGBA())
+	else
+		local color = CDM.usableColor
+		fState.Icon:SetVertexColor(color:GetRGBA())
+	end
 end
 
 function CDM.RefreshAllUsable()
 	for category, vState in pairs(CDM.viewers) do
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			if fState.spellID then
-				CDM.RefreshUsable(fState)
-			end
+			CDM.RefreshUsable(fState)
 		end
 	end
 end
@@ -677,6 +729,14 @@ function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
 end
 
 function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
+	local fState = CDM.categoryLookup[category]
+	if fState then
+		if fState.spellID ~= spellID then
+			CDM.RefreshCategory(fState, spellID)
+			CDM.RefreshIcon(fState)
+		end
+	end
+
 	local startGCD = startRecoveryCategory == Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY
 	if startGCD or not spellID then
 		CDM.dirty.cooldown = true
