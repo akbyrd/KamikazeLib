@@ -1,7 +1,5 @@
 To Do
 -----
-EnableFrame todo
-CalculateAction todo
 Item categories
 	Use item id to support older potions
 	Store C_Spell.GetLastCategoryCooldownSource across reloads

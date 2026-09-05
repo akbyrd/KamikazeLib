@@ -341,9 +341,10 @@ function CDM.ConstructFrame(vState)
 end
 
 function CDM.EnableFrame(fState, cdvInfo)
-	-- TODO: Revisit this. I think it's possible now?
-	-- NOTE: We don't rebuild "pressed" state here. Probably not a good way to do it and definitely
-	-- more trouble than it's worth.
+	-- NOTE: We don't rebuild "pressed" state here. We don't track pressCount for spells that aren't
+	-- on the CDM. So we can't tell if it was already being held when a rebuild occurs. We could
+	-- track it, but it could be an override and we always store the base spellID specifically to
+	-- avoid dealing with complexity from overrides. So it's not worth handling that edge case.
 
 	fState.baseSpellID = cdvInfo.spellID
 	fState.spellID     = cdvInfo.spellID
@@ -765,7 +766,6 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 	if down then
 		local buttonType = SecureButton_GetModifiedAttribute(button, "type", mouseButton)
 		if buttonType == "action" then
-			-- TODO: Is is possible for slot to be invalid?
 			local slot = button:CalculateAction(mouseButton)
 			local actionType, id, subType = GetActionInfo(slot)
 
