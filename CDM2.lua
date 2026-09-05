@@ -14,13 +14,17 @@ function CDM.Load()
 			iconZoom   = 0.08,
 			iconAspect = 1.65,
 			iconPad    = 1,
-			iconLimit  = 5,
+			iconLimit  = 6,
 
 			borderColor = "FF000000",
 			borderSize  = 1,
 
 			cdShowTime  = true,
-			cdFontScale = 0.75,
+			cdFontScale = 0.70,
+
+			chargeFontScale = 0.50,
+			chargeXOffset   = 0,
+			chargeYOffset   = 0.5,
 
 			pressColor  = "40FFFFFF",
 			queuedColor = "4DE6CC1A",
@@ -65,6 +69,7 @@ function CDM.Load()
 	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",     CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
 	CDM.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED", CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
 	CDM.RegisterEvent("SPELL_UPDATE_ICON",                      CDM.SPELL_UPDATE_ICON)
+	CDM.RegisterEvent("SPELL_UPDATE_USES",                      CDM.SPELL_UPDATE_USES)
 	hooksecurefunc(UIParent, "SetScale",                        CDM.RefreshScale)
 	hooksecurefunc("SecureActionButton_OnClick",                CDM.OnClick)
 
@@ -136,10 +141,16 @@ function CDM.Load()
 	}
 
 	local cdTypeface = LSM:Fetch("font", "PT Sans Narrow")
+	local chargeTypeface = LSM:Fetch("font", "Homespun")
+
 	for category, vState in pairs(CDM.viewers) do
-		vState.cdFontName = ("Kami.CDM2.Font.%s"):format(vState.name)
+		vState.cdFontName = ("Kami.CDM2.CDFont.%s"):format(vState.name)
 		vState.cdFont = CreateFont(vState.cdFontName)
 		vState.cdFont:SetFont(cdTypeface, 18, "OUTLINE")
+
+		local chargeFontName = ("Kami.CDM2.ChargeFont.%s"):format(vState.name)
+		vState.chargeFont = CreateFont(chargeFontName)
+		vState.chargeFont:SetFont(chargeTypeface, 18, "OUTLINE")
 	end
 end
 
@@ -247,15 +258,15 @@ function CDM.ConstructFrame(vState)
 	local fState = {}
 	fState.cfg = vState.cfg
 
-	-- Frame        | Textures      | Purpose
-	-- -------------|---------------|--------
-	-- Root         | Border        | Size, Position
-	--   Content    | Icon          | Inset
-	--     Recharge |               | Cooldown
-	--     Cooldown |               | Cooldown
-	--     Overlay  | Press, Queued | Draw Order
-	--     Bling    |               | Cooldown
-	--   Outline    | Assist        | Draw Order
+	-- Frame        | Textures/Text          | Purpose
+	-- -------------|------------------------|--------
+	-- Root         | Border                 | Size, Position
+	--   Content    | Icon                   | Inset
+	--     Recharge |                        | Cooldown
+	--     Cooldown |                        | Cooldown
+	--     Overlay  | Press, Queued, Charges | Draw Order
+	--     Bling    |                        | Cooldown
+	--   Outline    | Assist                 | Draw Order
 
 	fState.Root = CreateFrame("Frame", nil, vState.Root)
 	fState.Root:SetParentKey("Root")
@@ -316,6 +327,10 @@ function CDM.ConstructFrame(vState)
 	fState.Queued:SetAllPoints()
 	fState.Queued:SetColorTexture(queuedColor:GetRGBA())
 	fState.Queued:SetBlendMode("ADD")
+
+	fState.Charges = fState.Overlay:CreateFontString(nil, "OVERLAY")
+	fState.Charges:SetParentKey("Charges")
+	fState.Charges:SetFontObject(vState.chargeFont)
 
 	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
 	-- Ideally it would be above the Outline / Assist, but it needs to be clipped by Content
@@ -389,6 +404,7 @@ function CDM.DisableFrame(fState)
 	fState.Recharge:Clear()
 	fState.Press:Hide()
 	fState.Queued:Hide()
+	fState.Charges:SetText("")
 	fState.Bling:Clear()
 	fState.Assist:Hide()
 	fState.Proc:Hide()
@@ -449,12 +465,15 @@ end
 function CDM.RefreshAllSizes()
 	for category, vState in pairs(CDM.viewers) do
 		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
-		local iconSize    = Round(vState.cfg.iconSize   / pixelsToUI)
-		local borderSize  = Round(vState.cfg.borderSize / pixelsToUI)
-		local assistSize  = Round(vState.cfg.assistSize / pixelsToUI)
-		local iconZoom    = vState.cfg.iconZoom
-		local iconAspect  = vState.cfg.iconAspect
-		local cdFontScale = vState.cfg.cdFontScale
+		local iconSize        = Round(vState.cfg.iconSize      / pixelsToUI)
+		local borderSize      = Round(vState.cfg.borderSize    / pixelsToUI)
+		local assistSize      = Round(vState.cfg.assistSize    / pixelsToUI)
+		local chargeXOffset   = Round(vState.cfg.chargeXOffset / pixelsToUI)
+		local chargeYOffset   = Round(vState.cfg.chargeYOffset / pixelsToUI)
+		local iconZoom        = vState.cfg.iconZoom
+		local iconAspect      = vState.cfg.iconAspect
+		local cdFontScale     = vState.cfg.cdFontScale
+		local chargeFontScale = vState.cfg.chargeFontScale
 
 		local xScale, yScale = Kami.Util.AspectScale(iconAspect)
 		vState.xSize = Round(xScale * iconSize)
@@ -467,10 +486,14 @@ function CDM.RefreshAllSizes()
 		local cdFontSize = Round(cdFontScale * cySize)
 		vState.cdFont:SetFontHeight(cdFontSize)
 
+		local chargeFontSize = Round(chargeFontScale * cySize)
+		vState.chargeFont:SetFontHeight(chargeFontSize)
+
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			fState.Root:SetSize(vState.xSize, vState.ySize)
 			fState.Content:SetSize(cxSize, cySize)
 			fState.Recharge:SetSize(diagSize, diagSize)
+			fState.Charges:SetPoint("BOTTOMRIGHT", fState.Content, "BOTTOMRIGHT", chargeXOffset, chargeYOffset)
 			fState.Bling:SetSize(diagSize, diagSize)
 			fState.Proc:RefreshSize()
 
@@ -578,6 +601,15 @@ function CDM.RefreshCooldown(fState)
 	else
 		fState.Recharge:Clear()
 	end
+
+	local count
+	if chargeInfo and chargeInfo.maxCharges > 1 then
+		count = chargeInfo.currentCharges
+	else
+		count = C_Spell.GetSpellCastCount(fState.spellID)
+	end
+	count = C_StringUtil.TruncateWhenZero(count)
+	fState.Charges:SetText(count)
 end
 
 function CDM.RefreshAllCooldowns()
@@ -753,6 +785,13 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 		if fState then
 			CDM.RefreshCooldown(fState)
 		end
+	end
+end
+
+function CDM.SPELL_UPDATE_USES(spellID, baseSpellID)
+	local fState = CDM.spellLookup[spellID] or CDM.spellLookup[baseSpellID]
+	if fState then
+		CDM.RefreshCooldown(fState)
 	end
 end
 

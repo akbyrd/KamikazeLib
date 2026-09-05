@@ -1,6 +1,5 @@
 To Do
 -----
-Charge text
 Settings
 	Don't use Blizz settings
 	Editable in combat
