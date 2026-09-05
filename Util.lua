@@ -83,3 +83,11 @@ function Util.TableRefAdd(table, key, add)
 	table[key] = value ~= 0 and value or nil
 	return value
 end
+
+function Util.TableKeys(table)
+	local keys = {}
+	for k, v in pairs(table) do
+		_G.table.insert(keys, k)
+	end
+	return keys
+end

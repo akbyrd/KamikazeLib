@@ -165,20 +165,19 @@ function CDM.Rebuild()
 	if InCombatLockdown() and CDM.hasBuilt then return end
 	CDM.hasBuilt = true
 
-	-- TODO: Reorder
 	print("Kami CDM Rebuild")
 	CDM.GatherCDs()
 	CDM.AssignFrames()
 	CDM.RefreshAllSizes()
 	CDM.RefreshAllPositions()
+	CDM.RefreshAllOverrides()
 	CDM.RefreshAllCooldowns()
+	CDM.RefreshAllIcons()
 	CDM.RefreshAllUsable()
 	CDM.RefreshAllPress()
 	CDM.RefreshAllQueued()
-	CDM.RefreshAssist(nil, AssistedCombatManager.lastNextCastSpellID)
 	CDM.RefreshAllProcs()
-	CDM.RefreshAllOverrides()
-	CDM.RefreshAllIcons()
+	CDM.RefreshAssist(nil, AssistedCombatManager.lastNextCastSpellID)
 end
 
 function CDM.GatherCDs()
@@ -504,6 +503,31 @@ function CDM.RefreshAllPositions()
 	end
 end
 
+function CDM.RefreshOverride(fState, spellID)
+	-- Remove the current override
+	if fState.spellID ~= fState.baseSpellID then
+		CDM.spellLookup[fState.spellID] = nil
+		fState.spellID = fState.baseSpellID
+	end
+
+	-- Apply the new override (or revert back to base)
+	if spellID and spellID ~= fState.spellID then
+		CDM.spellLookup[spellID] = fState
+		fState.spellID = spellID
+	end
+end
+
+function CDM.RefreshAllOverrides()
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			if fState.spellID then
+				local spellID = C_Spell.GetOverrideSpell(fState.baseSpellID)
+				CDM.RefreshOverride(fState, spellID)
+			end
+		end
+	end
+end
+
 function CDM.RefreshCooldown(fState)
 	local cdInfo   = C_Spell.GetSpellCooldown(fState.spellID) -- SpellCooldownInfo
 	local onCD     = cdInfo.isActive and not cdInfo.isOnGCD
@@ -546,6 +570,21 @@ function CDM.RefreshAllCooldowns()
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			if fState.spellID then
 				CDM.RefreshCooldown(fState)
+			end
+		end
+	end
+end
+
+function CDM.RefreshIcon(fState)
+	local texture = C_Spell.GetSpellTexture(fState.spellID)
+	fState.Icon:SetTexture(texture)
+end
+
+function CDM.RefreshAllIcons()
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			if fState.spellID then
+				CDM.RefreshIcon(fState)
 			end
 		end
 	end
@@ -599,6 +638,17 @@ function CDM.RefreshAllQueued()
 	end
 end
 
+function CDM.RefreshAllProcs()
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			if fState.spellID then
+				local show = C_SpellActivationOverlay.IsSpellOverlayed(fState.spellID)
+				fState.Proc:SetShown(show)
+			end
+		end
+	end
+end
+
 function CDM.RefreshAssist(mgr, spellID)
 	if CDM.assistGlow then
 		local fState = CDM.assistGlow
@@ -611,58 +661,6 @@ function CDM.RefreshAssist(mgr, spellID)
 		if fState then
 			fState.Assist:Show()
 			CDM.assistGlow = fState
-		end
-	end
-end
-
-function CDM.RefreshAllProcs()
-	for category, vState in pairs(CDM.viewers) do
-		for iFrame, fState in ipairs(vState.cdFrames) do
-			if fState.spellID then
-				local show = C_SpellActivationOverlay.IsSpellOverlayed(fState.spellID)
-				fState.Proc:SetShown(show)
-			end
-		end
-	end
-end
-
-function CDM.RefreshOverride(fState, spellID)
-	-- Remove the current override
-	if fState.spellID ~= fState.baseSpellID then
-		CDM.spellLookup[fState.spellID] = nil
-		fState.spellID = fState.baseSpellID
-	end
-
-	-- Apply the new override (or revert back to base)
-	if spellID and spellID ~= fState.spellID then
-		CDM.spellLookup[spellID] = fState
-		fState.spellID = spellID
-	end
-end
-
-function CDM.RefreshAllOverrides()
-	for category, vState in pairs(CDM.viewers) do
-		for iFrame, fState in ipairs(vState.cdFrames) do
-			if fState.spellID then
-				local spellID = C_Spell.GetOverrideSpell(fState.baseSpellID)
-				CDM.RefreshOverride(fState, spellID)
-			end
-		end
-	end
-end
-
-function CDM.RefreshIcon(fState)
-	print(GetTime(), "RefreshIcon", fState.spellID)
-	local texture = C_Spell.GetSpellTexture(fState.spellID)
-	fState.Icon:SetTexture(texture)
-end
-
-function CDM.RefreshAllIcons()
-	for category, vState in pairs(CDM.viewers) do
-		for iFrame, fState in ipairs(vState.cdFrames) do
-			if fState.spellID then
-				CDM.RefreshIcon(fState)
-			end
 		end
 	end
 end
@@ -733,9 +731,13 @@ function CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID
 end
 
 function CDM.SPELL_UPDATE_ICON(spellID)
-	local fState = CDM.spellLookup[spellID]
-	if fState then
-		CDM.RefreshIcon(fState)
+	if spellID then
+		local fState = CDM.spellLookup[spellID]
+		if fState then
+			CDM.RefreshIcon(fState)
+		end
+	else
+		CDM.RefreshAllIcons()
 	end
 end
 
