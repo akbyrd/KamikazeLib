@@ -1,6 +1,8 @@
 To Do
 -----
-Spell overrides
+RefreshAssist todo
+EnableFrame todo
+CalculateAction todo
 Item categories
 	Use item id to support older potions
 	Store C_Spell.GetLastCategoryCooldownSource across reloads
@@ -24,6 +26,7 @@ Buff Bars
 ----
 Anchoring
 Disable ability highlight on specific spells
+Tooltips
 Per-talent layout
 Track any item
 Track any spell
@@ -48,6 +51,7 @@ Can't track racial
 
 ClassUIEnhanced
 ---------------
+Buggy as hell
 Can't track racial
 Can't track health potion / healthstone
 Can't change assistant highlight type

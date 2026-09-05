@@ -50,21 +50,25 @@ function CDM.Load()
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
-	CDM.eventFrame:SetScript("OnEvent",                     CDM.DispatchEvent)
-	CDM.eventFrame:SetScript("OnUpdate",                    CDM.Update)
-	CDM.RegisterEvent("UI_SCALE_CHANGED",                   CDM.RefreshScale)
-	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",               CDM.RefreshScale)
-	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                CDM.RefreshAllUsable)
-	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",               CDM.PLAYER_REGEN_ENABLED)
-	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",              CDM.SPELL_UPDATE_COOLDOWN)
-	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",           CDM.SPELL_RANGE_CHECK_UPDATE)
-	CDM.RegisterEvent("GLOBAL_MOUSE_DOWN",                  CDM.GLOBAL_MOUSE_DOWN)
-	CDM.RegisterEvent("GLOBAL_MOUSE_UP",                    CDM.GLOBAL_MOUSE_UP)
-	CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",         CDM.CURRENT_SPELL_CAST_CHANGED)
-	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW", CDM.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
-	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE", CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
-	hooksecurefunc(UIParent, "SetScale",                    CDM.RefreshScale)
-	hooksecurefunc("SecureActionButton_OnClick",            CDM.OnClick)
+	CDM.eventFrame:SetScript("OnEvent",                         CDM.DispatchEvent)
+	CDM.eventFrame:SetScript("OnUpdate",                        CDM.Update)
+	CDM.RegisterEvent("UI_SCALE_CHANGED",                       CDM.RefreshScale)
+	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                   CDM.RefreshScale)
+	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                    CDM.RefreshAllUsable)
+	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                   CDM.PLAYER_REGEN_ENABLED)
+	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                  CDM.SPELL_UPDATE_COOLDOWN)
+	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",               CDM.SPELL_RANGE_CHECK_UPDATE)
+	CDM.RegisterEvent("GLOBAL_MOUSE_DOWN",                      CDM.GLOBAL_MOUSE_DOWN)
+	CDM.RegisterEvent("GLOBAL_MOUSE_UP",                        CDM.GLOBAL_MOUSE_UP)
+	CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",             CDM.CURRENT_SPELL_CAST_CHANGED)
+	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",     CDM.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
+	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",     CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
+	CDM.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED", CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
+	CDM.RegisterEvent("SPELL_UPDATE_ICON",                      CDM.SPELL_UPDATE_ICON)
+	hooksecurefunc(UIParent, "SetScale",                        CDM.RefreshScale)
+	hooksecurefunc("SecureActionButton_OnClick",                CDM.OnClick)
+
+	-- TODO: Replace with GetNextCastSpell pull?
 	hooksecurefunc(AssistedCombatManager, "UpdateAllAssistedHighlightFramesForSpell", CDM.RefreshAssist)
 
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
@@ -115,11 +119,11 @@ function CDM.Load()
 		{ threshold = 2  * SECONDS_PER_DAY,  format = dFmt,                      components = {{ div = SECONDS_PER_DAY,  step = 1,   rounding = round }} },
 	})
 
-	CDM.spells        = {}
 	CDM.usableColor   = CreateColorFromHexString("FFFFFFFF")
 	CDM.noManaColor   = CreateColorFromHexString("FF8080FF")
 	CDM.noRangeColor  = CreateColorFromHexString("FFA32626")
 	CDM.noUsableColor = CreateColorFromHexString("FF666666")
+	CDM.spellLookup   = {}
 	CDM.mousePresses  = {}
 	CDM.spellPresses  = {}
 	CDM.pressCounts   = {}
@@ -161,6 +165,7 @@ function CDM.Rebuild()
 	if InCombatLockdown() and CDM.hasBuilt then return end
 	CDM.hasBuilt = true
 
+	-- TODO: Reorder
 	print("Kami CDM Rebuild")
 	CDM.GatherCDs()
 	CDM.AssignFrames()
@@ -172,6 +177,8 @@ function CDM.Rebuild()
 	CDM.RefreshAllQueued()
 	CDM.RefreshAssist(nil, AssistedCombatManager.lastNextCastSpellID)
 	CDM.RefreshAllProcs()
+	CDM.RefreshAllOverrides()
+	CDM.RefreshAllIcons()
 end
 
 function CDM.GatherCDs()
@@ -340,29 +347,25 @@ function CDM.EnableFrame(fState, cdvInfo)
 	-- NOTE: We don't rebuild "pressed" state here. Probably not a good way to do it and definitely
 	-- more trouble than it's worth.
 
-	fState.cdvInfo = cdvInfo
+	fState.baseSpellID = cdvInfo.spellID
+	fState.spellID     = cdvInfo.spellID
 
-	local texture
-	if cdvInfo.spellID then
-		texture = C_Spell.GetSpellTexture(cdvInfo.spellID)
-		C_Spell.EnableSpellRangeCheck(cdvInfo.spellID, true)
+	if fState.spellID then
+		C_Spell.EnableSpellRangeCheck(fState.baseSpellID, true)
 	else
-		texture = GetInventoryItemTexture("player", cdvInfo.equipSlot)
+		local texture = GetInventoryItemTexture("player", cdvInfo.equipSlot)
+		fState.Icon:SetTexture(texture)
 	end
 
-	-- TODO: Want color caching?
 	local borderColor = CreateColorFromHexString(fState.cfg.borderColor)
 	fState.Root:Show()
-	fState.Icon:SetTexture(texture)
 	fState.Border:SetVertexColor(borderColor:GetRGBA())
 end
 
 -- TODO: We only need to clear the things EnableFrame and a CD update won't handle
 function CDM.DisableFrame(fState)
-	if fState.cdvInfo then
-		if fState.cdvInfo.spellID then
-			C_Spell.EnableSpellRangeCheck(fState.cdvInfo.spellID, false)
-		end
+	if fState.baseSpellID then
+		C_Spell.EnableSpellRangeCheck(fState.baseSpellID, false)
 	end
 
 	fState.Root:Hide()
@@ -380,12 +383,13 @@ function CDM.DisableFrame(fState)
 		CDM.assistGlow = nil
 	end
 
-	fState.cdvInfo = nil
+	fState.spellID = nil
+	fState.baseSpellID = nil
 	fState.hasBling = nil
 end
 
 function CDM.AssignFrames()
-	wipe(CDM.spells)
+	wipe(CDM.spellLookup)
 
 	for category, vState in pairs(CDM.viewers) do
 		-- Disable existing frames
@@ -412,7 +416,7 @@ function CDM.AssignFrames()
 			table.insert(vState.cdFrames, fState)
 
 			if cdvInfo.spellID then
-				CDM.spells[cdvInfo.spellID] = fState
+				CDM.spellLookup[cdvInfo.spellID] = fState
 			end
 		end
 	end
@@ -501,11 +505,10 @@ function CDM.RefreshAllPositions()
 end
 
 function CDM.RefreshCooldown(fState)
-	local spellID  = fState.cdvInfo.spellID
-	local cdInfo   = C_Spell.GetSpellCooldown(spellID) -- SpellCooldownInfo
+	local cdInfo   = C_Spell.GetSpellCooldown(fState.spellID) -- SpellCooldownInfo
 	local onCD     = cdInfo.isActive and not cdInfo.isOnGCD
 	local onGCD    = cdInfo.isOnGCD
-	local duration = C_Spell.GetSpellCooldownDuration(spellID)
+	local duration = C_Spell.GetSpellCooldownDuration(fState.spellID)
 
 	if onCD then
 		fState.Cooldown:SetHideCountdownNumbers(not fState.cfg.cdShowTime)
@@ -528,10 +531,10 @@ function CDM.RefreshCooldown(fState)
 		fState.Bling:SetCooldownDuration(1e-3)
 	end
 
-	local chargeInfo = C_Spell.GetSpellCharges(spellID) -- SpellChargeInfo
+	local chargeInfo = C_Spell.GetSpellCharges(fState.spellID) -- SpellChargeInfo
 	local recharging = chargeInfo and chargeInfo.isActive and not onCD
 	if recharging then
-		local duration = C_Spell.GetSpellChargeDuration(spellID)
+		local duration = C_Spell.GetSpellChargeDuration(fState.spellID)
 		fState.Recharge:SetCooldownFromDurationObject(duration)
 	else
 		fState.Recharge:Clear()
@@ -539,14 +542,18 @@ function CDM.RefreshCooldown(fState)
 end
 
 function CDM.RefreshAllCooldowns()
-	for spellID, fState in pairs(CDM.spells) do
-		CDM.RefreshCooldown(fState)
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			if fState.spellID then
+				CDM.RefreshCooldown(fState)
+			end
+		end
 	end
 end
 
 function CDM.RefreshUsable(fState)
-	local usable, noMana = C_Spell.IsSpellUsable(fState.cdvInfo.spellID)
-	local noRange = C_Spell.IsSpellInRange(fState.cdvInfo.spellID) == false -- nil is "no target" etc
+	local usable, noMana = C_Spell.IsSpellUsable(fState.spellID)
+	local noRange = C_Spell.IsSpellInRange(fState.spellID) == false -- nil is "no target" etc
 
 	local color
 	if     noRange then color = CDM.noRangeColor
@@ -559,13 +566,17 @@ function CDM.RefreshUsable(fState)
 end
 
 function CDM.RefreshAllUsable()
-	for spellID, fState in pairs(CDM.spells) do
-		CDM.RefreshUsable(fState)
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			if fState.spellID then
+				CDM.RefreshUsable(fState)
+			end
+		end
 	end
 end
 
 function CDM.RefreshPress(spellID, pressed)
-	local fState = CDM.spells[spellID]
+	local fState = CDM.spellLookup[spellID]
 	if fState then
 		fState.Press:SetShown(pressed)
 	end
@@ -578,29 +589,81 @@ function CDM.RefreshAllPress()
 end
 
 function CDM.RefreshAllQueued()
-	for spellID, fState in pairs(CDM.spells) do
-		local isCurrent = C_Spell.IsCurrentSpell(spellID)
-		fState.Queued:SetShown(isCurrent)
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			if fState.spellID then
+				local isCurrent = C_Spell.IsCurrentSpell(fState.spellID)
+				fState.Queued:SetShown(isCurrent)
+			end
+		end
 	end
 end
 
 function CDM.RefreshAssist(mgr, spellID)
 	if CDM.assistGlow then
-		CDM.assistGlow.Assist:Hide()
+		local fState = CDM.assistGlow
+		fState.Assist:Hide()
 		CDM.assistGlow = nil
 	end
 
-	local fState = spellID and CDM.spells[spellID] -- CDM.overrides[oSpellID])
-	if fState then
-		CDM.assistGlow = fState
-		fState.Assist:Show()
+	if spellID then
+		local fState = CDM.spellLookup[spellID]
+		if fState then
+			fState.Assist:Show()
+			CDM.assistGlow = fState
+		end
 	end
 end
 
 function CDM.RefreshAllProcs()
-	for spellID, fState in pairs(CDM.spells) do
-		local show = C_SpellActivationOverlay.IsSpellOverlayed(spellID)
-		fState.Proc:SetShown(show)
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			if fState.spellID then
+				local show = C_SpellActivationOverlay.IsSpellOverlayed(fState.spellID)
+				fState.Proc:SetShown(show)
+			end
+		end
+	end
+end
+
+function CDM.RefreshOverride(fState, spellID)
+	-- Remove the current override
+	if fState.spellID ~= fState.baseSpellID then
+		CDM.spellLookup[fState.spellID] = nil
+		fState.spellID = fState.baseSpellID
+	end
+
+	-- Apply the new override (or revert back to base)
+	if spellID and spellID ~= fState.spellID then
+		CDM.spellLookup[spellID] = fState
+		fState.spellID = spellID
+	end
+end
+
+function CDM.RefreshAllOverrides()
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			if fState.spellID then
+				local spellID = C_Spell.GetOverrideSpell(fState.baseSpellID)
+				CDM.RefreshOverride(fState, spellID)
+			end
+		end
+	end
+end
+
+function CDM.RefreshIcon(fState)
+	print(GetTime(), "RefreshIcon", fState.spellID)
+	local texture = C_Spell.GetSpellTexture(fState.spellID)
+	fState.Icon:SetTexture(texture)
+end
+
+function CDM.RefreshAllIcons()
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			if fState.spellID then
+				CDM.RefreshIcon(fState)
+			end
+		end
 	end
 end
 
@@ -609,7 +672,7 @@ function CDM.PLAYER_REGEN_ENABLED()
 end
 
 function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
-	local fState = CDM.spells[spellID]
+	local fState = CDM.spellLookup[spellID]
 	if fState then
 		CDM.RefreshUsable(fState)
 	end
@@ -620,7 +683,8 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 	if startGCD or not spellID then
 		CDM.dirty.cooldown = true
 	else
-		local fState = CDM.spells[spellID] or CDM.spells[baseSpellID]
+		-- NOTE: Supposedly this event can arrive before the override event, so we need to check base
+		local fState = CDM.spellLookup[spellID] or CDM.spellLookup[baseSpellID]
 		if fState then
 			CDM.RefreshCooldown(fState)
 		end
@@ -647,18 +711,31 @@ function CDM.CURRENT_SPELL_CAST_CHANGED(cancelledCast)
 	CDM.RefreshAllQueued()
 end
 
--- TODO: Can spellID be nil?
 function CDM.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW(spellID)
-	local fState = CDM.spells[spellID]
+	local fState = CDM.spellLookup[spellID]
 	if fState then
 		fState.Proc:Show()
 	end
 end
 
 function CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE(spellID)
-	local fState = CDM.spells[spellID]
+	local fState = CDM.spellLookup[spellID]
 	if fState then
 		fState.Proc:Hide()
+	end
+end
+
+function CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID)
+	local fState = CDM.spellLookup[baseSpellID]
+	if fState then
+		CDM.RefreshOverride(fState, overrideSpellID)
+	end
+end
+
+function CDM.SPELL_UPDATE_ICON(spellID)
+	local fState = CDM.spellLookup[spellID]
+	if fState then
+		CDM.RefreshIcon(fState)
 	end
 end
 
@@ -710,18 +787,21 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 		end
 	end
 
+	local fState      = CDM.spellLookup[spellID]
+	local currSpellID = fState and fState.baseSpellID
 	local prevSpellID = CDM.spellPresses[button]
-	if prevSpellID ~= spellID then
-		CDM.spellPresses[button] = spellID
+
+	if prevSpellID ~= currSpellID then
+		CDM.spellPresses[button] = currSpellID
 
 		if prevSpellID then
 			local pressCount = Kami.Util.TableRefAdd(CDM.pressCounts, prevSpellID, -1)
 			CDM.RefreshPress(prevSpellID, pressCount > 0)
 		end
 
-		if spellID then
-			local pressCount = Kami.Util.TableRefAdd(CDM.pressCounts, spellID, 1)
-			CDM.RefreshPress(spellID, pressCount > 0)
+		if currSpellID then
+			local pressCount = Kami.Util.TableRefAdd(CDM.pressCounts, currSpellID, 1)
+			CDM.RefreshPress(currSpellID, pressCount > 0)
 		end
 	end
 end
