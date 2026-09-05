@@ -377,10 +377,6 @@ function CDM.DisableFrame(fState)
 	fState.Assist:Hide()
 	fState.Proc:Hide()
 
-	if CDM.assistFrame == fState then
-		CDM.assistFrame = nil
-	end
-
 	fState.spellID = nil
 	fState.baseSpellID = nil
 	fState.hasBling = nil
@@ -388,7 +384,7 @@ end
 
 function CDM.AssignFrames()
 	wipe(CDM.spellLookup)
-	CDM.assistFrame = nil
+	CDM.assistSpellID = nil
 
 	for category, vState in pairs(CDM.viewers) do
 		-- Disable existing frames
@@ -650,18 +646,20 @@ function CDM.RefreshAllProcs()
 end
 
 function CDM.RefreshAssist()
-	local spellID = C_AssistedCombat.GetNextCastSpell(false)
-	local fState = spellID and CDM.spellLookup[spellID]
+	local spellID     = C_AssistedCombat.GetNextCastSpell(false)
+	local fState      = spellID and CDM.spellLookup[spellID]
+	local baseSpellID = fState and fState.baseSpellID
 
-	if fState ~= CDM.assistFrame then
-		if CDM.assistFrame then
-			CDM.assistFrame.Assist:Hide()
-			CDM.assistFrame = nil
+	if baseSpellID ~= CDM.assistSpellID then
+		if CDM.assistSpellID then
+			local fState = CDM.spellLookup[CDM.assistSpellID]
+			fState.Assist:Hide()
+			CDM.assistSpellID = nil
 		end
 
-		if fState then
+		if baseSpellID then
 			fState.Assist:Show()
-			CDM.assistFrame = fState
+			CDM.assistSpellID = baseSpellID
 		end
 	end
 end
