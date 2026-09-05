@@ -68,9 +68,6 @@ function CDM.Load()
 	hooksecurefunc(UIParent, "SetScale",                        CDM.RefreshScale)
 	hooksecurefunc("SecureActionButton_OnClick",                CDM.OnClick)
 
-	-- TODO: Replace with GetNextCastSpell pull?
-	hooksecurefunc(AssistedCombatManager, "UpdateAllAssistedHighlightFramesForSpell", CDM.RefreshAssist)
-
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.Rebuild)
 
@@ -154,6 +151,8 @@ function CDM.Update()
 		CDM.dirty.cooldown = false
 		CDM.RefreshAllCooldowns()
 	end
+
+	CDM.RefreshAssist()
 end
 
 function CDM.Rebuild()
@@ -177,7 +176,7 @@ function CDM.Rebuild()
 	CDM.RefreshAllPress()
 	CDM.RefreshAllQueued()
 	CDM.RefreshAllProcs()
-	CDM.RefreshAssist(nil, AssistedCombatManager.lastNextCastSpellID)
+	CDM.RefreshAssist()
 end
 
 function CDM.GatherCDs()
@@ -378,8 +377,8 @@ function CDM.DisableFrame(fState)
 	fState.Assist:Hide()
 	fState.Proc:Hide()
 
-	if CDM.assistGlow == fState then
-		CDM.assistGlow = nil
+	if CDM.assistFrame == fState then
+		CDM.assistFrame = nil
 	end
 
 	fState.spellID = nil
@@ -389,6 +388,7 @@ end
 
 function CDM.AssignFrames()
 	wipe(CDM.spellLookup)
+	CDM.assistFrame = nil
 
 	for category, vState in pairs(CDM.viewers) do
 		-- Disable existing frames
@@ -649,18 +649,19 @@ function CDM.RefreshAllProcs()
 	end
 end
 
-function CDM.RefreshAssist(mgr, spellID)
-	if CDM.assistGlow then
-		local fState = CDM.assistGlow
-		fState.Assist:Hide()
-		CDM.assistGlow = nil
-	end
+function CDM.RefreshAssist()
+	local spellID = C_AssistedCombat.GetNextCastSpell(false)
+	local fState = spellID and CDM.spellLookup[spellID]
 
-	if spellID then
-		local fState = CDM.spellLookup[spellID]
+	if fState ~= CDM.assistFrame then
+		if CDM.assistFrame then
+			CDM.assistFrame.Assist:Hide()
+			CDM.assistFrame = nil
+		end
+
 		if fState then
 			fState.Assist:Show()
-			CDM.assistGlow = fState
+			CDM.assistFrame = fState
 		end
 	end
 end

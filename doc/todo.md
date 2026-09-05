@@ -1,6 +1,5 @@
 To Do
 -----
-RefreshAssist todo
 EnableFrame todo
 CalculateAction todo
 Item categories
