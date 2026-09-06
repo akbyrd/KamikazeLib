@@ -1,31 +1,45 @@
 To Do
 -----
+Saved vars
+	Approach 1 - Explicit resolve/cache step
+	Approach 2 - Metatable intercepts reads with lazy caching
+	----
+	Overriding
+	Only save overrides
+	Intermediate data (converted colors)
+	Related fields (coordinate space)
+	Versioning
+		Include in Setting_*
+		Function for upgrading
+	Last used potion in category
+	Refresh only what changed
+		Maybe register refresh functions for each setting?
+	Need to be able to iterate tables with inheritance
 Settings
 	Don't use Blizz settings
 	Editable in combat
 	Edit mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
 	Cache colors / intermediates
-Saved vars
-	Last used potion in category
-Custom row wrapping
 Profile performance
 ----
+Custom row wrapping
+Disable ability highlight on specific spells
+Per-talent layout
 Buff Bars
 	Skin
 	Custom spell color (classify?)
 	Show permanent buff bars as full
 	Hide pip
 	Pandemic support
-----
-Anchoring
-Disable ability highlight on specific spells
-Tooltips
-Per-talent layout
-Track any item
-Track any spell
 Sweeping strikes bar
 Whirlwind bar
 Rage bar
+----
+Anchoring
+Tooltips
+Track any item
+Track any spell
+Skyriding
 
 
 

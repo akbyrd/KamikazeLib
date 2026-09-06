@@ -2,7 +2,8 @@ local Kami = select(2, ...)
 
 function Kami.Load()
 	_G.Kami = Kami
-	_G.KLSavedVars = {}
+	_G.KLSavedVars = _G.KLSavedVars or {}
+	_G.KLCharVars = _G.KLCharVars or {}
 	_G.BINDING_HEADER_KAMIKAZELIB = "KamikazeLib"
 	_G.SLASH_KAMIKAZELIB1 = "/kamikazelib"
 	_G.SLASH_KAMIKAZELIB2 = "/kl"

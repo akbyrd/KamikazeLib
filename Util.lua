@@ -91,3 +91,11 @@ function Util.TableKeys(table)
 	end
 	return keys
 end
+
+function Util.TableValues(table)
+	local values = {}
+	for k, v in pairs(table) do
+		_G.table.insert(values, v)
+	end
+	return values
+end

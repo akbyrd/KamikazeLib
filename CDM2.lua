@@ -2,62 +2,77 @@ local Kami = select(2, ...)
 local CDM = {}
 Kami.CDM2 = CDM
 
-local LSM = LibStub("LibSharedMedia-3.0")
+local Config    = Kami.Config
+local PixelAnts = Kami.PixelAnts
+local Util      = Kami.Util
+local LSM       = LibStub("LibSharedMedia-3.0")
 
 function CDM.Load()
-	CDM.cfg = {
-		default = {
-			xPos = 0,
-			yPos = 0,
+	KLSavedVars.CDM = KLSavedVars.CDM or {}
+	KLCharVars.CDM  = KLCharVars.CDM  or {}
+	CDM.savedVars   = KLSavedVars.CDM
+	CDM.charVars    = KLCharVars.CDM
 
-			iconSize   = 50,
-			iconZoom   = 0.08,
-			iconAspect = 1.65,
-			iconPad    = 1,
-			iconLimit  = 6,
+	CDM.savedVars.profile   = CDM.savedVars.profile   or {}
+	CDM.charVars.lastSource = CDM.charVars.lastSource or {}
 
-			borderColor = "FF000000",
-			borderSize  = 1,
+	CDM.cfg = Config.Create(
+		{
+			xPos = Config.Size("0ui"),
+			yPos = Config.Size("0ui"),
 
-			cdShowTime  = true,
-			cdFontScale = 0.70,
+			iconSize   = Config.Size("50ui"),
+			iconZoom   = Config.Number(0.08),
+			iconAspect = Config.Number(1.65),
+			iconPad    = Config.Size("1ui"),
+			iconLimit  = Config.Number(6),
 
-			chargeFontScale = 0.50,
-			chargeXOffset   = 0,
-			chargeYOffset   = 0.5,
+			usableColor   = Config.Color("FFFFFFFF"),
+			noManaColor   = Config.Color("FF8080FF"),
+			noRangeColor  = Config.Color("FFA32626"),
+			noUsableColor = Config.Color("FF666666"),
 
-			pressColor  = "40FFFFFF",
-			queuedColor = "4DE6CC1A",
+			borderColor = Config.Color("FF000000"),
+			borderSize  = Config.Size("1ui"),
 
-			assistColor = "FF3399F2",
-			assistSize  = 1,
+			cdShowTime = Config.Bool(true),
+			cdFontSize = Config.Size("70%"),
 
-			procColor = "FFFFFF00",
-			procSpeed = 0.30,
-			procSize  = 2,
-			procDuty  = 0.6,
+			chargeFontSize = Config.Size("50%"),
+			chargeXOffset  = Config.Size("0ui"),
+			chargeYOffset  = Config.Size("0.5ui"),
+
+			pressColor  = Config.Color("40FFFFFF"),
+			queuedColor = Config.Color("4DE6CC1A"),
+
+			assistColor = Config.Color("FF3399F2"),
+			assistSize  = Config.Size("1ui"),
+
+			procSize     = Config.Size("2ui"),
+			procInset    = Config.Size("0ui"),
+			procColor    = Config.Color("FFFFFF00"),
+			procSpeed    = Config.Number(0.30),
+			procSegments = Config.Number(2),
+			procDuty     = Config.Number(0.6),
 		},
+		{
+			Essential = {
+				yPos = "-248ui",
+			},
 
-		[Enum.CooldownViewerCategory.Essential] = {
-			yPos = -248,
-		},
-
-		[Enum.CooldownViewerCategory.Utility] = {
-			yPos = -324,
-			iconSize = 30,
-		},
-	}
-
-	setmetatable(CDM.cfg[Enum.CooldownViewerCategory.Essential], { __index = CDM.cfg.default })
-	setmetatable(CDM.cfg[Enum.CooldownViewerCategory.Utility],   { __index = CDM.cfg.default })
+			Utility = {
+				yPos     = "-324ui",
+				iconSize = "30ui",
+			},
+		})
 
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
 	CDM.eventFrame:SetScript("OnEvent",                         CDM.DispatchEvent)
 	CDM.eventFrame:SetScript("OnUpdate",                        CDM.Update)
-	CDM.RegisterEvent("UI_SCALE_CHANGED",                       CDM.RefreshScale)
-	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                   CDM.RefreshScale)
+	CDM.RegisterEvent("UI_SCALE_CHANGED",                       CDM.OnScaleChanged)
+	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                   CDM.OnScaleChanged)
 	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                    CDM.RefreshAllUsable)
 	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                   CDM.PLAYER_REGEN_ENABLED)
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                  CDM.SPELL_UPDATE_COOLDOWN)
@@ -70,11 +85,11 @@ function CDM.Load()
 	CDM.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED", CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
 	CDM.RegisterEvent("SPELL_UPDATE_ICON",                      CDM.SPELL_UPDATE_ICON)
 	CDM.RegisterEvent("SPELL_UPDATE_USES",                      CDM.SPELL_UPDATE_USES)
-	hooksecurefunc(UIParent, "SetScale",                        CDM.RefreshScale)
+	hooksecurefunc(UIParent, "SetScale",                        CDM.OnScaleChanged)
 	hooksecurefunc("SecureActionButton_OnClick",                CDM.OnClick)
 
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
-	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.Rebuild)
+	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.OnCDMChanged)
 
 	local viewers = {
 		Enum.CooldownViewerCategory.Essential,
@@ -91,11 +106,12 @@ function CDM.Load()
 
 		local vState = {
 			name     = categoryName,
-			cfg      = CDM.cfg[category],
+			cfg      = CDM.cfg.derived[categoryName],
 			Root     = Root,
 			pool     = {},
 			cdvInfos = {},
 			cdFrames = {},
+			iconSize = nil,
 			xSize    = nil,
 			ySize    = nil,
 		}
@@ -121,10 +137,6 @@ function CDM.Load()
 		{ threshold = 2  * SECONDS_PER_DAY,  format = dFmt,                      components = {{ div = SECONDS_PER_DAY,  step = 1,   rounding = round }} },
 	})
 
-	CDM.usableColor    = CreateColorFromHexString("FFFFFFFF")
-	CDM.noManaColor    = CreateColorFromHexString("FF8080FF")
-	CDM.noRangeColor   = CreateColorFromHexString("FFA32626")
-	CDM.noUsableColor  = CreateColorFromHexString("FF666666")
 	CDM.spellLookup    = {}
 	CDM.categoryLookup = {}
 	CDM.categoryIcons  = {
@@ -152,6 +164,9 @@ function CDM.Load()
 		vState.chargeFont = CreateFont(chargeFontName)
 		vState.chargeFont:SetFont(chargeTypeface, 18, "OUTLINE")
 	end
+
+	Config.SetUserOverrides(CDM.cfg, CDM.savedVars.profile)
+	CDM.Rebuild()
 end
 
 function CDM.RegisterEvent(event, func)
@@ -174,17 +189,10 @@ function CDM.Update()
 end
 
 function CDM.Rebuild()
-	-- NOTE: Hook fires when events are being throttled. Wait for the unlock.
-	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
-	if layoutMgr:AreNotificationsLocked() then return end
-
-	-- NOTE: Spell overrides trigger NotifyListeners
-	if InCombatLockdown() and CDM.hasBuilt then return end
-	CDM.hasBuilt = true
-
-	print("Kami CDM Rebuild")
 	CDM.GatherCDs()
 	CDM.AssignFrames()
+	CDM.RefreshScale()
+	CDM.RefreshAllConfig()
 	CDM.RefreshAllSizes()
 	CDM.RefreshAllPositions()
 	CDM.RefreshAllCategories()
@@ -271,13 +279,11 @@ function CDM.ConstructFrame(vState)
 	fState.Root = CreateFrame("Frame", nil, vState.Root)
 	fState.Root:SetParentKey("Root")
 
-	local borderColor = CreateColorFromHexString(fState.cfg.borderColor)
 	fState.Border = fState.Root:CreateTexture(nil, "OVERLAY")
 	fState.Border:SetParentKey("Border")
 	fState.Border:SetAllPoints()
 	fState.Border:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
 	fState.Border:SetTextureSliceMargins(1, 1, 1, 1)
-	fState.Border:SetVertexColor(borderColor:GetRGBA())
 
 	-- BUG: Edge and bling are broken in 12.1 They aren't scaled properly and they don't
 	-- clip. They show up as a rotating rectangle. So we manually rescale and clip them.
@@ -314,18 +320,14 @@ function CDM.ConstructFrame(vState)
 	fState.Overlay:SetParentKey("Overlay")
 	fState.Overlay:SetAllPoints()
 
-	local pressColor = CreateColorFromHexString(vState.cfg.pressColor)
 	fState.Press = fState.Overlay:CreateTexture(nil, "OVERLAY", nil, 0)
 	fState.Press:SetParentKey("Press")
 	fState.Press:SetAllPoints()
-	fState.Press:SetColorTexture(pressColor:GetRGBA())
 	fState.Press:SetBlendMode("ADD")
 
-	local queuedColor = CreateColorFromHexString(vState.cfg.queuedColor)
 	fState.Queued = fState.Overlay:CreateTexture(nil, "OVERLAY", nil, 0)
 	fState.Queued:SetParentKey("Queued")
 	fState.Queued:SetAllPoints()
-	fState.Queued:SetColorTexture(queuedColor:GetRGBA())
 	fState.Queued:SetBlendMode("ADD")
 
 	fState.Charges = fState.Overlay:CreateFontString(nil, "OVERLAY")
@@ -351,16 +353,13 @@ function CDM.ConstructFrame(vState)
 	fState.Outline:SetParentKey("Outline")
 	fState.Outline:SetAllPoints()
 
-	local assistColor = CreateColorFromHexString(vState.cfg.assistColor)
 	fState.Assist = fState.Outline:CreateTexture(nil, "OVERLAY", nil, 1)
 	fState.Assist:SetParentKey("Assist")
 	fState.Assist:SetAllPoints()
 	fState.Assist:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
 	fState.Assist:SetTextureSliceMargins(1, 1, 1, 1)
-	fState.Assist:SetVertexColor(assistColor:GetRGBA())
 
-	local procColor = CreateColorFromHexString(vState.cfg.procColor)
-	fState.Proc = Kami.PixelAnts.Create(fState.Outline, vState.cfg.procSize, 0, procColor, vState.cfg.procSpeed, 2, vState.cfg.procDuty)
+	fState.Proc = PixelAnts.Create(fState.Outline)
 
 	return fState
 end
@@ -394,12 +393,10 @@ function CDM.DisableFrame(fState)
 		C_Spell.EnableSpellRangeCheck(fState.baseSpellID, false)
 	end
 
-	local color = CDM.usableColor
-
 	fState.Root:Hide()
 	fState.Icon:SetTexture(nil)
 	fState.Icon:SetDesaturated(false)
-	fState.Icon:SetVertexColor(color:GetRGBA())
+	fState.Icon:SetVertexColor(1, 1, 1, 1)
 	fState.Cooldown:Clear()
 	fState.Recharge:Clear()
 	fState.Press:Hide()
@@ -453,40 +450,65 @@ function CDM.AssignFrames()
 end
 
 function CDM.RefreshScale()
+	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
 	for category, vState in pairs(CDM.viewers) do
-		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / vState.Root:GetParent():GetEffectiveScale()
 		vState.Root:SetScale(pixelsToUI)
 	end
 
-	CDM.RefreshAllSizes()
-	CDM.RefreshAllPositions()
+	Config.RefreshValues(CDM.cfg, pixelsToUI)
+end
+
+function CDM.RefreshConfig(fState)
+	fState.Border:SetVertexColor(fState.cfg.borderColor:GetRGBA())
+	fState.Press:SetColorTexture(fState.cfg.pressColor:GetRGBA())
+	fState.Queued:SetColorTexture(fState.cfg.queuedColor:GetRGBA())
+	fState.Assist:SetVertexColor(fState.cfg.assistColor:GetRGBA())
+
+	fState.Proc:SetConfig(
+		nil,
+		nil,
+		fState.cfg.procColor,
+		fState.cfg.procSpeed,
+		fState.cfg.procSegments,
+		fState.cfg.procDuty)
+end
+
+function CDM.RefreshAllConfig()
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			CDM.RefreshConfig(fState)
+		end
+	end
 end
 
 function CDM.RefreshAllSizes()
-	for category, vState in pairs(CDM.viewers) do
-		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
-		local iconSize        = Round(vState.cfg.iconSize      / pixelsToUI)
-		local borderSize      = Round(vState.cfg.borderSize    / pixelsToUI)
-		local assistSize      = Round(vState.cfg.assistSize    / pixelsToUI)
-		local chargeXOffset   = Round(vState.cfg.chargeXOffset / pixelsToUI)
-		local chargeYOffset   = Round(vState.cfg.chargeYOffset / pixelsToUI)
-		local iconZoom        = vState.cfg.iconZoom
-		local iconAspect      = vState.cfg.iconAspect
-		local cdFontScale     = vState.cfg.cdFontScale
-		local chargeFontScale = vState.cfg.chargeFontScale
+	local pxSize, pySize = GetPhysicalScreenSize()
 
-		local xScale, yScale = Kami.Util.AspectScale(iconAspect)
-		vState.xSize = Round(xScale * iconSize)
-		vState.ySize = Round(yScale * iconSize)
+	for category, vState in pairs(CDM.viewers) do
+		local cfg        = vState.cfg
+		local iconSize   = Round(cfg.iconSize   + cfg.iconSizeRel   * pySize)
+		local borderSize = Round(cfg.borderSize + cfg.borderSizeRel * iconSize)
+		local assistSize = Round(cfg.assistSize + cfg.assistSizeRel * iconSize)
+		local procSize   = Round(cfg.procSize   + cfg.procSizeRel   * iconSize)
+		local procInset  = Round(cfg.procInset  + cfg.procInsetRel  * iconSize)
+		local iconZoom   = cfg.iconZoom
+		local iconAspect = cfg.iconAspect
+
+		local xScale, yScale = Util.AspectScale(iconAspect)
+		vState.iconSize = iconSize -- TODO: Why do we need this?
+		vState.xSize    = Round(xScale * iconSize)
+		vState.ySize    = Round(yScale * iconSize)
 
 		local cxSize   = vState.xSize - 2*borderSize
 		local cySize   = vState.ySize - 2*borderSize
 		local diagSize = sqrt(cxSize^2 + cySize^2)
 
-		local cdFontSize = Round(cdFontScale * cySize)
-		vState.cdFont:SetFontHeight(cdFontSize)
+		local chargeXOffset  = Round(cfg.chargeXOffset  + cfg.chargeXOffsetRel  * cxSize)
+		local chargeYOffset  = Round(cfg.chargeYOffset  + cfg.chargeYOffsetRel  * cySize)
+		local cdFontSize     = Round(cfg.cdFontSize     + cfg.cdFontSizeRel     * cySize)
+		local chargeFontSize = Round(cfg.chargeFontSize + cfg.chargeFontSizeRel * cySize)
 
-		local chargeFontSize = Round(chargeFontScale * cySize)
+		vState.cdFont:SetFontHeight(cdFontSize)
 		vState.chargeFont:SetFontHeight(chargeFontSize)
 
 		for iFrame, fState in ipairs(vState.cdFrames) do
@@ -495,22 +517,25 @@ function CDM.RefreshAllSizes()
 			fState.Recharge:SetSize(diagSize, diagSize)
 			fState.Charges:SetPoint("BOTTOMRIGHT", fState.Content, "BOTTOMRIGHT", chargeXOffset, chargeYOffset)
 			fState.Bling:SetSize(diagSize, diagSize)
+			fState.Proc:SetConfig(procSize, procInset, nil, nil, nil, nil)
 			fState.Proc:RefreshSize()
 
-			Kami.Util.ZoomIcon(fState.Icon, iconZoom, cxSize, cySize)
-			Kami.Util.SetSliceScale(fState.Border, borderSize)
-			Kami.Util.SetSliceScale(fState.Assist, assistSize)
+			Util.ZoomIcon(fState.Icon, iconZoom, cxSize, cySize)
+			Util.SetSliceScale(fState.Border, borderSize)
+			Util.SetSliceScale(fState.Assist, assistSize)
 		end
 	end
 end
 
 function CDM.RefreshAllPositions()
+	local pxSize, pySize = GetPhysicalScreenSize()
+
 	for category, vState in pairs(CDM.viewers) do
-		local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
-		local xPos      = Round(vState.cfg.xPos    / pixelsToUI)
-		local yPos      = Round(vState.cfg.yPos    / pixelsToUI)
-		local iconPad   = Round(vState.cfg.iconPad / pixelsToUI)
-		local iconLimit = vState.cfg.iconLimit
+		local cfg       = vState.cfg
+		local xPos      = Round(cfg.xPos    + cfg.xPosRel    * pxSize)
+		local yPos      = Round(cfg.yPos    + cfg.yPosRel    * pySize)
+		local iconPad   = Round(cfg.iconPad + cfg.iconPadRel * vState.iconSize)
+		local iconLimit = cfg.iconLimit
 
 		local mxPos = 0
 		local myPos = 0
@@ -533,7 +558,6 @@ function CDM.RefreshAllPositions()
 			myPos = math.min(myPos, yPos - vState.ySize)
 		end
 
-		local pxSize, pySize = GetPhysicalScreenSize()
 		local vxPos = Round((0 + pxSize - mxPos) / 2 + xPos)
 		local vyPos = Round((0 - pySize - myPos) / 2 + yPos)
 		vState.Root:SetPoint("TOPLEFT", UIParent, "TOPLEFT", vxPos, vyPos)
@@ -636,7 +660,9 @@ function CDM.RefreshAllCategories()
 	for category, vState in pairs(CDM.viewers) do
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			if fState.categoryID then
-				local spellID = C_Spell.GetLastCategoryCooldownSource(fState.categoryID)
+				local uiLastSpellID = C_Spell.GetLastCategoryCooldownSource(fState.categoryID)
+				local klLastSpellID = CDM.charVars.lastSource[fState.categoryID]
+				local spellID = uiLastSpellID or klLastSpellID
 				if spellID then
 					CDM.RefreshCategory(fState, spellID)
 				end
@@ -674,15 +700,14 @@ function CDM.RefreshUsable(fState)
 		local noRange = C_Spell.IsSpellInRange(fState.spellID) == false -- nil is "no target" etc
 
 		local color
-		if     noRange then color = CDM.noRangeColor
-		elseif usable  then color = CDM.usableColor
-		elseif noMana  then color = CDM.noManaColor
-		else                color = CDM.noUsableColor
+		if     noRange then color = fState.cfg.noRangeColor
+		elseif usable  then color = fState.cfg.usableColor
+		elseif noMana  then color = fState.cfg.noManaColor
+		else                color = fState.cfg.noUsableColor
 		end
-
 		fState.Icon:SetVertexColor(color:GetRGBA())
 	else
-		local color = CDM.usableColor
+		local color = fState.cfg.usableColor
 		fState.Icon:SetVertexColor(color:GetRGBA())
 	end
 end
@@ -749,6 +774,12 @@ function CDM.RefreshAssist()
 	end
 end
 
+function CDM.OnScaleChanged()
+	CDM.RefreshScale()
+	CDM.RefreshAllSizes()
+	CDM.RefreshAllPositions()
+end
+
 function CDM.PLAYER_REGEN_ENABLED()
 	CDM.Rebuild()
 end
@@ -771,6 +802,8 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 	local fState = CDM.categoryLookup[category]
 	if fState then
 		if fState.spellID ~= spellID then
+			-- TODO: Do we need to save this to a account saved vars too?
+			CDM.charVars.lastSource[category] = spellID
 			CDM.RefreshCategory(fState, spellID)
 			CDM.RefreshIcon(fState)
 		end
@@ -902,15 +935,27 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 		CDM.spellPresses[button] = currSpellID
 
 		if prevSpellID then
-			local pressCount = Kami.Util.TableRefAdd(CDM.pressCounts, prevSpellID, -1)
+			local pressCount = Util.TableRefAdd(CDM.pressCounts, prevSpellID, -1)
 			CDM.RefreshPress(prevSpellID, pressCount > 0)
 		end
 
 		if currSpellID then
-			local pressCount = Kami.Util.TableRefAdd(CDM.pressCounts, currSpellID, 1)
+			local pressCount = Util.TableRefAdd(CDM.pressCounts, currSpellID, 1)
 			CDM.RefreshPress(currSpellID, pressCount > 0)
 		end
 	end
+end
+
+function CDM.OnCDMChanged()
+	-- NOTE: Hook fires when events are being throttled. Wait for the unlock.
+	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
+	if layoutMgr:AreNotificationsLocked() then return end
+
+	-- NOTE: Spell overrides trigger NotifyListeners
+	if InCombatLockdown() then return end
+
+	print("Kami CDM Rebuild")
+	CDM.Rebuild()
 end
 
 CDM.Load()
