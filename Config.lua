@@ -2,8 +2,6 @@ local Kami = select(2, ...)
 local Config = {}
 Kami.Config = Config
 
-local Util = Kami.Util
-
 function Config.Color(value)  return { type = "color",  value = value } end
 function Config.Size(value)   return { type = "size",   value = value } end
 function Config.Number(value) return { type = "number", value = value } end
@@ -63,85 +61,106 @@ local typeDefs = {
 	},
 }
 
-local function ValidateOverrides(types, values)
-	for overrideKey, overrideValues in pairs(overrides) do
-		for key, value in pairs(overrideValues) do
-			assert(types[key], ("Overriding %s but it doesn't exist"):format(tostring(key)))
-		end
-	end
-end
-
-local function ValidateValues(types, values)
-	for key, value in pairs(values) do
-		local type = types[key]
-		typeDefs[type].parse(value)
-	end
-end
-
 -- TODO: Validate user overrides without erroring or discarding them
 -- TODO: Maybe this should take a table as an argument and manage it internally instead
 
--- base      - { configKey: { type, value } }
--- overrides - { overrideKey: { configKey: value } }
-function Config.Create(base, overrides)
-	local types = {}
-	local base = {}
+-- branch - The name of the root branch
+-- root   - { key: { type, value } }
+function Config.Create(branch, root)
+	local types  = {}
+	local values = {}
 
-	for key, typedValue in pairs(base) do
+	for key, typedValue in pairs(root) do
 		local typeDef = type(typedValue) == "table" and typeDefs[typedValue.type]
 		assert(typeDef, ("Config for %s does not have a type"):format(tostring(key)))
-		types[key] = typedValue.type
-		base[key] = typedValue.value
+		typeDef.parse(typedValue.value)
+		types[key]  = typedValue.type
+		values[key] = typedValue.value
 	end
-
-	local derived = {}
-	ValidateValues(base)
-	for overrideKey, overrideValues in pairs(overrides) do
-		ValidateOverrides(overrideValues)
-		ValidateValues(overrideValues)
-		setmetatable(overrideValues, { __index = base })
-		derived[overrideKey] = {}
-	end
+	setmetatable(values, { __index = nil })
 
 	local config = {
-		types         = types,
-		base          = base,
-		overrides     = overrides,
-		userOverrides = nil,
-		derived       = derived,
+		types           = types,
+		nodeToBranch    = { [values] = branch },
+		branchToTop     = { [branch] = values },
+		branchToDerived = { [branch] = {} },
 	}
 	return config
 end
 
--- userOverrides - { overrideKey: { configKey: value } }
-function Config.SetUserOverrides(config, userOverrides)
-	for overrideKey, override in pairs(config.overrides) do
-		userOverrides[overrideKey] = userOverrides[overrideKey] or {}
+-- parentBranch - The branch to add the override to.
+-- newBranch    - The new branch name. Defaults to parentBranch, extending it.
+-- values       - { key: value }. The override to add.
+function Config.AddOverride(config, parentBranch, newBranch, values)
+	local parent = config.branchToTop[parentBranch]
+	assert(parent, ("Overriding %s but it doesn't exist"):format(tostring(parentBranch)))
+	assert(not config.nodeToBranch[values], "Adding an override that is already in the tree")
+
+	for key, value in pairs(values) do
+		local type = config.types[key]
+		assert(type, ("Overriding %s but it doesn't exist"):format(tostring(key)))
+		typeDefs[type].parse(value)
 	end
 
-	-- TODO: Validate userOverrides doesn't override something that doesn't exist
-	for overrideKey, overrideValues in pairs(userOverrides) do
-		ValidateOverrides(overrideValues)
-		ValidateValues(overrideValues)
-		setmetatable(overrideValues, { __index = config.overrides[overrideKey] })
-		getmetatable(config.overrides).__index = userOverrides.base
+	setmetatable(values, { __index = parent })
+	newBranch = newBranch or parentBranch
+
+	if newBranch == parentBranch then
+		for node, branch in pairs(config.nodeToBranch) do
+			local meta = getmetatable(node)
+			if meta.__index == parent then
+				meta.__index = values
+			end
+		end
+	else
+		assert(not config.branchToTop[newBranch], ("Adding %s but it already exists"):format(tostring(newBranch)))
+		config.branchToDerived[newBranch] = {}
 	end
 
-	-- TODO: This shouldn't be a special case
-	userOverrides.base = userOverrides.base or {}
-	ValidateOverrides(userOverrides.base)
-	ValidateValues(userOverrides.base)
-	setmetatable(userOverrides.base, { __index = config.base })
+	config.nodeToBranch[values] = newBranch
+	config.branchToTop[newBranch] = values
+end
 
-	config.userOverrides = userOverrides
+-- values - { key: value }. The override to remove. Must have been previously added.
+function Config.RemoveOverride(config, values)
+	local branch = config.nodeToBranch[values]
+	assert(branch, "Removing an override that is not in the tree")
+
+	local parent = getmetatable(values).__index
+	assert(parent, "Removing the root")
+
+	for node, nodeBranch in pairs(config.nodeToBranch) do
+		local meta = getmetatable(node)
+		if meta.__index == values then
+			meta.__index = parent
+		end
+	end
+
+	setmetatable(values, nil)
+	config.nodeToBranch[values] = nil
+
+	if config.branchToTop[branch] == values then
+		if config.nodeToBranch[parent] == branch then
+			config.branchToTop[branch] = parent
+		else
+			config.branchToTop[branch] = nil
+			config.branchToDerived[branch] = nil
+		end
+	end
+end
+
+-- Returns the derived table for a branch. Its identity is stable for the life of the branch.
+function Config.GetBranch(config, branch)
+	local derived = config.branchToDerived[branch]
+	assert(derived, ("Branch %s doesn't exist"):format(tostring(branch)))
+	return derived
 end
 
 function Config.RefreshValues(config, pixelsToUI)
-	for overrideKey, derivedValues in pairs(config.derived) do
-		local userOverride = config.userOverrides[overrideKey]
-		for key, value in pairs(config.base) do
-			local type = config.types[key]
-			typeDefs[type].resolve(derivedValues, key, userOverride[key], pixelsToUI)
+	for branch, derivedValues in pairs(config.branchToDerived) do
+		local top = config.branchToTop[branch]
+		for key, type in pairs(config.types) do
+			typeDefs[type].resolve(derivedValues, key, top[key], pixelsToUI)
 		end
 	end
 end

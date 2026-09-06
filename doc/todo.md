@@ -1,20 +1,5 @@
 To Do
 -----
-Saved vars
-	Approach 1 - Explicit resolve/cache step
-	Approach 2 - Metatable intercepts reads with lazy caching
-	----
-	Overriding
-	Only save overrides
-	Intermediate data (converted colors)
-	Related fields (coordinate space)
-	Versioning
-		Include in Setting_*
-		Function for upgrading
-	Last used potion in category
-	Refresh only what changed
-		Maybe register refresh functions for each setting?
-	Need to be able to iterate tables with inheritance
 Settings
 	Don't use Blizz settings
 	Editable in combat
@@ -40,6 +25,7 @@ Tooltips
 Track any item
 Track any spell
 Skyriding
+Settings versioning
 
 
 

@@ -13,10 +13,13 @@ function CDM.Load()
 	CDM.savedVars   = KLSavedVars.CDM
 	CDM.charVars    = KLCharVars.CDM
 
+	-- TODO: Rename profile?
+	-- TODO: Rename lastSource
+	-- TODO: Rename Base to Default?
 	CDM.savedVars.profile   = CDM.savedVars.profile   or {}
 	CDM.charVars.lastSource = CDM.charVars.lastSource or {}
 
-	CDM.cfg = Config.Create(
+	CDM.cfg = Config.Create("Default",
 		{
 			xPos = Config.Size("0ui"),
 			yPos = Config.Size("0ui"),
@@ -25,7 +28,7 @@ function CDM.Load()
 			iconZoom   = Config.Number(0.08),
 			iconAspect = Config.Number(1.65),
 			iconPad    = Config.Size("1ui"),
-			iconLimit  = Config.Number(6),
+			iconLimit  = Config.Number(5),
 
 			usableColor   = Config.Color("FFFFFFFF"),
 			noManaColor   = Config.Color("FF8080FF"),
@@ -54,17 +57,22 @@ function CDM.Load()
 			procSpeed    = Config.Number(0.30),
 			procSegments = Config.Number(2),
 			procDuty     = Config.Number(0.6),
-		},
-		{
-			Essential = {
-				yPos = "-248ui",
-			},
-
-			Utility = {
-				yPos     = "-324ui",
-				iconSize = "30ui",
-			},
 		})
+
+	Config.AddOverride(CDM.cfg, "Default", "Essential",
+		{
+			yPos = "-248ui",
+		})
+
+	Config.AddOverride(CDM.cfg, "Default", "Utility",
+		{
+			yPos     = "-324ui",
+			iconSize = "30ui",
+		})
+
+	for branch, values in pairs(CDM.savedVars.profile) do
+		Config.AddOverride(CDM.cfg, branch, nil, values)
+	end
 
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
@@ -106,7 +114,7 @@ function CDM.Load()
 
 		local vState = {
 			name     = categoryName,
-			cfg      = CDM.cfg.derived[categoryName],
+			cfg      = Config.GetBranch(CDM.cfg, categoryName),
 			Root     = Root,
 			pool     = {},
 			cdvInfos = {},
@@ -165,7 +173,6 @@ function CDM.Load()
 		vState.chargeFont:SetFont(chargeTypeface, 18, "OUTLINE")
 	end
 
-	Config.SetUserOverrides(CDM.cfg, CDM.savedVars.profile)
 	CDM.Rebuild()
 end
 
