@@ -15,9 +15,14 @@ Lib\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
 KamikazeLib.lua
 Util.lua
 Config.lua
+Settings.lua
 PixelAnts.lua
 WorldMarkers.lua
 MouseCursor.lua
 CombatText.lua
 CDM.lua
 CDM2.lua
+SettingsTest.lua
+IconTest.lua
+IconTest2.lua
+IconTest3.lua

@@ -6,7 +6,8 @@ function Kami.Load()
 	_G.KLCharVars = _G.KLCharVars or {}
 	_G.BINDING_HEADER_KAMIKAZELIB = "KamikazeLib"
 	_G.SLASH_KAMIKAZELIB1 = "/kamikazelib"
-	_G.SLASH_KAMIKAZELIB2 = "/kl"
+	_G.SLASH_KAMIKAZELIB2 = "/kami"
+	_G.SLASH_KAMIKAZELIB3 = "/kl"
 
 	SlashCmdList.KAMIKAZELIB = function(msg)
 		local args = {}
@@ -15,7 +16,7 @@ function Kami.Load()
 		end
 
 		if #args == 0 then
-			Settings.OpenToCategory(Kami.MC.options.category.ID)
+			Kami.Settings.Toggle()
 		else
 			local category = args[1]
 			if category == "sct" then

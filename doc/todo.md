@@ -1,13 +1,21 @@
 To Do
 -----
 Settings
-	Don't use Blizz settings
-	Editable in combat
-	Edit mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
-	Cache colors / intermediates
+	Show in built-in Options > Addons
+	Flat, modern style (e.g. Sourcery / Danders Frames)
+	Allow open / edit in combat
+	Edit Mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
+	Search
+	Undo/redo
+	Tooltips
+	Slider
+		Mouse wheel / arrow keys (focus tracking)
+		Text entry
+		Units selector
 Profile performance
 ----
 Custom row wrapping
+Anchoring
 Disable ability highlight on specific spells
 Per-talent layout
 Buff Bars
@@ -20,7 +28,6 @@ Sweeping strikes bar
 Whirlwind bar
 Rage bar
 ----
-Anchoring
 Tooltips
 Track any item
 Track any spell
@@ -32,6 +39,7 @@ Settings versioning
 Cooldown Manager Control
 ------------------------
 Mostly abandoned
+Got completely rewritten and sucks now
 Can't control row wrapping well
 No button press overlay
 No assistant highlight

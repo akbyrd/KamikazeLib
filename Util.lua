@@ -99,3 +99,24 @@ function Util.TableValues(table)
 	end
 	return values
 end
+
+function Util.Utf8(codepoint)
+	if codepoint < 0x80 then
+		return string.char(codepoint)
+	elseif codepoint < 0x800 then
+		local byte1 = 0xC0 + bit.rshift(codepoint, 6)
+		local byte2 = 0x80 + bit.band(codepoint, 0x3F)
+		return string.char(byte1, byte2)
+	elseif codepoint < 0x10000 then
+		local byte1 = 0xE0 + bit.rshift(codepoint, 12)
+		local byte2 = 0x80 + bit.band(bit.rshift(codepoint, 6), 0x3F)
+		local byte3 = 0x80 + bit.band(codepoint, 0x3F)
+		return string.char(byte1, byte2, byte3)
+	else
+		local byte1 = 0xF0 + bit.rshift(codepoint, 18)
+		local byte2 = 0x80 + bit.band(bit.rshift(codepoint, 12), 0x3F)
+		local byte3 = 0x80 + bit.band(bit.rshift(codepoint, 6), 0x3F)
+		local byte4 = 0x80 + bit.band(codepoint, 0x3F)
+		return string.char(byte1, byte2, byte3, byte4)
+	end
+end
