@@ -120,3 +120,22 @@ function Util.Utf8(codepoint)
 		return string.char(byte1, byte2, byte3, byte4)
 	end
 end
+
+function Util.CenterIcon(frame, frameSize, font, fontSize)
+	-- Center a fonts em square on a box. This is an approximation because it guesses the shift
+	-- value, which requires per-glyph data to calculate accurately.
+
+	assert(fontSize % 1 == 0 and frameSize % 1 == 0, "font size and box size must be whole pixels")
+	assert(fontSize % 2 == frameSize % 2, "font size and box size must have the same parity")
+
+	local baseline = floor(fontSize * font.ascent / (font.ascent + font.descent) + 0.5)
+	local shift    = fontSize % font.grid == 0 and 0 or 1
+	local xOffset  = (frameSize - fontSize) / 2 - shift
+	local yOffset  = (frameSize + fontSize) / 2 - baseline
+
+	local fs = frame:GetFontString()
+	fs:SetJustifyH("LEFT")
+	fs:SetJustifyV("TOP")
+	fs:ClearAllPoints()
+	fs:SetPoint("TOPLEFT", xOffset + 0.5, -yOffset + 0.5)
+end

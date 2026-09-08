@@ -31,19 +31,22 @@ function Settings.Load()
 		borderSize        = 1,
 		borderColor       = CreateColorFromHexString("0FFFFFFF"),
 		backgroundTexture = "Interface\\Buttons\\WHITE8x8",
-		iconFont          = "Interface\\AddOns\\KamikazeLib\\Media\\MaterialSymbolsSharp-Regular.ttf",
+		iconFont          = {
+			path    = "Interface\\AddOns\\KamikazeLib\\Media\\MaterialSymbolsSharp-Regular.ttf",
+			ascent  = 1056,
+			descent = 96,
+			grid    = 24,
+		},
 		iconSize          = UISize(rootSize, -7),
 		backgroundColor   = CreateColorFromHexString("FA1C1C1C"),
 		paddingSize       = UISize(rootSize, -7),
 		closeSize         = UISize(rootSize, -6),
 		closeColor        = CreateColorFromHexString("80E64D4D"),
-		iconOffsetY       = -0.073,
 		buttonColor       = CreateColorFromHexString("08FFFFFF"),
 	}
 
 	local IconFont = CreateFont("KL_ICON_FONT")
-	--IconFont:SetFont(cfg.iconFont, cfg.iconSize, "")
-	IconFont:SetFont(cfg.iconFont, cfg.closeSize, "MONOCHROME")
+	IconFont:SetFont(cfg.iconFont.path, cfg.iconSize, "")
 	IconFont:SetTextColor(1, 1, 1, 0.35)
 
 	local IconFontHover = CreateFont("KL_ICON_FONT_HOVER")
@@ -86,12 +89,9 @@ function Settings.Load()
 	Close:SetNormalFontObject(IconFont)
 	Close:SetHighlightFontObject(IconFontHover)
 	Close:SetText(Util.Utf8(0xE5CD))
-	Close:GetFontString():SetSize(cfg.closeSize, cfg.closeSize)
-	Close:GetFontString():SetPoint("CENTER", 0, cfg.iconOffsetY * cfg.closeSize)
-	Close:GetFontString():SetJustifyH("LEFT")
-	Close:GetFontString():SetJustifyV("MIDDLE")
+	-- TODO: Maybe "IconButton" is a better abstraction?
+	Util.CenterIcon(Close, cfg.closeSize, cfg.iconFont, cfg.iconSize)
 	Close:SetPushedTextOffset(0, 0)
-	--Close:GetFontString():SetPoint("CENTER", -1, -1.5)
 	Close:RegisterForClicks("LeftButtonDown")
 	Close:SetScript("OnClick", function() Root:Hide() end)
 

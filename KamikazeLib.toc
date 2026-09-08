@@ -22,7 +22,3 @@ MouseCursor.lua
 CombatText.lua
 CDM.lua
 CDM2.lua
-SettingsTest.lua
-IconTest.lua
-IconTest2.lua
-IconTest3.lua
