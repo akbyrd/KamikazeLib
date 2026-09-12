@@ -108,19 +108,19 @@ local typeDefs = {
 }
 
 local function IndexParentValue(value, valueKey)
-	local meta             = getmetatable(value)
-	local parent           = getmetatable(meta.node).__index
-	local parentTypedValue = parent and parent[meta.key]
-	return parentTypedValue and parentTypedValue.value[valueKey]
+	local meta       = getmetatable(value)
+	local parent     = getmetatable(meta.node).__index
+	local parentDecl = parent and parent[meta.key]
+	return parentDecl and parentDecl.value[valueKey]
 end
 
 -- branch - The name of the root branch
 -- root   - { key: { type, value } }
 function Config.Create(branch, root)
-	for key, typedValue in pairs(root) do
-		local typeDef = type(typedValue) == "table" and typeDefs[typedValue.type]
+	for key, decl in pairs(root) do
+		local typeDef = type(decl) == "table" and typeDefs[decl.type]
 		assert(typeDef, ("Config key %s does not have a type"):format(key))
-		typeDef.parse(key, typedValue.value)
+		typeDef.parse(key, decl.value)
 	end
 
 	root        = setmetatable(root, { __index = nil })
@@ -145,14 +145,14 @@ function Config.AddOverride(tree, parentBranch, newBranch, override)
 	setmetatable(override, { __index = parent })
 	newBranch = newBranch or parentBranch
 
-	for key, typedValue in pairs(override) do
-		local typeDef = type(typedValue) == "table" and typeDefs[typedValue.type]
+	for key, decl in pairs(override) do
+		local typeDef = type(decl) == "table" and typeDefs[decl.type]
 		assert(typeDef, ("Override key %s does not have a type"):format(key))
-		assert(not parent[key] or parent[key].type == typedValue.type, ("Override key %s does not match existing type"):format(key))
-		if type(typedValue.value) == "table" then
-			setmetatable(typedValue.value, { __index = IndexParentValue, node = override, key = key })
+		assert(not parent[key] or parent[key].type == decl.type, ("Override key %s does not match existing type"):format(key))
+		if type(decl.value) == "table" then
+			setmetatable(decl.value, { __index = IndexParentValue, node = override, key = key })
 		end
-		typeDef.parse(key, typedValue.value)
+		typeDef.parse(key, decl.value)
 	end
 
 	local dOverride
@@ -229,14 +229,13 @@ function Config.RefreshValues(tree, pixelsToUI)
 	for node, derived in pairs(tree.nodeToDerived) do
 		wipe(derived)
 
-		for key, typedValue in pairs(node) do
-			local typeDef = typeDefs[typedValue.type]
-			typeDef.resolve(derived, key, typedValue.value, pixelsToUI)
+		for key, decl in pairs(node) do
+			local typeDef = typeDefs[decl.type]
+			typeDef.resolve(derived, key, decl.value, pixelsToUI)
 		end
 	end
 end
 
--- TODO: Consider renaming typedValue to decl
 -- TODO: Support config types nested inside a table (e.g. the color mixin in a color table)
 -- TODO: How can we support ordering or grouping for a settings UI?
 -- TODO: Parse color tables without checking every individual key
