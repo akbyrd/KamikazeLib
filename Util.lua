@@ -100,6 +100,14 @@ function Util.TableValues(table)
 	return values
 end
 
+function Util.TableShallowCopy(table)
+	local copy = {}
+	for key, value in pairs(table) do
+		copy[key] = value
+	end
+	return copy
+end
+
 function Util.Utf8(codepoint)
 	if codepoint < 0x80 then
 		return string.char(codepoint)
@@ -121,21 +129,31 @@ function Util.Utf8(codepoint)
 	end
 end
 
-function Util.CenterIcon(frame, frameSize, font, fontSize)
-	-- Center a fonts em square on a box. This is an approximation because it guesses the shift
-	-- value, which requires per-glyph data to calculate accurately.
+function Util.UISize(base, exponent)
+	local x = base * 1.618^exponent
+	return tostring(x) .. "ui"
+end
 
-	assert(fontSize % 1 == 0 and frameSize % 1 == 0, "font size and box size must be whole pixels")
-	assert(fontSize % 2 == frameSize % 2, "font size and box size must have the same parity")
+-- TODO: Do we need to restrict to integers?
+function Util.SameParity(x, y)
+	local xParity = x % 2
+	local yParity = y % 2
+	return y + (xParity - yParity)
+end
+
+function Util.CenterIcon(font, frameSize, fontSize)
+	-- Center em square on a box, instead of the line box. This is an approximation because it
+	-- guesses the rounding value, which requires per-glyph data to calculate accurately. Assumes the
+	-- frame is in pixel space.
+
+	assert(fontSize % 1 == 0 and frameSize % 1 == 0, "frame size and font size must be integer values")
+	assert(fontSize % 2 == frameSize % 2, "frame size and font size must have the same parity")
 
 	local baseline = floor(fontSize * font.ascent / (font.ascent + font.descent) + 0.5)
-	local shift    = fontSize % font.grid == 0 and 0 or 1
-	local xOffset  = (frameSize - fontSize) / 2 - shift
+	local rounding = fontSize % font.grid == 0 and 0 or 1
+	local xOffset  = (frameSize - fontSize) / 2 - rounding
 	local yOffset  = (frameSize + fontSize) / 2 - baseline
-
-	local fs = frame:GetFontString()
-	fs:SetJustifyH("LEFT")
-	fs:SetJustifyV("TOP")
-	fs:ClearAllPoints()
-	fs:SetPoint("TOPLEFT", xOffset + 0.5, -yOffset + 0.5)
+	xOffset  = 0 + xOffset + 0.5
+	yOffset  = 0 - yOffset + 0.5
+	return xOffset, yOffset
 end

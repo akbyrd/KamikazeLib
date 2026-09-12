@@ -1,18 +1,12 @@
 To Do
 -----
 Settings
-	Show in built-in Options > Addons
-	Flat, modern style (e.g. Sourcery / Danders Frames)
-	Allow open / edit in combat
+	Implement GUI framework
+	Show in built-in Options > Addons?
 	Edit Mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
-	Search
-	Undo/redo
-	Tooltips
-	Slider
-		Mouse wheel / arrow keys (focus tracking)
-		Text entry
-		Units selector
+	Implement search
 Profile performance
+	Appears to be a memory leak
 ----
 Custom row wrapping
 Anchoring

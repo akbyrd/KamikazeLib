@@ -2,112 +2,121 @@ local Kami = select(2, ...)
 local Settings = {}
 Kami.Settings = Settings
 
-local Util = Kami.Util
+local Config = Kami.Config
+local UI     = Kami.UI
 
 function Settings.Load()
-	local rootSize   = 700
-	local className  = select(2, UnitClass("player"))
-	local classColor = C_ClassColor.GetClassColor(className)
-	--local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
-	local pixelsToUI = 0.59259256904508 -- TODO: Handle this properly
+	Settings.handlers = {}
+	Settings.eventFrame = CreateFrame("Frame")
+	Settings.eventFrame:SetParentKey("Kami.Settings.Event")
+	Settings.eventFrame:SetScript("OnEvent",       Settings.DispatchEvent)
+	Settings.RegisterEvent("UI_SCALE_CHANGED",     Settings.RefreshScale)
+	Settings.RegisterEvent("DISPLAY_SIZE_CHANGED", Settings.RefreshScale)
+	hooksecurefunc(UIParent, "SetScale",           Settings.RefreshScale)
 
-	local function UISize(base, exponent)
-		local x = base * 1.618^exponent
-		x = x + 1
-		return Round(x - (x % 2)) -- DEBUG: Round down to even
-	end
-
-	--local PADDING       = Scale(PANEL_WIDTH, -7)
-	--local CONTENT_WIDTH = PANEL_WIDTH - 2 * PADDING
-	--local CONTROL_WIDTH = Scale(CONTENT_WIDTH, -1)
-	--local ROW_HEIGHT    = Scale(CONTENT_WIDTH, -6)
-	--local GUTTER        = Scale(ROW_HEIGHT, -4)
-	--local WIDGET_HEIGHT = ROW_HEIGHT - 2 * GUTTER
-	--local INSET         = Scale(GUTTER, -2)
-
-	local cfg = {
-		xSize             = UISize(rootSize, 0),
-		ySize             = UISize(rootSize, 1),
-		borderSize        = 1,
-		borderColor       = CreateColorFromHexString("0FFFFFFF"),
-		backgroundTexture = "Interface\\Buttons\\WHITE8x8",
-		iconFont          = {
-			path    = "Interface\\AddOns\\KamikazeLib\\Media\\MaterialSymbolsSharp-Regular.ttf",
-			ascent  = 1056,
-			descent = 96,
-			grid    = 24,
-		},
-		iconSize          = UISize(rootSize, -7),
-		backgroundColor   = CreateColorFromHexString("FA1C1C1C"),
-		paddingSize       = UISize(rootSize, -7),
-		closeSize         = UISize(rootSize, -6),
-		closeColor        = CreateColorFromHexString("80E64D4D"),
-		buttonColor       = CreateColorFromHexString("08FFFFFF"),
+	-- TODO: Any good patterns for "stronger types" in lua?
+	local rootSize = 400
+	local iconFont = {
+		path    = "Interface\\AddOns\\KamikazeLib\\Media\\MaterialSymbolsSharp-Regular.ttf",
+		ascent  = 1056,
+		descent = 96,
+		grid    = 24,
+		size    = 24,
 	}
 
-	local IconFont = CreateFont("KL_ICON_FONT")
-	IconFont:SetFont(cfg.iconFont.path, cfg.iconSize, "")
-	IconFont:SetTextColor(1, 1, 1, 0.35)
+	Settings.cfgTree = Config.Create("Default",
+		{
+			borderSize        = Config.Size("1px"),
+			borderColor       = Config.Color("0FFFFFFF"),
+			backgroundTexture = Config.String("Interface\\Buttons\\WHITE8x8"),
+			backgroundColor   = Config.Color("FA1C1C1C"),
+		})
 
-	local IconFontHover = CreateFont("KL_ICON_FONT_HOVER")
-	IconFontHover:CopyFontObject(IconFont)
-	IconFontHover:SetTextColor(1, 1, 1, 1)
+	Config.AddOverride(Settings.cfgTree, "Default", "Window",
+		{
+			xSize       = Config.UISize(rootSize, 0),
+			ySize       = Config.UISize(rootSize, 1),
+			paddingSize = Config.UISize(rootSize, -8),
+		})
 
-	local Root = CreateFrame("Frame", "KL_SETTINGS", UIParent, "BackdropTemplate")
-	Root:SetSize(cfg.xSize, cfg.ySize)
-	Root:SetScale(pixelsToUI)
-	Root:SetPoint("CENTER")
-	Root:SetFrameStrata("DIALOG")
-	Root:SetClampedToScreen(true)
-	Root:SetMovable(true)
-	Root:EnableMouse(true)
-	Root:RegisterForDrag("LeftButton")
-	Root:SetScript("OnDragStart", Root.StartMoving)
-	Root:SetScript("OnDragStop", function(self)
-		self:StopMovingOrSizing()
-		local x = Round(self:GetLeft())
-		local y = Round(self:GetBottom())
-		self:ClearAllPoints()
-		self:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, y)
-	end)
-	Root:SetBackdrop({
-		bgFile   = cfg.backgroundTexture,
-		edgeFile = cfg.backgroundTexture,
-		edgeSize = cfg.borderSize })
-	Root:SetBackdropColor(cfg.backgroundColor:GetRGBA())
-	Root:SetBackdropBorderColor(cfg.borderColor:GetRGBA())
-	Root:Hide()
+	Config.AddOverride(Settings.cfgTree, "Default", "Button",
+		{
+			xSize           = Config.UISize(rootSize, -6),
+			ySize           = Config.UISize(rootSize, -6),
+			backgroundColor = Config.Color("08FFFFFF"),
+			hoverTexture    = Config.String("Interface\\Buttons\\WHITE8x8"),
+			hoverColor      = Config.Color("14FFFFFF"),
+		})
 
-	local Close = CreateFrame("Button", nil, Root)
-	Close:SetParentKey("Close")
-	Close:SetSize(cfg.closeSize, cfg.closeSize)
-	Close:SetPoint("TOPRIGHT", -cfg.paddingSize, -cfg.paddingSize)
-	Close:SetNormalTexture(cfg.backgroundTexture)
-	Close:GetNormalTexture():SetVertexColor(cfg.buttonColor:GetRGBA())
-	Close:SetHighlightTexture(cfg.backgroundTexture, "BLEND")
-	Close:GetHighlightTexture():SetVertexColor(cfg.closeColor:GetRGBA())
-	Close:SetNormalFontObject(IconFont)
-	Close:SetHighlightFontObject(IconFontHover)
-	Close:SetText(Util.Utf8(0xE5CD))
-	-- TODO: Maybe "IconButton" is a better abstraction?
-	Util.CenterIcon(Close, cfg.closeSize, cfg.iconFont, cfg.iconSize)
-	Close:SetPushedTextOffset(0, 0)
-	Close:RegisterForClicks("LeftButtonDown")
-	Close:SetScript("OnClick", function() Root:Hide() end)
+	Config.AddOverride(Settings.cfgTree, "Button", "IconButton",
+		{
+			font = Config.Font({
+				info    = iconFont,
+				color   = "A6FFFFFF",
+				shadow  = true,
+			}),
+			hoverFont = Config.Font({
+				info    = iconFont,
+				color   = "FFFFFFFF",
+				shadow  = true,
+			}),
+			disabledFont = Config.Font({
+				info    = iconFont,
+				color   = "59FFFFFF",
+				shadow  = true,
+			}),
+		})
 
-	Settings.Root = Root
-	Settings.Close = Close
+	Config.AddOverride(Settings.cfgTree, "IconButton", "CloseButton",
+		{
+			-- TODO: How do we select the disabled font?
+			-- Config.FontVariant?
+			-- Maybe we create objects separately and styles are just selectors?
+			hoverColor = Config.Color("80E64D4D"),
+		})
+
+	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
+	Config.RefreshValues(Settings.cfgTree, pixelsToUI)
+
+	Settings.Window = UI.Window.Create(UI.Root, Settings.cfgTree, { name = "Settings" })
+	Settings.Window.Frame:Hide()
+
+	Settings.Window:RefreshScale()
+end
+
+function Settings.RefreshScale()
+	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
+	Config.RefreshValues(Settings.cfgTree, pixelsToUI)
+
+	UI.RefreshScale()
+	Settings.Window:RefreshScale()
 end
 
 function Settings.Toggle()
-	Settings.Root:SetShown(not Settings.Root:IsShown())
+	Settings.Window.Frame:SetShown(not Settings.Window.Frame:IsShown())
 end
+
+----------------------------------------------------------------------------------------------------
+-- Event Handlers
+
+function Settings.RegisterEvent(event, func)
+	Settings.eventFrame:RegisterEvent(event)
+	Settings.handlers[event] = func
+end
+
+function Settings.DispatchEvent(frame, event, ...)
+	local func = Settings.handlers[event]
+	func(...)
+end
+
+----------------------------------------------------------------------------------------------------
+-- File Load
 
 Settings.Load()
 Settings.Toggle()
 
 local login = CreateFrame("Frame")
-login:RegisterEvent("PLAYER_ENTERING_WORLD")
+--login:RegisterEvent("PLAYER_ENTERING_WORLD")
 login:SetScript("OnEvent", function(self)
 	self:UnregisterEvent("PLAYER_ENTERING_WORLD")
 	C_Timer.After(0, function()
@@ -115,3 +124,7 @@ login:SetScript("OnEvent", function(self)
 		SlashCmdList.SOURCERY("")
 	end)
 end)
+
+-- TODO: Should we use a flat colored box or a gradient texture for things?
+-- TODO: Refine cfg and construction ordering
+-- TODO: Improve slash command handling

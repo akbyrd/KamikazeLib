@@ -15,6 +15,7 @@ Lib\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
 KamikazeLib.lua
 Util.lua
 Config.lua
+UI.lua
 Settings.lua
 PixelAnts.lua
 WorldMarkers.lua

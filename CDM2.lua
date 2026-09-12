@@ -19,7 +19,7 @@ function CDM.Load()
 	CDM.savedVars.profile   = CDM.savedVars.profile   or {}
 	CDM.charVars.lastSource = CDM.charVars.lastSource or {}
 
-	CDM.cfg = Config.Create("Default",
+	CDM.cfgTree = Config.Create("Default",
 		{
 			xPos = Config.Size("0ui"),
 			yPos = Config.Size("0ui"),
@@ -59,19 +59,19 @@ function CDM.Load()
 			procDuty     = Config.Number(0.6),
 		})
 
-	Config.AddOverride(CDM.cfg, "Default", "Essential",
+	Config.AddOverride(CDM.cfgTree, "Default", "Essential",
 		{
-			yPos = "-248ui",
+			yPos = Config.Size("-248ui"),
 		})
 
-	Config.AddOverride(CDM.cfg, "Default", "Utility",
+	Config.AddOverride(CDM.cfgTree, "Default", "Utility",
 		{
-			yPos     = "-324ui",
-			iconSize = "30ui",
+			yPos     = Config.Size("-324ui"),
+			iconSize = Config.Size("30ui"),
 		})
 
 	for branch, values in pairs(CDM.savedVars.profile) do
-		Config.AddOverride(CDM.cfg, branch, nil, values)
+		Config.AddOverride(CDM.cfgTree, branch, nil, values)
 	end
 
 	CDM.handlers = {}
@@ -114,7 +114,7 @@ function CDM.Load()
 
 		local vState = {
 			name     = categoryName,
-			cfg      = Config.GetBranch(CDM.cfg, categoryName),
+			cfg      = Config.GetBranch(CDM.cfgTree, categoryName),
 			Root     = Root,
 			pool     = {},
 			cdvInfos = {},
@@ -174,16 +174,6 @@ function CDM.Load()
 	end
 
 	CDM.Rebuild()
-end
-
-function CDM.RegisterEvent(event, func)
-	CDM.eventFrame:RegisterEvent(event)
-	CDM.handlers[event] = func
-end
-
-function CDM.DispatchEvent(frame, event, ...)
-	local func = CDM.handlers[event]
-	func(...)
 end
 
 function CDM.Update()
@@ -462,7 +452,7 @@ function CDM.RefreshScale()
 		vState.Root:SetScale(pixelsToUI)
 	end
 
-	Config.RefreshValues(CDM.cfg, pixelsToUI)
+	Config.RefreshValues(CDM.cfgTree, pixelsToUI)
 end
 
 function CDM.RefreshConfig(fState)
@@ -781,6 +771,19 @@ function CDM.RefreshAssist()
 	end
 end
 
+----------------------------------------------------------------------------------------------------
+-- Event Handlers
+
+function CDM.RegisterEvent(event, func)
+	CDM.eventFrame:RegisterEvent(event)
+	CDM.handlers[event] = func
+end
+
+function CDM.DispatchEvent(frame, event, ...)
+	local func = CDM.handlers[event]
+	func(...)
+end
+
 function CDM.OnScaleChanged()
 	CDM.RefreshScale()
 	CDM.RefreshAllSizes()
@@ -964,5 +967,8 @@ function CDM.OnCDMChanged()
 	print("Kami CDM Rebuild")
 	CDM.Rebuild()
 end
+
+----------------------------------------------------------------------------------------------------
+-- File Load
 
 CDM.Load()

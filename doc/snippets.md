@@ -49,3 +49,8 @@ C_Spell.GetLastCategoryCooldownSource
 Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY
 SetUseAuraDisplayTime
 ```
+
+```lua
+local className  = select(2, UnitClass("player"))
+local classColor = C_ClassColor.GetClassColor(className)
+```
