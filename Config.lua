@@ -112,12 +112,14 @@ function Config.Create(branch, root)
 		assert(typeDef, ("Config key %s does not have a type"):format(key))
 		typeDef.parse(key, typedValue.value)
 	end
-	setmetatable(root, { __index = nil })
+
+	root        = setmetatable(root, { __index = nil })
+	local dRoot = setmetatable({},   { __index = nil })
 
 	local tree = {
-		nodeToBranch    = { [root]   = branch },
-		branchToTip     = { [branch] = root },
-		branchToDerived = { [branch] = {} },
+		branchToTip   = { [branch] = root },
+		nodeToBranch  = { [root]   = branch },
+		nodeToDerived = { [root]   = dRoot },
 	}
 	return tree
 end
@@ -137,11 +139,19 @@ function Config.AddOverride(tree, parentBranch, newBranch, override)
 		typeDef.parse(key, typedValue.value)
 	end
 
-	setmetatable(override, { __index = parent })
 	newBranch = newBranch or parentBranch
 
+	local dOverride
 	if newBranch == parentBranch then
-		for node, branch in pairs(tree.nodeToBranch) do
+		-- NOTE: Steal the parent's derived table to maintain a stable reference from GetBranch.
+		local dTip      = tree.nodeToDerived[parent]
+		local dAncestor = getmetatable(dTip).__index
+		local dParent   = setmetatable({},   { __index = dAncestor })
+		dOverride       = setmetatable(dTip, { __index = dParent })
+		tree.nodeToDerived[parent] = dParent
+
+		-- Re-point all child layers at the new tip
+		for node, dNode in pairs(tree.nodeToDerived) do
 			local meta = getmetatable(node)
 			if meta.__index == parent then
 				meta.__index = override
@@ -149,10 +159,14 @@ function Config.AddOverride(tree, parentBranch, newBranch, override)
 		end
 	else
 		assert(not tree.branchToTip[newBranch], ("Adding branch %s but it already exists"):format(newBranch))
-		tree.branchToDerived[newBranch] = {}
+
+		local dParent = tree.nodeToDerived[parent]
+		dOverride     = setmetatable({}, { __index = dParent })
 	end
 
-	tree.nodeToBranch[override] = newBranch
+	setmetatable(override, { __index = parent })
+	tree.nodeToBranch[override]  = newBranch
+	tree.nodeToDerived[override] = dOverride
 	tree.branchToTip[newBranch] = override
 end
 
@@ -161,56 +175,53 @@ function Config.RemoveOverride(tree, override)
 	local branch = tree.nodeToBranch[override]
 	assert(branch, ("Removing branch %s that is not in the tree"):format(tostring(override)))
 
-	local parent = getmetatable(override).__index
-	assert(parent, "Removing the root")
+	local parent    = getmetatable(override).__index
+	local dParent   = tree.nodeToDerived[parent]
+	local dOverride = tree.nodeToDerived[override]
 
-	for node, nodeBranch in pairs(tree.nodeToBranch) do
+	if override == tree.branchToTip[branch] then
+		if branch == tree.nodeToBranch[parent] then
+			-- NOTE: Return the parent's stolen derived table to maintain a stable reference from GetBranch.
+			local dAncestor = getmetatable(dParent).__index
+			dParent         = setmetatable(dOverride, { __index = dAncestor })
+			tree.nodeToDerived[parent] = dParent
+			tree.branchToTip[branch] = parent
+		else
+			tree.branchToTip[branch] = nil
+		end
+	end
+
+	-- Re-point all child layers at the parent
+	for node, dNode in pairs(tree.nodeToDerived) do
 		local meta = getmetatable(node)
 		if meta.__index == override then
 			meta.__index = parent
+			setmetatable(dNode, { __index = dParent })
 		end
 	end
 
 	setmetatable(override, nil)
-	tree.nodeToBranch[override] = nil
-
-	if tree.branchToTip[branch] == override then
-		if tree.nodeToBranch[parent] == branch then
-			tree.branchToTip[branch] = parent
-		else
-			tree.branchToTip[branch] = nil
-			tree.branchToDerived[branch] = nil
-		end
-	end
+	tree.nodeToBranch[override]  = nil
+	tree.nodeToDerived[override] = nil
 end
 
 -- Returns the derived table for a branch. Its identity is stable for the life of the branch.
 function Config.GetBranch(tree, branch)
-	local derived = tree.branchToDerived[branch]
-	assert(derived, ("Branch %s doesn't exist"):format(branch))
-	return derived
+	local node = tree.branchToTip[branch]
+	assert(node, ("Branch %s doesn't exist"):format(branch))
+	return tree.nodeToDerived[node]
 end
 
 function Config.RefreshValues(tree, pixelsToUI)
-	for branch, derived in pairs(tree.branchToDerived) do
+	for node, derived in pairs(tree.nodeToDerived) do
 		wipe(derived)
 
-		local node = tree.branchToTip[branch]
-		while node do
-			for key, typedValue in pairs(node) do
-				if derived[key] == nil then
-					local typeDef = typeDefs[typedValue.type]
-					typeDef.resolve(derived, key, typedValue.value, pixelsToUI)
-				end
-			end
-			node = getmetatable(node).__index
+		for key, typedValue in pairs(node) do
+			local typeDef = typeDefs[typedValue.type]
+			typeDef.resolve(derived, key, typedValue.value, pixelsToUI)
 		end
 	end
 end
-
--- TODO: Cache heavy derivations like font creation (typedValue table is the key)
--- TODO: Derived tables can lead to a lot of duplication. Do we care more about memory or lookup speed?
--- TODO: Could store derived on the typedValue so it never gets calculated more than once
 
 -- TODO: Implement partial overrides
 -- TODO: Design how table overrides should work (re-use color and font tables?)
@@ -218,3 +229,4 @@ end
 -- TODO: How can we support ordering or grouping for a settings UI?
 -- TODO: Parse color tables without checking every individual key
 -- TODO: Validate user overrides without erroring or discarding them
+-- TODO: Consider removing the root and letting it be a forest. Removes some duplication and special cases.
