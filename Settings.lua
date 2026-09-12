@@ -69,9 +69,9 @@ function Settings.Load()
 
 	Config.AddOverride(Settings.cfgTree, "IconButton", "CloseButton",
 		{
-			-- TODO: How do we select the disabled font?
-			-- Config.FontVariant?
-			-- Maybe we create objects separately and styles are just selectors?
+			font = {
+				color = Config.Color("59FFFFFF")
+			},
 			hoverColor = Config.Color("80E64D4D"),
 		})
 

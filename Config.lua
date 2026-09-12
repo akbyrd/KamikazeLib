@@ -90,19 +90,29 @@ local typeDefs = {
 			assert(type(value) == "table" and value.info, ("Invalid font %s: %s"):format(key, tostring(value)))
 		end,
 		resolve = function(derived, key, value)
-			local copy = Util.TableShallowCopy(value)
-			local color = CreateColorFromHexString(copy.color)
-			copy.object = CreateFont(tostring(value))
-			copy.object:SetFont(copy.info.path, copy.size or copy.info.size, copy.flags or "")
-			copy.object:SetTextColor(color:GetRGBA())
-			if copy.shadow then
-				copy.object:SetShadowColor(0, 0, 0, 1)
-				copy.object:SetShadowOffset(1, -1)
+			local color = CreateColorFromHexString(value.color)
+			local font  = CreateFont(tostring(value))
+			local size  = value.size or value.info.size
+			font:SetFont(value.info.path, size, value.flags or "")
+			font:SetTextColor(color:GetRGBA())
+			if value.shadow then
+				font:SetShadowColor(0, 0, 0, 1)
+				font:SetShadowOffset(1, -1)
 			end
-			derived[key] = copy
+			derived[key] = {
+				object = font,
+				size  = size
+			}
 		end,
 	},
 }
+
+local function IndexParentValue(value, valueKey)
+	local meta             = getmetatable(value)
+	local parent           = getmetatable(meta.node).__index
+	local parentTypedValue = parent and parent[meta.key]
+	return parentTypedValue and parentTypedValue.value[valueKey]
+end
 
 -- branch - The name of the root branch
 -- root   - { key: { type, value } }
@@ -132,14 +142,18 @@ function Config.AddOverride(tree, parentBranch, newBranch, override)
 	assert(parent, ("Overriding branch %s but it doesn't exist"):format(parentBranch))
 	assert(not tree.nodeToBranch[override], "Adding an override branch that is already in the tree")
 
+	setmetatable(override, { __index = parent })
+	newBranch = newBranch or parentBranch
+
 	for key, typedValue in pairs(override) do
 		local typeDef = type(typedValue) == "table" and typeDefs[typedValue.type]
 		assert(typeDef, ("Override key %s does not have a type"):format(key))
 		assert(not parent[key] or parent[key].type == typedValue.type, ("Override key %s does not match existing type"):format(key))
+		if type(typedValue.value) == "table" then
+			setmetatable(typedValue.value, { __index = IndexParentValue, node = override, key = key })
+		end
 		typeDef.parse(key, typedValue.value)
 	end
-
-	newBranch = newBranch or parentBranch
 
 	local dOverride
 	if newBranch == parentBranch then
@@ -164,7 +178,6 @@ function Config.AddOverride(tree, parentBranch, newBranch, override)
 		dOverride     = setmetatable({}, { __index = dParent })
 	end
 
-	setmetatable(override, { __index = parent })
 	tree.nodeToBranch[override]  = newBranch
 	tree.nodeToDerived[override] = dOverride
 	tree.branchToTip[newBranch] = override
@@ -223,9 +236,8 @@ function Config.RefreshValues(tree, pixelsToUI)
 	end
 end
 
--- TODO: Implement partial overrides
--- TODO: Design how table overrides should work (re-use color and font tables?)
--- TODO: Support config types nested inside a table? (e.g. the color mixin in a color table)
+-- TODO: Consider renaming typedValue to decl
+-- TODO: Support config types nested inside a table (e.g. the color mixin in a color table)
 -- TODO: How can we support ordering or grouping for a settings UI?
 -- TODO: Parse color tables without checking every individual key
 -- TODO: Validate user overrides without erroring or discarding them
