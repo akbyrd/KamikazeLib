@@ -116,7 +116,7 @@ function Config.Create(branch, root)
 
 	local tree = {
 		nodeToBranch    = { [root]   = branch },
-		branchToTop     = { [branch] = root },
+		branchToTip     = { [branch] = root },
 		branchToDerived = { [branch] = {} },
 	}
 	return tree
@@ -124,61 +124,61 @@ end
 
 -- parentBranch - The branch to add the override to.
 -- newBranch    - The new branch name. Defaults to parentBranch, extending it.
--- values       - { key: value }. The override to add.
-function Config.AddOverride(tree, parentBranch, newBranch, values)
-	local parent = tree.branchToTop[parentBranch]
+-- override     - { key: value }. The override to add.
+function Config.AddOverride(tree, parentBranch, newBranch, override)
+	local parent = tree.branchToTip[parentBranch]
 	assert(parent, ("Overriding branch %s but it doesn't exist"):format(parentBranch))
-	assert(not tree.nodeToBranch[values], "Adding an override branch that is already in the tree")
+	assert(not tree.nodeToBranch[override], "Adding an override branch that is already in the tree")
 
-	for key, typedValue in pairs(values) do
+	for key, typedValue in pairs(override) do
 		local typeDef = type(typedValue) == "table" and typeDefs[typedValue.type]
 		assert(typeDef, ("Override key %s does not have a type"):format(key))
 		assert(not parent[key] or parent[key].type == typedValue.type, ("Override key %s does not match existing type"):format(key))
 		typeDef.parse(key, typedValue.value)
 	end
 
-	setmetatable(values, { __index = parent })
+	setmetatable(override, { __index = parent })
 	newBranch = newBranch or parentBranch
 
 	if newBranch == parentBranch then
 		for node, branch in pairs(tree.nodeToBranch) do
 			local meta = getmetatable(node)
 			if meta.__index == parent then
-				meta.__index = values
+				meta.__index = override
 			end
 		end
 	else
-		assert(not tree.branchToTop[newBranch], ("Adding branch %s but it already exists"):format(newBranch))
+		assert(not tree.branchToTip[newBranch], ("Adding branch %s but it already exists"):format(newBranch))
 		tree.branchToDerived[newBranch] = {}
 	end
 
-	tree.nodeToBranch[values] = newBranch
-	tree.branchToTop[newBranch] = values
+	tree.nodeToBranch[override] = newBranch
+	tree.branchToTip[newBranch] = override
 end
 
--- values - { key: value }. The override to remove. Must have been previously added.
-function Config.RemoveOverride(tree, values)
-	local branch = tree.nodeToBranch[values]
-	assert(branch, ("Removing branch %s that is not in the tree"):format(tostring(values)))
+-- override - { key: value }. The override to remove. Must have been previously added.
+function Config.RemoveOverride(tree, override)
+	local branch = tree.nodeToBranch[override]
+	assert(branch, ("Removing branch %s that is not in the tree"):format(tostring(override)))
 
-	local parent = getmetatable(values).__index
+	local parent = getmetatable(override).__index
 	assert(parent, "Removing the root")
 
 	for node, nodeBranch in pairs(tree.nodeToBranch) do
 		local meta = getmetatable(node)
-		if meta.__index == values then
+		if meta.__index == override then
 			meta.__index = parent
 		end
 	end
 
-	setmetatable(values, nil)
-	tree.nodeToBranch[values] = nil
+	setmetatable(override, nil)
+	tree.nodeToBranch[override] = nil
 
-	if tree.branchToTop[branch] == values then
+	if tree.branchToTip[branch] == override then
 		if tree.nodeToBranch[parent] == branch then
-			tree.branchToTop[branch] = parent
+			tree.branchToTip[branch] = parent
 		else
-			tree.branchToTop[branch] = nil
+			tree.branchToTip[branch] = nil
 			tree.branchToDerived[branch] = nil
 		end
 	end
@@ -195,7 +195,7 @@ function Config.RefreshValues(tree, pixelsToUI)
 	for branch, derived in pairs(tree.branchToDerived) do
 		wipe(derived)
 
-		local node = tree.branchToTop[branch]
+		local node = tree.branchToTip[branch]
 		while node do
 			for key, typedValue in pairs(node) do
 				if derived[key] == nil then
