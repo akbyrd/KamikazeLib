@@ -141,18 +141,18 @@ function Util.SameParity(x, y)
 	return y + (xParity - yParity)
 end
 
-function Util.CenterIcon(font, frameSize, fontSize)
+function Util.CenterIcon(font, xFrameSize, yFrameSize, fontSize)
 	-- Center em square on a box, instead of the line box. This is an approximation because it
 	-- guesses the rounding value, which requires per-glyph data to calculate accurately. Assumes the
 	-- frame is in pixel space.
 
-	assert(fontSize % 1 == 0 and frameSize % 1 == 0, "frame size and font size must be integer values")
-	assert(fontSize % 2 == frameSize % 2, "frame size and font size must have the same parity")
+	assert(fontSize % 1 == 0 and xFrameSize % 1 == 0 and yFrameSize % 1 == 0, "frame size and font size must be integer values")
+	assert(fontSize % 2 == xFrameSize % 2 and fontSize % 2 == yFrameSize % 2, "frame size and font size must have the same parity")
 
 	local baseline = floor(fontSize * font.ascent / (font.ascent + font.descent) + 0.5)
 	local rounding = fontSize % font.grid == 0 and 0 or 1
-	local xOffset  = (frameSize - fontSize) / 2 - rounding
-	local yOffset  = (frameSize + fontSize) / 2 - baseline
+	local xOffset  = (xFrameSize - fontSize) / 2 - rounding
+	local yOffset  = (yFrameSize + fontSize) / 2 - baseline
 	xOffset  = 0 + xOffset + 0.5
 	yOffset  = 0 - yOffset + 0.5
 	return xOffset, yOffset

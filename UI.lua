@@ -6,19 +6,24 @@ local Config = Kami.Config
 local Util   = Kami.Util
 
 -- NOTE: We assume cfg doesn't change. We don't dynamically re-apply state. Only scale fix-ups.
--- NOTE: We assume frames are not re-anchored unexpectedly. No ClearAllPoints calls after creation.
+-- NOTE: We assume frames are not re-anchored unexpectedly. No unnecessary ClearAllPoints.
+-- NOTE: The caller is responsible for anchoring, not Create (unless it's an internal component).
+-- NOTE: SetPointsOffset is used for positioning to avoid repeating anchors.
 
 ----------------------------------------------------------------------------------------------------
 -- Root
 
 function UI.Load()
-	UI.Root = { Frame = CreateFrame("Frame", nil, UIParent) }
-	UI.Root.Frame:SetAllPoints()
+	UI.Root = {}
+	UI.Root.Region = CreateFrame("Frame", nil, UIParent)
+	UI.Root.Region:SetAllPoints()
+	UI.Root.Children = {}
 end
 
+-- TODO: All 3 passes and recurse?
 function UI.RefreshScale()
 	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
-	UI.Root.Frame:SetScale(pixelsToUI)
+	UI.Root.Region:SetScale(pixelsToUI)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -35,10 +40,12 @@ UI.Window.__index = UI.Window
 
 function UI.Window.Create(parent, cfgTree, args)
 	local self = setmetatable({}, UI.Window)
-	self.style = Config.GetBranch(cfgTree, "Window")
+	self.style = Config.GetBranch(cfgTree, args.styleName or "Window")
 
-	self.Frame = CreateFrame("Frame", nil, parent.Frame, "BackdropTemplate")
+	self.Frame = CreateFrame("Frame", nil, parent.Region, "BackdropTemplate")
 	self.Frame:SetParentKey(args.name)
+	self.Frame:SetFrameStrata("HIGH")
+	self.Frame:SetToplevel(true)
 	self.Frame:SetClampedToScreen(true)
 	self.Frame:SetMovable(true)
 	self.Frame:EnableMouse(true)
@@ -56,6 +63,10 @@ function UI.Window.Create(parent, cfgTree, args)
 	local y = Round((screenY + self.style.ySize) / 2)
 	self.Frame:SetPoint("TOPLEFT", nil, "BOTTOMLEFT", x, y)
 
+	self.Region = self.Frame
+	self.Children = {}
+	table.insert(parent.Children, self)
+
 	self.Close = UI.IconButton.Create(self, cfgTree,
 		{
 			name      = "Close",
@@ -63,21 +74,139 @@ function UI.Window.Create(parent, cfgTree, args)
 			glyph     = 0xE5CD,
 			onClick   = function() self.Frame:Hide() end,
 		})
+	self.Close.Region:SetPoint("TOPRIGHT")
+
+	self.Stack = UI.Stack.Create(self, cfgTree,
+		{
+			name = "Stack",
+		})
+	self.Stack.Region:SetPoint("TOPLEFT")
 
 	return self
 end
 
-function UI.Window:RefreshScale()
-	self.Frame:SetSize(self.style.xSize, self.style.ySize)
-	self.Frame:SetBackdrop({
-		bgFile   = self.style.backgroundTexture,
-		edgeFile = self.style.backgroundTexture,
-		edgeSize = self.style.borderSize })
-	self.Frame:SetBackdropColor(self.style.backgroundColor:GetRGBA())
-	self.Frame:SetBackdropBorderColor(self.style.borderColor:GetRGBA())
+function UI.Window:Measure()
+	local s = self.style
 
-	self.Close.Frame:SetPoint("TOPRIGHT", -self.style.paddingSize, -self.style.paddingSize)
-	self.Close:RefreshScale()
+	self.xSize = s.xSize
+	self.ySize = s.ySize
+
+	for i, child in ipairs(self.Children) do
+		child:Measure()
+	end
+end
+
+function UI.Window:Arrange(xSize, ySize)
+	local s = self.style
+
+	self.Frame:SetSize(xSize, ySize)
+	self.Frame:SetBackdrop({
+		bgFile   = s.backgroundTexture,
+		edgeFile = s.backgroundTexture,
+		edgeSize = s.borderSize })
+	self.Frame:SetBackdropColor(s.backgroundColor:GetRGBA())
+	self.Frame:SetBackdropBorderColor(s.borderColor:GetRGBA())
+
+	self.Close.Region:SetPointsOffset(-s.padSize, -s.padSize)
+	self.Stack.Region:SetPointsOffset(s.padSize, -(s.padSize + s.yContentOffset))
+
+	for i, child in ipairs(self.Children) do
+		child:Arrange(child.xSize, child.ySize)
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+-- Stack
+
+UI.Stack = setmetatable({}, { __index = UI.Component })
+UI.Stack.__index = UI.Stack
+
+function UI.Stack.Create(parent, cfgTree, args)
+	local self = setmetatable({}, UI.Stack)
+	self.style = Config.GetBranch(cfgTree, args.styleName or "Stack")
+
+	-- TODO: Remove backdrop
+	self.Frame = CreateFrame("Frame", nil, parent.Region, "BackdropTemplate")
+	self.Frame:SetBackdrop({ bgFile = self.style.backgroundTexture })
+	self.Frame:SetBackdropColor(1, 1, 1, 0.5)
+	self.Frame:SetParentKey(args.name)
+
+	self.Region = self.Frame
+	self.Children = {}
+	table.insert(parent.Children, self)
+	return self
+end
+
+function UI.Stack:Measure()
+	local s = self.style
+
+	local xDir = 0
+	local yDir = 1
+	local xSize = 0
+	local ySize = 0
+	local gapCount = max(0, #self.Children - 1)
+
+	for i, child in ipairs(self.Children) do
+		child:Measure()
+		xSize = max(xSize, child.xSize)
+		ySize = ySize + child.ySize
+	end
+	xSize = xSize + (s.gapSize * gapCount) * xDir
+	ySize = ySize + (s.gapSize * gapCount) * yDir
+
+	self.xSize = xSize
+	self.ySize = ySize
+end
+
+function UI.Stack:Arrange(xSize, ySize)
+	local s = self.style
+	self.Frame:SetSize(xSize, ySize)
+
+	local xDir = 0
+	local yDir = 1
+	local xOffset = 0
+	local yOffset = 0
+
+	for i, child in ipairs(self.Children) do
+		child.Region:SetPointsOffset(xOffset, -yOffset)
+		child:Arrange(child.xSize, child.ySize)
+
+		xOffset = xOffset + (child.xSize + s.gapSize) * xDir
+		yOffset = yOffset + (child.ySize + s.gapSize) * yDir
+	end
+end
+
+----------------------------------------------------------------------------------------------------
+-- Label
+
+UI.Label = setmetatable({}, { __index = UI.Component })
+UI.Label.__index = UI.Label
+
+function UI.Label.Create(parent, cfgTree, args)
+	local self = setmetatable({}, UI.Label)
+	self.style = Config.GetBranch(cfgTree, args.styleName or "Label")
+
+	self.Text = parent.Region:CreateFontString(nil, "ARTWORK")
+	self.Text:SetParentKey(args.name)
+	self.Text:SetFontObject(self.style.font.object)
+	self.Text:SetText(args.text)
+
+	self.Region = self.Text
+	self.Children = {}
+	table.insert(parent.Children, self)
+	return self
+end
+
+-- TODO: How do we handle wrapping?
+-- * Maybe pass max size into measure?
+-- * Maybe Arrange returns the actual size?
+function UI.Label:Measure()
+	self.xSize = self.Text:GetUnboundedStringWidth()
+	self.ySize = self.Text:GetStringHeight()
+end
+
+function UI.Label:Arrange(xSize, ySize)
+	self.Text:SetSize(xSize, ySize)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -90,7 +219,7 @@ function UI.IconButton.Create(parent, cfgTree, args)
 	local self = setmetatable({}, UI.IconButton)
 	self.style = Config.GetBranch(cfgTree, args.styleName or "IconButton")
 
-	self.Button = CreateFrame("Button", nil, parent.Frame, "BackdropTemplate")
+	self.Button = CreateFrame("Button", nil, parent.Region, "BackdropTemplate")
 	self.Button:SetParentKey(args.name)
 	self.Button:SetText(Util.Utf8(args.glyph))
 	self.Button:SetPushedTextOffset(0, 0)
@@ -108,31 +237,40 @@ function UI.IconButton.Create(parent, cfgTree, args)
 	self.FontString:SetJustifyH("LEFT")
 	self.FontString:SetJustifyV("TOP")
 	self.FontString:ClearAllPoints()
+	self.FontString:SetPoint("TOPLEFT")
 
-	self.Frame = self.Button
+	self.Region = self.Button
+	self.Children = {}
+	table.insert(parent.Children, self)
 	return self
 end
 
-function UI.IconButton:RefreshScale()
-	local fontSize = self.style.font.size
-	local buttonSize = Util.SameParity(fontSize, self.style.xSize)
-	local xOffset, yOffset = Util.CenterIcon(self.style.font.info, buttonSize, fontSize)
+function UI.IconButton:Measure()
+	local s = self.style
+	local buttonSize = Util.SameParity(s.font.size, s.xSize)
 
-	local borderSize = self.style.borderSize
+	self.xSize = buttonSize
+	self.ySize = buttonSize
+end
+
+function UI.IconButton:Arrange(xSize, ySize)
+	local s = self.style
+	local xOffset, yOffset = Util.CenterIcon(s.font.info, xSize, ySize, s.font.size)
+
+	self.Button:SetSize(xSize, ySize)
 	self.Button:SetBackdrop({
-		bgFile   = self.style.backgroundTexture,
-		edgeFile = self.style.backgroundTexture,
-		edgeSize = borderSize,
-		insets   = { left = borderSize, right = borderSize, top = borderSize, bottom = borderSize } })
-	self.Button:SetBackdropColor(self.style.backgroundColor:GetRGBA())
-	self.Button:SetBackdropBorderColor(self.style.borderColor:GetRGBA())
+		bgFile   = s.backgroundTexture,
+		edgeFile = s.backgroundTexture,
+		edgeSize = s.borderSize,
+		insets   = { left = s.borderSize, right = s.borderSize, top = s.borderSize, bottom = s.borderSize } })
+	self.Button:SetBackdropColor(s.backgroundColor:GetRGBA())
+	self.Button:SetBackdropBorderColor(s.borderColor:GetRGBA())
 
 	local ht = self.Button:GetHighlightTexture()
-	ht:SetPoint("TOPLEFT",      borderSize, -borderSize)
-	ht:SetPoint("BOTTOMRIGHT", -borderSize,  borderSize)
+	ht:SetPoint("TOPLEFT",      s.borderSize, -s.borderSize)
+	ht:SetPoint("BOTTOMRIGHT", -s.borderSize,  s.borderSize)
 
-	self.Button:SetSize(buttonSize, buttonSize)
-	self.FontString:SetPoint("TOPLEFT", xOffset, yOffset)
+	self.FontString:SetPointsOffset(xOffset, yOffset)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -140,4 +278,5 @@ end
 
 UI.Load()
 
+-- TODO: Maybe the hierarchy should split Containers and Widgets?
 -- TODO: Consider a declarative UI builder

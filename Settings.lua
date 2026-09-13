@@ -4,6 +4,7 @@ Kami.Settings = Settings
 
 local Config = Kami.Config
 local UI     = Kami.UI
+local LSM    = LibStub("LibSharedMedia-3.0")
 
 function Settings.Load()
 	Settings.handlers = {}
@@ -16,6 +17,9 @@ function Settings.Load()
 
 	-- TODO: Any good patterns for "stronger types" in lua?
 	local rootSize = 400
+	local textFont = {
+		path = LSM:Fetch("font", "PT Sans Narrow", true) or "Fonts\\ARIALN.TTF",
+	}
 	local iconFont = {
 		path    = "Interface\\AddOns\\KamikazeLib\\Media\\MaterialSymbolsSharp-Regular.ttf",
 		ascent  = 1056,
@@ -32,13 +36,31 @@ function Settings.Load()
 			borderColor       = Config.Color("0FFFFFFF"),
 			backgroundTexture = Config.String("Interface\\Buttons\\WHITE8x8"),
 			backgroundColor   = Config.Color("FA1C1C1C"),
+			padSize           = Config.UISize(rootSize, -8),
+			font              = Config.Font({
+				info   = textFont,
+				color  = "A6FFFFFF",
+				shadow = true,
+				size   = 18, -- TODO: Want to be able to use Config.Size for this
+			}),
 		})
 
 	Config.AddNode(Settings.cfgTree, "Default", "Window",
 		{
-			xSize       = Config.UISize(rootSize, 0),
-			ySize       = Config.UISize(rootSize, 1),
-			paddingSize = Config.UISize(rootSize, -8),
+			xSize          = Config.UISize(rootSize, 0),
+			ySize          = Config.UISize(rootSize, 1),
+			yContentOffset = Config.UISize(rootSize, -6)
+		})
+
+	Config.AddNode(Settings.cfgTree, "Default", "Stack",
+		{
+			gapSize = Config.UISize(rootSize, -7),
+			-- TODO: Should be in Row
+			labelWidth = Config.UISize(rootSize, -1),
+		})
+
+	Config.AddNode(Settings.cfgTree, "Default", "Label",
+		{
 		})
 
 	Config.AddNode(Settings.cfgTree, "Default", "Button",
@@ -53,19 +75,22 @@ function Settings.Load()
 	Config.AddNode(Settings.cfgTree, "Button", "IconButton",
 		{
 			font = Config.Font({
-				info    = iconFont,
-				color   = "A6FFFFFF",
-				shadow  = true,
+				info   = iconFont,
+				color  = "A6FFFFFF",
+				shadow = true,
+				size   = 24,
 			}),
 			hoverFont = Config.Font({
-				info    = iconFont,
-				color   = "FFFFFFFF",
-				shadow  = true,
+				info   = iconFont,
+				color  = "FFFFFFFF",
+				shadow = true,
+				size   = 24,
 			}),
 			disabledFont = Config.Font({
-				info    = iconFont,
-				color   = "59FFFFFF",
-				shadow  = true,
+				info   = iconFont,
+				color  = "59FFFFFF",
+				shadow = true,
+				size   = 24,
 			}),
 		})
 
@@ -79,9 +104,17 @@ function Settings.Load()
 	Config.RefreshValues(Settings.cfgTree, pixelsToUI)
 
 	Settings.Window = UI.Window.Create(UI.Root, Settings.cfgTree, { name = "Settings" })
-	Settings.Window.Frame:Hide()
+	Settings.Window.Region:Hide()
 
-	Settings.Window:RefreshScale()
+	for i = 1, 10, 1 do
+		local temp = UI.Label.Create(Settings.Window.Stack, Settings.cfgTree, { name = "Temp", text = "Hello World" })
+		temp.Region:SetPoint("TOPLEFT")
+	end
+
+	-- TODO: Do we need to refresh scale?
+	--UI.RefreshScale()
+	Settings.Window:Measure()
+	Settings.Window:Arrange(Settings.Window.xSize, Settings.Window.ySize)
 end
 
 function Settings.RefreshScale()
@@ -89,11 +122,12 @@ function Settings.RefreshScale()
 	Config.RefreshValues(Settings.cfgTree, pixelsToUI)
 
 	UI.RefreshScale()
-	Settings.Window:RefreshScale()
+	Settings.Window:Measure()
+	Settings.Window:Arrange(Settings.Window.xSize, Settings.Window.ySize)
 end
 
 function Settings.Toggle()
-	Settings.Window.Frame:SetShown(not Settings.Window.Frame:IsShown())
+	Settings.Window.Region:SetShown(not Settings.Window.Region:IsShown())
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -125,6 +159,5 @@ login:SetScript("OnEvent", function(self)
 	end)
 end)
 
--- TODO: Should we use a flat colored box or a gradient texture for things?
 -- TODO: Refine cfg and construction ordering
 -- TODO: Improve slash command handling
