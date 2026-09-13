@@ -125,14 +125,12 @@ function UI.Stack.Create(parent, cfgTree, args)
 	local self = setmetatable({}, UI.Stack)
 	self.style = Config.GetBranch(cfgTree, args.styleName or "Stack")
 
-	-- TODO: Remove backdrop
-	self.Frame = CreateFrame("Frame", nil, parent.Region, "BackdropTemplate")
-	self.Frame:SetBackdrop({ bgFile = self.style.backgroundTexture })
-	self.Frame:SetBackdropColor(1, 1, 1, 0.5)
-	self.Frame:SetParentKey(args.name)
+	self.Frame = CreateFrame("Frame", nil, parent.Region)
 
 	self.Region = self.Frame
 	self.Children = {}
+	self.xDir = args.xDir or 0
+	self.yDir = args.yDir or 1
 	table.insert(parent.Children, self)
 	return self
 end
@@ -140,30 +138,28 @@ end
 function UI.Stack:Measure()
 	local s = self.style
 
-	local xDir = 0
-	local yDir = 1
-	local xSize = 0
-	local ySize = 0
-	local gapCount = max(0, #self.Children - 1)
+	local xSum = 0
+	local ySum = 0
+	local xMax = 0
+	local yMax = 0
 
 	for i, child in ipairs(self.Children) do
 		child:Measure()
-		xSize = max(xSize, child.xSize)
-		ySize = ySize + child.ySize
+		xSum = xSum + child.xSize
+		ySum = ySum + child.ySize
+		xMax = max(xMax, child.xSize)
+		yMax = max(yMax, child.ySize)
 	end
-	xSize = xSize + (s.gapSize * gapCount) * xDir
-	ySize = ySize + (s.gapSize * gapCount) * yDir
 
-	self.xSize = xSize
-	self.ySize = ySize
+	local gapSize = s.gapSize * max(0, #self.Children - 1)
+	self.xSize = self.xDir ~= 0 and xSum + gapSize or xMax
+	self.ySize = self.yDir ~= 0 and ySum + gapSize or yMax
 end
 
 function UI.Stack:Arrange(xSize, ySize)
 	local s = self.style
 	self.Frame:SetSize(xSize, ySize)
 
-	local xDir = 0
-	local yDir = 1
 	local xOffset = 0
 	local yOffset = 0
 
@@ -171,8 +167,8 @@ function UI.Stack:Arrange(xSize, ySize)
 		child.Region:SetPointsOffset(xOffset, -yOffset)
 		child:Arrange(child.xSize, child.ySize)
 
-		xOffset = xOffset + (child.xSize + s.gapSize) * xDir
-		yOffset = yOffset + (child.ySize + s.gapSize) * yDir
+		xOffset = xOffset + (child.xSize + s.gapSize) * self.xDir
+		yOffset = yOffset + (child.ySize + s.gapSize) * self.yDir
 	end
 end
 
