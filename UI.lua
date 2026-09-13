@@ -11,6 +11,11 @@ local Util   = Kami.Util
 -- NOTE: SetPointsOffset is used for positioning to avoid repeating anchors.
 
 ----------------------------------------------------------------------------------------------------
+-- Constants
+
+UI.NO_LIMIT = math.huge
+
+----------------------------------------------------------------------------------------------------
 -- Root
 
 function UI.Load()
@@ -85,14 +90,17 @@ function UI.Window.Create(parent, cfgTree, args)
 	return self
 end
 
-function UI.Window:Measure()
+function UI.Window:Measure(mxSize, mySize)
 	local s = self.style
 
 	self.xSize = s.xSize
 	self.ySize = s.ySize
 
+	local mcxSize = s.xSize - 2 * s.padSize
+	local mcySize = s.ySize - 2 * s.padSize - s.yContentOffset
+
 	for i, child in ipairs(self.Children) do
-		child:Measure()
+		child:Measure(mcxSize, mcySize)
 	end
 end
 
@@ -108,7 +116,7 @@ function UI.Window:Arrange(xSize, ySize)
 	self.Frame:SetBackdropBorderColor(s.borderColor:GetRGBA())
 
 	self.Close.Region:SetPointsOffset(-s.padSize, -s.padSize)
-	self.Stack.Region:SetPointsOffset(s.padSize, -(s.padSize + s.yContentOffset))
+	self.Stack.Region:SetPointsOffset(s.padSize, -s.padSize - s.yContentOffset)
 
 	for i, child in ipairs(self.Children) do
 		child:Arrange(child.xSize, child.ySize)
@@ -135,25 +143,28 @@ function UI.Stack.Create(parent, cfgTree, args)
 	return self
 end
 
-function UI.Stack:Measure()
+function UI.Stack:Measure(mxSize, mySize)
 	local s = self.style
 
-	local xSum = 0
-	local ySum = 0
-	local xMax = 0
-	local yMax = 0
+	local mcxSize = self.xDir ~= 0 and UI.NO_LIMIT or mxSize
+	local mcySize = self.yDir ~= 0 and UI.NO_LIMIT or mySize
+
+	local xSum     = 0
+	local ySum     = 0
+	local xLargest = 0
+	local yLargest = 0
 
 	for i, child in ipairs(self.Children) do
-		child:Measure()
-		xSum = xSum + child.xSize
-		ySum = ySum + child.ySize
-		xMax = max(xMax, child.xSize)
-		yMax = max(yMax, child.ySize)
+		child:Measure(mcxSize, mcySize)
+		xSum     = xSum + child.xSize
+		ySum     = ySum + child.ySize
+		xLargest = max(xLargest, child.xSize)
+		yLargest = max(yLargest, child.ySize)
 	end
 
 	local gapSize = s.gapSize * max(0, #self.Children - 1)
-	self.xSize = self.xDir ~= 0 and xSum + gapSize or xMax
-	self.ySize = self.yDir ~= 0 and ySum + gapSize or yMax
+	self.xSize = self.xDir ~= 0 and xSum + gapSize or xLargest
+	self.ySize = self.yDir ~= 0 and ySum + gapSize or yLargest
 end
 
 function UI.Stack:Arrange(xSize, ySize)
@@ -175,6 +186,9 @@ end
 ----------------------------------------------------------------------------------------------------
 -- Label
 
+-- TODO: Can we make the font object color white and apply color on the label? Surely we can?
+-- SetFixedColor, SetTextColor
+
 UI.Label = setmetatable({}, { __index = UI.Component })
 UI.Label.__index = UI.Label
 
@@ -193,15 +207,20 @@ function UI.Label.Create(parent, cfgTree, args)
 	return self
 end
 
--- TODO: How do we handle wrapping?
--- * Maybe pass max size into measure?
--- * Maybe Arrange returns the actual size?
-function UI.Label:Measure()
-	self.xSize = self.Text:GetUnboundedStringWidth()
-	self.ySize = self.Text:GetStringHeight()
+function UI.Label:Measure(mxSize, mySize)
+	-- NOTE: There's no way to measure wrapping without mutating the string.
+	self.Text:SetMaxLines(0)
+	self.Text:SetWidth(mxSize == UI.NO_LIMIT and 0 or mxSize)
+
+	self.xSize = min(mxSize, self.Text:GetUnboundedStringWidth())
+	self.ySize = min(mySize, self.Text:GetStringHeight())
 end
 
 function UI.Label:Arrange(xSize, ySize)
+	local lineHeight = self.Text:GetLineHeight()
+	local maxLines = floor(ySize / lineHeight)
+
+	self.Text:SetMaxLines(maxLines)
 	self.Text:SetSize(xSize, ySize)
 end
 
@@ -241,7 +260,7 @@ function UI.IconButton.Create(parent, cfgTree, args)
 	return self
 end
 
-function UI.IconButton:Measure()
+function UI.IconButton:Measure(mxSize, mySize)
 	local s = self.style
 	local buttonSize = Util.SameParity(s.font.size, s.xSize)
 

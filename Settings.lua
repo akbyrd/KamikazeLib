@@ -113,7 +113,7 @@ function Settings.Load()
 
 	-- TODO: Do we need to refresh scale?
 	--UI.RefreshScale()
-	Settings.Window:Measure()
+	Settings.Window:Measure(UI.NO_LIMIT, UI.NO_LIMIT)
 	Settings.Window:Arrange(Settings.Window.xSize, Settings.Window.ySize)
 end
 
@@ -122,7 +122,7 @@ function Settings.RefreshScale()
 	Config.RefreshValues(Settings.cfgTree, pixelsToUI)
 
 	UI.RefreshScale()
-	Settings.Window:Measure()
+	Settings.Window:Measure(UI.NO_LIMIT, UI.NO_LIMIT)
 	Settings.Window:Arrange(Settings.Window.xSize, Settings.Window.ySize)
 end
 
