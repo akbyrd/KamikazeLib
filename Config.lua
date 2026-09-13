@@ -1,5 +1,5 @@
 local Kami = select(2, ...)
-local Config = {}
+local Config = { Impl = {} }
 Kami.Config = Config
 
 local Util = Kami.Util
@@ -12,107 +12,6 @@ function Config.Size(value)      return { type = "size",    value = value       
 function Config.UISize(value, e) return { type = "size",    value = Util.UISize(value, e) } end
 function Config.Color(value)     return { type = "color",   value = value                 } end
 function Config.Font(value)      return { type = "font",    value = value                 } end
-
-local sizeUnits = { px = true, ui = true, ["%"] = true }
-
-local typeDefs = {
-	boolean = {
-		parse = function(key, value)
-			assert(type(value) == "boolean", ("Invalid boolean %s: %s"):format(key, tostring(value)))
-		end,
-		resolve = function(derived, key, value)
-			derived[key] = value
-		end,
-	},
-
-	number = {
-		parse = function(key, value)
-			assert(type(value) == "number", ("Invalid number %s: %s"):format(key, tostring(value)))
-		end,
-		resolve = function(derived, key, value)
-			derived[key] = value
-		end,
-	},
-
-	string = {
-		parse = function(key, value)
-			assert(type(value) == "string", ("Invalid string %s: %s"):format(key, tostring(value)))
-		end,
-
-		resolve = function(derived, key, value)
-			derived[key] = value
-		end,
-	},
-
-	table = {
-		parse = function(key, value)
-			assert(type(value) == "table", ("Invalid table %s: %s"):format(key, tostring(value)))
-		end,
-		resolve = function(derived, key, value)
-			derived[key] = value
-		end,
-	},
-
-	size = {
-		parse = function(key, value)
-			-- (%D*)$ - greedy all non-digits at the end
-			-- ^(.-)  - lazy everything else from the beginning
-			local number, unit = tostring(value):match("^(.-)(%D*)$")
-			assert(tonumber(number) and sizeUnits[unit], ("Invalid size %s: %s"):format(key, tostring(value)))
-		end,
-		resolve = function(derived, key, value, pixelsToUI)
-			local number, unit = value:match("^(.-)(%D*)$")
-			number = tonumber(number)
-			if unit == "%" then
-				derived[key]          = 0
-				derived[key .. "Rel"] = number / 100
-			elseif unit == "ui" then
-				derived[key]          = Round(number / pixelsToUI)
-				derived[key .. "Rel"] = 0
-			else
-				derived[key]          = Round(number)
-				derived[key .. "Rel"] = 0
-			end
-		end,
-	},
-
-	color = {
-		parse = function(key, value)
-			assert(type(value) == "string" and value:match("^%x%x%x%x%x%x%x%x$"), ("Invalid color %s: %s"):format(key, tostring(value)))
-		end,
-		resolve = function(derived, key, value)
-			derived[key] = CreateColorFromHexString(value)
-		end,
-	},
-
-	font = {
-		parse = function(key, value)
-			assert(type(value) == "table" and value.info, ("Invalid font %s: %s"):format(key, tostring(value)))
-		end,
-		resolve = function(derived, key, value)
-			local color = CreateColorFromHexString(value.color)
-			local font  = CreateFont(tostring(value))
-			local size  = value.size or value.info.size
-			font:SetFont(value.info.path, size, value.flags or "")
-			font:SetTextColor(color:GetRGBA())
-			if value.shadow then
-				font:SetShadowColor(0, 0, 0, 1)
-				font:SetShadowOffset(1, -1)
-			end
-			derived[key] = {
-				object = font,
-				size   = size
-			}
-		end,
-	},
-}
-
-local function IndexParentValue(value, valueKey)
-	local meta       = getmetatable(value)
-	local parent     = getmetatable(meta.node).__index
-	local parentDecl = parent and parent[meta.key]
-	return parentDecl and parentDecl.value[valueKey]
-end
 
 function Config.Create()
 	local tree = {
@@ -131,11 +30,12 @@ function Config.AddNode(tree, parentBranch, newBranch, node)
 	assert(not tree.nodeToBranch[node], "Adding a node that is already in the tree")
 
 	local parent = tree.branchToTip[parentBranch]
-	assert(parent or not parentBranch, ("Branch %s doesn't exist"):format(parentBranch))
+	assert(parent or not parentBranch, ("Branch %s doesn't exist"):format(tostring(parentBranch)))
 
 	setmetatable(node, { __index = parent })
 	newBranch = newBranch or parentBranch
 
+	local typeDefs = Config.Impl.typeDefs
 	for key, decl in pairs(node) do
 		local typeDef = type(decl) == "table" and typeDefs[decl.type]
 		assert(typeDef, ("Key %s does not have a type"):format(key))
@@ -143,7 +43,7 @@ function Config.AddNode(tree, parentBranch, newBranch, node)
 		local parentDecl = parent and parent[key]
 		assert(not parentDecl or parentDecl.type == decl.type, ("Key %s does not match existing type"):format(key))
 		if type(decl.value) == "table" then
-			setmetatable(decl.value, { __index = IndexParentValue, node = node, key = key })
+			setmetatable(decl.value, { __index = Config.Impl.IndexParentValue, node = node, key = key })
 		end
 		typeDef.parse(key, decl.value)
 	end
@@ -219,6 +119,7 @@ function Config.GetBranch(tree, branch)
 end
 
 function Config.RefreshValues(tree, pixelsToUI)
+	local typeDefs = Config.Impl.typeDefs
 	for node, derived in pairs(tree.nodeToDerived) do
 		wipe(derived)
 
@@ -228,6 +129,110 @@ function Config.RefreshValues(tree, pixelsToUI)
 		end
 	end
 end
+
+----------------------------------------------------------------------------------------------------
+-- Impl
+
+function Config.Impl.IndexParentValue(value, valueKey)
+	local meta       = getmetatable(value)
+	local parent     = getmetatable(meta.node).__index
+	local parentDecl = parent and parent[meta.key]
+	return parentDecl and parentDecl.value[valueKey]
+end
+
+Config.Impl.sizeUnits = { px = true, ui = true, ["%"] = true }
+Config.Impl.typeDefs = {
+	boolean = {
+		parse = function(key, value)
+			assert(type(value) == "boolean", ("Invalid boolean %s: %s"):format(key, tostring(value)))
+		end,
+		resolve = function(derived, key, value)
+			derived[key] = value
+		end,
+	},
+
+	number = {
+		parse = function(key, value)
+			assert(type(value) == "number", ("Invalid number %s: %s"):format(key, tostring(value)))
+		end,
+		resolve = function(derived, key, value)
+			derived[key] = value
+		end,
+	},
+
+	string = {
+		parse = function(key, value)
+			assert(type(value) == "string", ("Invalid string %s: %s"):format(key, tostring(value)))
+		end,
+
+		resolve = function(derived, key, value)
+			derived[key] = value
+		end,
+	},
+
+	table = {
+		parse = function(key, value)
+			assert(type(value) == "table", ("Invalid table %s: %s"):format(key, tostring(value)))
+		end,
+		resolve = function(derived, key, value)
+			derived[key] = value
+		end,
+	},
+
+	size = {
+		parse = function(key, value)
+			-- (%D*)$ - greedy all non-digits at the end
+			-- ^(.-)  - lazy everything else from the beginning
+			local number, unit = tostring(value):match("^(.-)(%D*)$")
+			assert(tonumber(number) and Config.Impl.sizeUnits[unit], ("Invalid size %s: %s"):format(key, tostring(value)))
+		end,
+		resolve = function(derived, key, value, pixelsToUI)
+			local number, unit = value:match("^(.-)(%D*)$")
+			number = tonumber(number)
+			if unit == "%" then
+				derived[key]          = 0
+				derived[key .. "Rel"] = number / 100
+			elseif unit == "ui" then
+				derived[key]          = Round(number / pixelsToUI)
+				derived[key .. "Rel"] = 0
+			else
+				derived[key]          = Round(number)
+				derived[key .. "Rel"] = 0
+			end
+		end,
+	},
+
+	color = {
+		parse = function(key, value)
+			assert(type(value) == "string" and value:match("^%x%x%x%x%x%x%x%x$"), ("Invalid color %s: %s"):format(key, tostring(value)))
+		end,
+		resolve = function(derived, key, value)
+			derived[key] = CreateColorFromHexString(value)
+		end,
+	},
+
+	font = {
+		parse = function(key, value)
+			assert(type(value) == "table" and value.info, ("Invalid font %s: %s"):format(key, tostring(value)))
+		end,
+		resolve = function(derived, key, value)
+			local color = CreateColorFromHexString(value.color)
+			local font  = CreateFont(tostring(value))
+			local size  = value.size or value.info.size
+			font:SetFont(value.info.path, size, value.flags or "")
+			font:SetTextColor(color:GetRGBA())
+			if value.shadow then
+				font:SetShadowColor(0, 0, 0, 1)
+				font:SetShadowOffset(1, -1)
+			end
+			derived[key] = {
+				info   = value.info,
+				object = font,
+				size   = size
+			}
+		end,
+	},
+}
 
 -- TODO: Support config types nested inside a table (e.g. the color mixin in a color table)
 -- TODO: How can we support ordering or grouping for a settings UI?
