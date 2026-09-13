@@ -19,7 +19,9 @@ function CDM.Load()
 	CDM.savedVars.profile   = CDM.savedVars.profile   or {}
 	CDM.charVars.lastSource = CDM.charVars.lastSource or {}
 
-	CDM.cfgTree = Config.Create("Default",
+	CDM.cfgTree = Config.Create()
+
+	Config.AddNode(CDM.cfgTree, nil, "Default",
 		{
 			xPos = Config.Size("0ui"),
 			yPos = Config.Size("0ui"),
@@ -59,19 +61,19 @@ function CDM.Load()
 			procDuty     = Config.Number(0.6),
 		})
 
-	Config.AddOverride(CDM.cfgTree, "Default", "Essential",
+	Config.AddNode(CDM.cfgTree, "Default", "Essential",
 		{
 			yPos = Config.Size("-248ui"),
 		})
 
-	Config.AddOverride(CDM.cfgTree, "Default", "Utility",
+	Config.AddNode(CDM.cfgTree, "Default", "Utility",
 		{
 			yPos     = Config.Size("-324ui"),
 			iconSize = Config.Size("30ui"),
 		})
 
 	for branch, values in pairs(CDM.savedVars.profile) do
-		Config.AddOverride(CDM.cfgTree, branch, nil, values)
+		Config.AddNode(CDM.cfgTree, branch, nil, values)
 	end
 
 	CDM.handlers = {}

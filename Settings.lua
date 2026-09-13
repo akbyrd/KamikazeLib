@@ -24,7 +24,9 @@ function Settings.Load()
 		size    = 24,
 	}
 
-	Settings.cfgTree = Config.Create("Default",
+	Settings.cfgTree = Config.Create()
+
+	Config.AddNode(Settings.cfgTree, nil, "Default",
 		{
 			borderSize        = Config.Size("1px"),
 			borderColor       = Config.Color("0FFFFFFF"),
@@ -32,14 +34,14 @@ function Settings.Load()
 			backgroundColor   = Config.Color("FA1C1C1C"),
 		})
 
-	Config.AddOverride(Settings.cfgTree, "Default", "Window",
+	Config.AddNode(Settings.cfgTree, "Default", "Window",
 		{
 			xSize       = Config.UISize(rootSize, 0),
 			ySize       = Config.UISize(rootSize, 1),
 			paddingSize = Config.UISize(rootSize, -8),
 		})
 
-	Config.AddOverride(Settings.cfgTree, "Default", "Button",
+	Config.AddNode(Settings.cfgTree, "Default", "Button",
 		{
 			xSize           = Config.UISize(rootSize, -6),
 			ySize           = Config.UISize(rootSize, -6),
@@ -48,7 +50,7 @@ function Settings.Load()
 			hoverColor      = Config.Color("14FFFFFF"),
 		})
 
-	Config.AddOverride(Settings.cfgTree, "Button", "IconButton",
+	Config.AddNode(Settings.cfgTree, "Button", "IconButton",
 		{
 			font = Config.Font({
 				info    = iconFont,
@@ -67,11 +69,9 @@ function Settings.Load()
 			}),
 		})
 
-	Config.AddOverride(Settings.cfgTree, "IconButton", "CloseButton",
+	Config.AddNode(Settings.cfgTree, "IconButton", "CloseButton",
 		{
-			font = {
-				color = Config.Color("59FFFFFF")
-			},
+			font       = Config.Font({ color = "59FFFFFF" }),
 			hoverColor = Config.Color("80E64D4D"),
 		})
 
