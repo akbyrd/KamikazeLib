@@ -21,6 +21,7 @@ UI.NO_LIMIT = math.huge
 function UI.Load()
 	UI.Root = {}
 	UI.Root.Region = CreateFrame("Frame", nil, UIParent)
+	UI.Root.Region:SetParentKey("KAMI_UI_ROOT")
 	UI.Root.Region:SetAllPoints()
 	UI.Root.Children = {}
 end
@@ -124,6 +125,62 @@ function UI.Window:Arrange(xSize, ySize)
 end
 
 ----------------------------------------------------------------------------------------------------
+-- Row
+
+UI.Row = setmetatable({}, { __index = UI.Component })
+UI.Row.__index = UI.Row
+
+function UI.Row.Create(parent, cfgTree, args)
+	local self = setmetatable({}, UI.Row)
+	self.style = Config.GetBranch(cfgTree, args.styleName or "Row")
+
+	self.Frame = CreateFrame("Frame", nil, parent.Region)
+	self.Frame:SetParentKey(args.name)
+
+	self.Region = self.Frame
+	self.Children = {}
+	table.insert(parent.Children, self)
+
+	self.Label = UI.Label.Create(self, cfgTree,
+		{
+			name = "Label",
+			text = args.text
+		})
+	self.Label.Region:SetPoint("TOPLEFT")
+	self.Label.Text:SetJustifyV("MIDDLE")
+	self.Label.Text:SetJustifyH("LEFT")
+	return self
+end
+
+function UI.Row:Measure(mxSize, mySize)
+	local s = self.style
+
+	local yLargest = 0
+	for i, child in ipairs(self.Children) do
+		local cxWidth = i == 1 and s.labelWidth or mxSize - s.labelWidth
+		child:Measure(cxWidth, mySize)
+		yLargest = max(yLargest, child.ySize)
+	end
+
+	self.xSize = mxSize
+	self.ySize = Clamp(yLargest, s.ySize, mySize)
+end
+
+function UI.Row:Arrange(xSize, ySize)
+	local s = self.style
+	self.Frame:SetSize(xSize, ySize)
+
+	local xOffset = 0
+	for i, child in ipairs(self.Children) do
+		local cxWidth = i == 1 and s.labelWidth or xSize - s.labelWidth
+		child.Region:SetPointsOffset(xOffset, 0)
+		child:Arrange(cxWidth, ySize)
+
+		xOffset = xOffset + cxWidth
+	end
+end
+
+----------------------------------------------------------------------------------------------------
 -- Stack
 
 UI.Stack = setmetatable({}, { __index = UI.Component })
@@ -134,6 +191,7 @@ function UI.Stack.Create(parent, cfgTree, args)
 	self.style = Config.GetBranch(cfgTree, args.styleName or "Stack")
 
 	self.Frame = CreateFrame("Frame", nil, parent.Region)
+	self.Frame:SetParentKey(args.name)
 
 	self.Region = self.Frame
 	self.Children = {}
@@ -146,25 +204,26 @@ end
 function UI.Stack:Measure(mxSize, mySize)
 	local s = self.style
 
-	local mcxSize = self.xDir ~= 0 and UI.NO_LIMIT or mxSize
-	local mcySize = self.yDir ~= 0 and UI.NO_LIMIT or mySize
-
-	local xSum     = 0
-	local ySum     = 0
+	local mcxSize  = self.xDir ~= 0 and UI.NO_LIMIT or mxSize
+	local mcySize  = self.yDir ~= 0 and UI.NO_LIMIT or mySize
 	local xLargest = 0
 	local yLargest = 0
 
+	self.xSize = 0
+	self.ySize = 0
+
 	for i, child in ipairs(self.Children) do
 		child:Measure(mcxSize, mcySize)
-		xSum     = xSum + child.xSize
-		ySum     = ySum + child.ySize
 		xLargest = max(xLargest, child.xSize)
 		yLargest = max(yLargest, child.ySize)
+
+		self.xSize = self.xSize + child.xSize
+		self.ySize = self.ySize + child.ySize
 	end
 
 	local gapSize = s.gapSize * max(0, #self.Children - 1)
-	self.xSize = self.xDir ~= 0 and xSum + gapSize or xLargest
-	self.ySize = self.yDir ~= 0 and ySum + gapSize or yLargest
+	self.xSize = self.xDir ~= 0 and self.xSize + gapSize or xLargest
+	self.ySize = self.yDir ~= 0 and self.ySize + gapSize or yLargest
 end
 
 function UI.Stack:Arrange(xSize, ySize)
@@ -185,9 +244,6 @@ end
 
 ----------------------------------------------------------------------------------------------------
 -- Label
-
--- TODO: Can we make the font object color white and apply color on the label? Surely we can?
--- SetFixedColor, SetTextColor
 
 UI.Label = setmetatable({}, { __index = UI.Component })
 UI.Label.__index = UI.Label

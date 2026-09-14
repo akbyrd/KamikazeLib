@@ -49,14 +49,18 @@ function Settings.Load()
 		{
 			xSize          = Config.UISize(rootSize, 0),
 			ySize          = Config.UISize(rootSize, 1),
-			yContentOffset = Config.UISize(rootSize, -6)
+			yContentOffset = Config.UISize(rootSize, -5)
+		})
+
+	Config.AddNode(Settings.cfgTree, "Default", "Row",
+		{
+			ySize      = Config.UISize(rootSize, -6),
+			labelWidth = Config.UISize(rootSize, -2),
 		})
 
 	Config.AddNode(Settings.cfgTree, "Default", "Stack",
 		{
 			gapSize = Config.UISize(rootSize, -7),
-			-- TODO: Should be in Row
-			labelWidth = Config.UISize(rootSize, -1),
 		})
 
 	Config.AddNode(Settings.cfgTree, "Default", "Label",
@@ -106,9 +110,14 @@ function Settings.Load()
 	Settings.Window = UI.Window.Create(UI.Root, Settings.cfgTree, { name = "Settings" })
 	Settings.Window.Region:Hide()
 
-	for i = 1, 10, 1 do
-		local temp = UI.Label.Create(Settings.Window.Stack, Settings.cfgTree, { name = "Temp", text = "Hello World" })
-		temp.Region:SetPoint("TOPLEFT")
+	for i = 1, 10 do
+		local row = UI.Row.Create(Settings.Window.Stack, Settings.cfgTree,
+			{
+				name = "Row",
+				text = "Hello World",
+			})
+		row.Region:SetPoint("TOPLEFT")
+		-- TODO: Put something inside
 	end
 
 	-- TODO: Do we need to refresh scale?
