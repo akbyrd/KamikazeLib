@@ -1,5 +1,8 @@
 To Do
 -----
+Procedurally fill settings
+	Default to empty row content
+	Create components as needed
 Settings
 	Implement GUI framework
 	Show in built-in Options > Addons?

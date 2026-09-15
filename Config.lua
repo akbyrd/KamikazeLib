@@ -195,7 +195,7 @@ Config.Impl.typeDefs = {
 			elseif unit == "ui" then
 				derived[key]          = Round(number / pixelsToUI)
 				derived[key .. "Rel"] = 0
-			else
+			elseif unit == "px" then
 				derived[key]          = Round(number)
 				derived[key .. "Rel"] = 0
 			end

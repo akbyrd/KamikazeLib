@@ -57,13 +57,22 @@ end
 function UI.Component:ConstrainSize()
 end
 
+function UI.AdjustString(string, xPos, yPos)
+	-- NOTE: Strings have their position floored to pixel positions before rendering. Floating point
+	-- noise from the scale chain causes tiny shifts above and below the desired integer value. A
+	-- half pixel offset turns the floor into a round. This fixes the position jitter visible on
+	-- strings, which is most obvious during dragging. Textures round and don't need the same fix. We
+	-- do this as a separate step and don't modify the stored position because we don't want the
+	-- rendering fix to infect other layout concerns.
+	string:SetPointsOffset(xPos + 0.5, yPos + 0.5)
+end
+
 ----------------------------------------------------------------------------------------------------
 -- Window
 
 UI.Window = setmetatable({}, { __index = UI.Component })
 UI.Window.__index = UI.Window
 
--- TODO: Round positions while dragging, not just on end
 function UI.Window.Create(parent, cfgTree, args)
 	local self = setmetatable({}, UI.Window)
 	self.style    = Config.GetBranch(cfgTree, args.styleName or "Window")
@@ -306,6 +315,7 @@ end
 
 function UI.Label:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
 	self:Place(xCellPos, yCellPos, xCellSize, yCellSize)
+	UI.AdjustString(self.Text, self.xPos, self.yPos)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -361,8 +371,8 @@ function UI.IconButton:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
 	local s = self.style
 	self:Place(xCellPos, yCellPos, xCellSize, yCellSize)
 
-	local xOffset, yOffset = Util.CenterIcon(s.font.info, self.xSize, self.ySize, s.font.size)
-	self.FontString:SetPointsOffset(xOffset, yOffset)
+	local xPos, yPos = Util.CenterIcon(s.font.info, self.xSize, self.ySize, s.font.size)
+	UI.AdjustString(self.FontString, xPos, yPos)
 
 	self.Button:SetBackdrop({
 		bgFile   = s.backgroundTexture,

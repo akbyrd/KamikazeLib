@@ -151,9 +151,8 @@ function Util.CenterIcon(font, xFrameSize, yFrameSize, fontSize)
 
 	local baseline = floor(fontSize * font.ascent / (font.ascent + font.descent) + 0.5)
 	local rounding = fontSize % font.grid == 0 and 0 or 1
-	local xOffset  = (xFrameSize - fontSize) / 2 - rounding
-	local yOffset  = (yFrameSize + fontSize) / 2 - baseline
-	xOffset  = 0 + xOffset + 0.5
-	yOffset  = 0 - yOffset + 0.5
-	return xOffset, yOffset
+
+	local xPos = 0 + ((xFrameSize - fontSize) / 2 - rounding)
+	local yPos = 0 - ((yFrameSize + fontSize) / 2 - baseline)
+	return xPos, yPos
 end
