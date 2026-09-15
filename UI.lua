@@ -63,7 +63,7 @@ end
 UI.Window = setmetatable({}, { __index = UI.Component })
 UI.Window.__index = UI.Window
 
--- TODO: Add a title
+-- TODO: Round positions while dragging, not just on end
 function UI.Window.Create(parent, cfgTree, args)
 	local self = setmetatable({}, UI.Window)
 	self.style    = Config.GetBranch(cfgTree, args.styleName or "Window")
@@ -95,6 +95,14 @@ function UI.Window.Create(parent, cfgTree, args)
 
 	self.Region = self.Frame
 
+	self.Title = UI.Label.Create(self, cfgTree,
+		{
+			name      = "Title",
+			styleName = "Title",
+			text      = args.name,
+		})
+	self.Title.Region:SetPoint("TOPLEFT")
+
 	self.Close = UI.IconButton.Create(self, cfgTree,
 		{
 			name      = "Close",
@@ -104,12 +112,15 @@ function UI.Window.Create(parent, cfgTree, args)
 			xAlign    = 1,
 		})
 	self.Close.Region:SetPoint("TOPLEFT")
+
 	self.Content = nil
 	return self
 end
 
 function UI.Window:Measure(xTargetSize, yTargetSize)
 	local s = self.style
+
+	self.Title:Measure(UI.NO_LIMIT, UI.NO_LIMIT)
 	self.Close:Measure(UI.NO_LIMIT, UI.NO_LIMIT)
 
 	local cxTargetSize = s.xSize - 2 * s.padSize
@@ -131,17 +142,20 @@ function UI.Window:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
 	self.Frame:SetBackdropColor(s.backgroundColor:GetRGBA())
 	self.Frame:SetBackdropBorderColor(s.borderColor:GetRGBA())
 
-	local cxPos  = s.padSize
-	local cyPos  = -s.padSize
-	local cxSize = self.xSize - 2 * s.padSize
-	local cySize = self.Close.ySize
-	self.Close:Arrange(cxPos, cyPos, cxSize, cySize)
+	local xPos  = s.padSize
+	local xSize = self.xSize - 2 * s.padSize
 
-	cxPos  = cxPos
-	cyPos  = cyPos - cySize - s.padSize
-	cxSize = cxSize
-	cySize = self.ySize - 3 * s.padSize - cySize
-	self.Content:Arrange(cxPos, cyPos, cxSize, cySize)
+	local yTitlePos  = -s.padSize
+	local yTitleSize = self.Title.ySize
+	self.Title:Arrange(xPos, yTitlePos, xSize, yTitleSize)
+
+	local yCloseSize = self.Close.ySize
+	self.Close:Arrange(xPos, yTitlePos, xSize, yCloseSize)
+
+	local yHeaderSize  = max(yTitleSize, yCloseSize)
+	local yContentPos  = 0          - 2 * s.padSize - yHeaderSize
+	local yContentSize = self.ySize - 3 * s.padSize - yHeaderSize
+	self.Content:Arrange(xPos, yContentPos, xSize, yContentSize)
 end
 
 ----------------------------------------------------------------------------------------------------

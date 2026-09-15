@@ -16,7 +16,7 @@ function Settings.Load()
 	hooksecurefunc(UIParent, "SetScale",           Settings.RefreshScale)
 
 	-- TODO: Any good patterns for "stronger types" in lua?
-	local rootSize = 400
+	local rootSize = 500
 	local textFont = {
 		path = LSM:Fetch("font", "PT Sans Narrow", true) or "Fonts\\ARIALN.TTF",
 	}
@@ -36,7 +36,7 @@ function Settings.Load()
 			borderColor       = Config.Color("0FFFFFFF"),
 			backgroundTexture = Config.String("Interface\\Buttons\\WHITE8x8"),
 			backgroundColor   = Config.Color("FA1C1C1C"),
-			padSize           = Config.UISize(rootSize, -8),
+			padSize           = Config.UISize(rootSize, -7),
 			font              = Config.Font({
 				info   = textFont,
 				color  = "A6FFFFFF",
@@ -66,10 +66,18 @@ function Settings.Load()
 		{
 		})
 
+	Config.AddNode(Settings.cfgTree, "Label", "Title",
+		{
+			font = Config.Font({
+				color  = "FFFFCC00",
+				size   = 24,
+			}),
+		})
+
 	Config.AddNode(Settings.cfgTree, "Default", "Button",
 		{
-			xSize           = Config.UISize(rootSize, -6),
-			ySize           = Config.UISize(rootSize, -6),
+			xSize           = Config.UISize(rootSize, -7),
+			ySize           = Config.UISize(rootSize, -7),
 			backgroundColor = Config.Color("08FFFFFF"),
 			hoverTexture    = Config.String("Interface\\Buttons\\WHITE8x8"),
 			hoverColor      = Config.Color("14FFFFFF"),
@@ -106,7 +114,10 @@ function Settings.Load()
 	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
 	Config.RefreshValues(Settings.cfgTree, pixelsToUI)
 
-	Settings.Window = UI.Window.Create(UI.Root, Settings.cfgTree, { name = "Settings" })
+	Settings.Window = UI.Window.Create(UI.Root, Settings.cfgTree,
+		{
+			name = "Settings"
+		})
 	Settings.Window.Content = UI.Stack.Create(Settings.Window, Settings.cfgTree,
 		{
 			name     = "Stack",
