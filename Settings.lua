@@ -107,16 +107,22 @@ function Settings.Load()
 	Config.RefreshValues(Settings.cfgTree, pixelsToUI)
 
 	Settings.Window = UI.Window.Create(UI.Root, Settings.cfgTree, { name = "Settings" })
-	Settings.Window.Region:Hide()
+	Settings.Window.Content = UI.Stack.Create(Settings.Window, Settings.cfgTree,
+		{
+			name     = "Stack",
+			xStretch = 1,
+			yStretch = 1,
+		})
+	Settings.Window.Content.Region:SetPoint("TOPLEFT")
 
 	for i = 1, 10 do
-		local row = UI.Row.Create(Settings.Window.Stack, Settings.cfgTree,
+		local row = UI.Row.Create(Settings.Window.Content, Settings.cfgTree,
 			{
 				name = "Row",
 				text = "Hello World",
 			})
 		row.Region:SetPoint("TOPLEFT")
-		table.insert(Settings.Window.Stack.Children, row)
+		table.insert(Settings.Window.Content.Children, row)
 
 		row.Content = UI.IconButton.Create(row, Settings.cfgTree,
 			{
@@ -133,6 +139,7 @@ function Settings.Load()
 	--UI.RefreshScale()
 	Settings.Window:Measure(UI.NO_LIMIT, UI.NO_LIMIT)
 	Settings.Window:Arrange(0, 0, UI.NO_LIMIT, UI.NO_LIMIT)
+	Settings.Window.Region:Hide()
 end
 
 function Settings.RefreshScale()

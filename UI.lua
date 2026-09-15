@@ -63,7 +63,6 @@ end
 UI.Window = setmetatable({}, { __index = UI.Component })
 UI.Window.__index = UI.Window
 
--- TODO: We probably shouldn't hard-code a stack as the window content
 -- TODO: Add a title
 function UI.Window.Create(parent, cfgTree, args)
 	local self = setmetatable({}, UI.Window)
@@ -105,15 +104,7 @@ function UI.Window.Create(parent, cfgTree, args)
 			xAlign    = 1,
 		})
 	self.Close.Region:SetPoint("TOPLEFT")
-
-	self.Stack = UI.Stack.Create(self, cfgTree,
-		{
-			name     = "Stack",
-			xStretch = 1,
-			yStretch = 1,
-		})
-	self.Stack.Region:SetPoint("TOPLEFT")
-
+	self.Content = nil
 	return self
 end
 
@@ -123,7 +114,7 @@ function UI.Window:Measure(xTargetSize, yTargetSize)
 
 	local cxTargetSize = s.xSize - 2 * s.padSize
 	local cyTargetSize = s.ySize - 3 * s.padSize - self.Close.ySize
-	self.Stack:Measure(cxTargetSize, cyTargetSize)
+	self.Content:Measure(cxTargetSize, cyTargetSize)
 
 	self.xSize = s.xSize
 	self.ySize = s.ySize
@@ -150,7 +141,7 @@ function UI.Window:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
 	cyPos  = cyPos - cySize - s.padSize
 	cxSize = cxSize
 	cySize = self.ySize - 3 * s.padSize - cySize
-	self.Stack:Arrange(cxPos, cyPos, cxSize, cySize)
+	self.Content:Arrange(cxPos, cyPos, cxSize, cySize)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -378,6 +369,5 @@ end
 UI.Load()
 
 -- TODO: Try nil for NO_LIMIT
--- TODO: 4 float anchoring to handle extra space
 -- TODO: Maybe the hierarchy should split Containers and Widgets?
 -- TODO: Consider a declarative UI builder
