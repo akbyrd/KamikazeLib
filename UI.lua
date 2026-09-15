@@ -24,7 +24,6 @@ function UI.Load()
 	UI.Root.Region = CreateFrame("Frame", nil, UIParent)
 	UI.Root.Region:SetParentKey("KAMI_UI_ROOT")
 	UI.Root.Region:SetAllPoints()
-	UI.Root.Children = {}
 end
 
 -- TODO: All 3 passes and recurse?
@@ -96,7 +95,6 @@ function UI.Window.Create(parent, cfgTree, args)
 	self.Frame:SetPoint("TOPLEFT", nil, "BOTTOMLEFT", x, y)
 
 	self.Region = self.Frame
-	table.insert(parent.Children, self)
 
 	self.Close = UI.IconButton.Create(self, cfgTree,
 		{
@@ -158,7 +156,6 @@ end
 ----------------------------------------------------------------------------------------------------
 -- Row
 
--- TODO: Change to only have a single content child
 UI.Row = setmetatable({}, { __index = UI.Component })
 UI.Row.__index = UI.Row
 
@@ -174,8 +171,6 @@ function UI.Row.Create(parent, cfgTree, args)
 	self.Frame:SetParentKey(args.name)
 
 	self.Region = self.Frame
-	self.Children = {}
-	table.insert(parent.Children, self)
 
 	self.Label = UI.Label.Create(self, cfgTree,
 		{
@@ -184,36 +179,26 @@ function UI.Row.Create(parent, cfgTree, args)
 			yAlign = 0.5,
 		})
 	self.Label.Region:SetPoint("TOPLEFT")
+	self.Content = nil
 	return self
 end
 
 function UI.Row:Measure(xTargetSize, yTargetSize)
 	local s = self.style
 
-	self.xSize = 0
-	self.ySize = s.ySize
+	self.Label:Measure(s.labelWidth, yTargetSize)
+	self.Content:Measure(xTargetSize - s.labelWidth, yTargetSize)
 
-	for i, child in ipairs(self.Children) do
-		local cxTargetSize = i == 1 and s.labelWidth or xTargetSize - s.labelWidth
-		child:Measure(cxTargetSize, yTargetSize)
-
-		local cxSize = i == 1 and s.labelWidth or child.xSize
-		self.xSize = self.xSize + cxSize
-		self.ySize = max(self.ySize, child.ySize)
-	end
+	self.xSize = s.labelWidth + self.Content.xSize
+	self.ySize = max(s.ySize, self.Label.ySize, self.Content.ySize)
 end
 
 function UI.Row:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
 	local s = self.style
 	self:Place(xCellPos, yCellPos, xCellSize, yCellSize)
 
-	local cxPos = 0
-	for i, child in ipairs(self.Children) do
-		local cxSize = i == 1 and s.labelWidth or child.xSize
-		child:Arrange(cxPos, 0, cxSize, self.ySize)
-
-		cxPos = cxPos + cxSize
-	end
+	self.Label:Arrange(0, 0, s.labelWidth, self.ySize)
+	self.Content:Arrange(s.labelWidth, 0, self.xSize - s.labelWidth, self.ySize)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -237,7 +222,6 @@ function UI.Stack.Create(parent, cfgTree, args)
 	self.Children = {}
 	self.xDir = args.xDir or 0
 	self.yDir = args.yDir or 1
-	table.insert(parent.Children, self)
 	return self
 end
 
@@ -304,7 +288,6 @@ function UI.Label.Create(parent, cfgTree, args)
 	self.Text:SetText(args.text)
 
 	self.Region = self.Text
-	table.insert(parent.Children, self)
 	return self
 end
 
@@ -353,7 +336,6 @@ function UI.IconButton.Create(parent, cfgTree, args)
 	self.FontString:SetPoint("TOPLEFT")
 
 	self.Region = self.Button
-	table.insert(parent.Children, self)
 	return self
 end
 

@@ -116,8 +116,9 @@ function Settings.Load()
 				text = "Hello World",
 			})
 		row.Region:SetPoint("TOPLEFT")
+		table.insert(Settings.Window.Stack.Children, row)
 
-		local control = UI.IconButton.Create(row, Settings.cfgTree,
+		row.Content = UI.IconButton.Create(row, Settings.cfgTree,
 			{
 				name      = "Control",
 				styleName = "CloseButton",
@@ -125,7 +126,7 @@ function Settings.Load()
 				onClick   = function() end,
 				yAlign    = 0.5,
 			})
-		control.Region:SetPoint("TOPLEFT")
+		row.Content.Region:SetPoint("TOPLEFT")
 	end
 
 	-- TODO: Do we need to refresh scale?
