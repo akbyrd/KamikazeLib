@@ -138,7 +138,7 @@ end
 function Util.SameParity(x, y)
 	local xParity = x % 2
 	local yParity = y % 2
-	return y + (xParity - yParity)
+	return y - (xParity - yParity)
 end
 
 function Util.CenterIcon(font, xFrameSize, yFrameSize, fontSize)

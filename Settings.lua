@@ -47,9 +47,8 @@ function Settings.Load()
 
 	Config.AddNode(Settings.cfgTree, "Default", "Window",
 		{
-			xSize          = Config.UISize(rootSize, 0),
-			ySize          = Config.UISize(rootSize, 1),
-			yContentOffset = Config.UISize(rootSize, -5)
+			xSize = Config.UISize(rootSize, 0),
+			ySize = Config.UISize(rootSize, 1),
 		})
 
 	Config.AddNode(Settings.cfgTree, "Default", "Row",
@@ -117,13 +116,22 @@ function Settings.Load()
 				text = "Hello World",
 			})
 		row.Region:SetPoint("TOPLEFT")
-		-- TODO: Put something inside
+
+		local control = UI.IconButton.Create(row, Settings.cfgTree,
+			{
+				name      = "Control",
+				styleName = "CloseButton",
+				glyph     = 0xE5CD,
+				onClick   = function() end,
+				yAlign    = 0.5,
+			})
+		control.Region:SetPoint("TOPLEFT")
 	end
 
 	-- TODO: Do we need to refresh scale?
 	--UI.RefreshScale()
 	Settings.Window:Measure(UI.NO_LIMIT, UI.NO_LIMIT)
-	Settings.Window:Arrange(Settings.Window.xSize, Settings.Window.ySize)
+	Settings.Window:Arrange(0, 0, UI.NO_LIMIT, UI.NO_LIMIT)
 end
 
 function Settings.RefreshScale()
@@ -132,7 +140,7 @@ function Settings.RefreshScale()
 
 	UI.RefreshScale()
 	Settings.Window:Measure(UI.NO_LIMIT, UI.NO_LIMIT)
-	Settings.Window:Arrange(Settings.Window.xSize, Settings.Window.ySize)
+	Settings.Window:Arrange(0, 0, UI.NO_LIMIT, UI.NO_LIMIT)
 end
 
 function Settings.Toggle()

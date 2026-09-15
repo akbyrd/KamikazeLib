@@ -9,6 +9,7 @@ local Util   = Kami.Util
 -- NOTE: We assume frames are not re-anchored unexpectedly. No unnecessary ClearAllPoints.
 -- NOTE: The caller is responsible for anchoring, not Create (unless it's an internal component).
 -- NOTE: SetPointsOffset is used for positioning to avoid repeating anchors.
+-- NOTE: Arrange may pass a larger size, but never a smaller size.
 
 ----------------------------------------------------------------------------------------------------
 -- Constants
@@ -35,8 +36,27 @@ end
 ----------------------------------------------------------------------------------------------------
 -- Component
 
-UI.Component = {}
+UI.Component = {
+	xStretch = 0,
+	yStretch = 0,
+	xAlign   = 0,
+	yAlign   = 0,
+}
 UI.Component.__index = UI.Component
+
+function UI.Component:Place(xCellPos, yCellPos, xCellSize, yCellSize)
+	self.xSize = Round(self.xSize + max(0, xCellSize - self.xSize) * self.xStretch)
+	self.ySize = Round(self.ySize + max(0, yCellSize - self.ySize) * self.yStretch)
+	self:ConstrainSize()
+	self.Region:SetSize(self.xSize, self.ySize)
+
+	self.xPos = Round(xCellPos + max(0, xCellSize - self.xSize) * self.xAlign)
+	self.yPos = Round(yCellPos - max(0, yCellSize - self.ySize) * self.yAlign)
+	self.Region:SetPointsOffset(self.xPos, self.yPos)
+end
+
+function UI.Component:ConstrainSize()
+end
 
 ----------------------------------------------------------------------------------------------------
 -- Window
@@ -44,9 +64,15 @@ UI.Component.__index = UI.Component
 UI.Window = setmetatable({}, { __index = UI.Component })
 UI.Window.__index = UI.Window
 
+-- TODO: We probably shouldn't hard-code a stack as the window content
+-- TODO: Add a title
 function UI.Window.Create(parent, cfgTree, args)
 	local self = setmetatable({}, UI.Window)
-	self.style = Config.GetBranch(cfgTree, args.styleName or "Window")
+	self.style    = Config.GetBranch(cfgTree, args.styleName or "Window")
+	self.xAlign   = args.xAlign
+	self.yAlign   = args.yAlign
+	self.xStretch = args.xStretch
+	self.yStretch = args.yStretch
 
 	self.Frame = CreateFrame("Frame", nil, parent.Region, "BackdropTemplate")
 	self.Frame:SetParentKey(args.name)
@@ -70,7 +96,6 @@ function UI.Window.Create(parent, cfgTree, args)
 	self.Frame:SetPoint("TOPLEFT", nil, "BOTTOMLEFT", x, y)
 
 	self.Region = self.Frame
-	self.Children = {}
 	table.insert(parent.Children, self)
 
 	self.Close = UI.IconButton.Create(self, cfgTree,
@@ -79,36 +104,37 @@ function UI.Window.Create(parent, cfgTree, args)
 			styleName = "CloseButton",
 			glyph     = 0xE5CD,
 			onClick   = function() self.Frame:Hide() end,
+			xAlign    = 1,
 		})
-	self.Close.Region:SetPoint("TOPRIGHT")
+	self.Close.Region:SetPoint("TOPLEFT")
 
 	self.Stack = UI.Stack.Create(self, cfgTree,
 		{
-			name = "Stack",
+			name     = "Stack",
+			xStretch = 1,
+			yStretch = 1,
 		})
 	self.Stack.Region:SetPoint("TOPLEFT")
 
 	return self
 end
 
-function UI.Window:Measure(mxSize, mySize)
+function UI.Window:Measure(xTargetSize, yTargetSize)
 	local s = self.style
+	self.Close:Measure(UI.NO_LIMIT, UI.NO_LIMIT)
+
+	local cxTargetSize = s.xSize - 2 * s.padSize
+	local cyTargetSize = s.ySize - 3 * s.padSize - self.Close.ySize
+	self.Stack:Measure(cxTargetSize, cyTargetSize)
 
 	self.xSize = s.xSize
 	self.ySize = s.ySize
-
-	local mcxSize = s.xSize - 2 * s.padSize
-	local mcySize = s.ySize - 2 * s.padSize - s.yContentOffset
-
-	for i, child in ipairs(self.Children) do
-		child:Measure(mcxSize, mcySize)
-	end
 end
 
-function UI.Window:Arrange(xSize, ySize)
+function UI.Window:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
 	local s = self.style
 
-	self.Frame:SetSize(xSize, ySize)
+	self.Frame:SetSize(self.xSize, self.ySize)
 	self.Frame:SetBackdrop({
 		bgFile   = s.backgroundTexture,
 		edgeFile = s.backgroundTexture,
@@ -116,23 +142,33 @@ function UI.Window:Arrange(xSize, ySize)
 	self.Frame:SetBackdropColor(s.backgroundColor:GetRGBA())
 	self.Frame:SetBackdropBorderColor(s.borderColor:GetRGBA())
 
-	self.Close.Region:SetPointsOffset(-s.padSize, -s.padSize)
-	self.Stack.Region:SetPointsOffset(s.padSize, -s.padSize - s.yContentOffset)
+	local cxPos  = s.padSize
+	local cyPos  = -s.padSize
+	local cxSize = self.xSize - 2 * s.padSize
+	local cySize = self.Close.ySize
+	self.Close:Arrange(cxPos, cyPos, cxSize, cySize)
 
-	for i, child in ipairs(self.Children) do
-		child:Arrange(child.xSize, child.ySize)
-	end
+	cxPos  = cxPos
+	cyPos  = cyPos - cySize - s.padSize
+	cxSize = cxSize
+	cySize = self.ySize - 3 * s.padSize - cySize
+	self.Stack:Arrange(cxPos, cyPos, cxSize, cySize)
 end
 
 ----------------------------------------------------------------------------------------------------
 -- Row
 
+-- TODO: Change to only have a single content child
 UI.Row = setmetatable({}, { __index = UI.Component })
 UI.Row.__index = UI.Row
 
 function UI.Row.Create(parent, cfgTree, args)
 	local self = setmetatable({}, UI.Row)
-	self.style = Config.GetBranch(cfgTree, args.styleName or "Row")
+	self.style    = Config.GetBranch(cfgTree, args.styleName or "Row")
+	self.xAlign   = args.xAlign
+	self.yAlign   = args.yAlign
+	self.xStretch = args.xStretch
+	self.yStretch = args.yStretch
 
 	self.Frame = CreateFrame("Frame", nil, parent.Region)
 	self.Frame:SetParentKey(args.name)
@@ -143,40 +179,40 @@ function UI.Row.Create(parent, cfgTree, args)
 
 	self.Label = UI.Label.Create(self, cfgTree,
 		{
-			name = "Label",
-			text = args.text
+			name   = "Label",
+			text   = args.text,
+			yAlign = 0.5,
 		})
 	self.Label.Region:SetPoint("TOPLEFT")
-	self.Label.Text:SetJustifyV("MIDDLE")
-	self.Label.Text:SetJustifyH("LEFT")
 	return self
 end
 
-function UI.Row:Measure(mxSize, mySize)
+function UI.Row:Measure(xTargetSize, yTargetSize)
 	local s = self.style
 
-	local yLargest = 0
-	for i, child in ipairs(self.Children) do
-		local cxWidth = i == 1 and s.labelWidth or mxSize - s.labelWidth
-		child:Measure(cxWidth, mySize)
-		yLargest = max(yLargest, child.ySize)
-	end
+	self.xSize = 0
+	self.ySize = s.ySize
 
-	self.xSize = mxSize
-	self.ySize = Clamp(yLargest, s.ySize, mySize)
+	for i, child in ipairs(self.Children) do
+		local cxTargetSize = i == 1 and s.labelWidth or xTargetSize - s.labelWidth
+		child:Measure(cxTargetSize, yTargetSize)
+
+		local cxSize = i == 1 and s.labelWidth or child.xSize
+		self.xSize = self.xSize + cxSize
+		self.ySize = max(self.ySize, child.ySize)
+	end
 end
 
-function UI.Row:Arrange(xSize, ySize)
+function UI.Row:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
 	local s = self.style
-	self.Frame:SetSize(xSize, ySize)
+	self:Place(xCellPos, yCellPos, xCellSize, yCellSize)
 
-	local xOffset = 0
+	local cxPos = 0
 	for i, child in ipairs(self.Children) do
-		local cxWidth = i == 1 and s.labelWidth or xSize - s.labelWidth
-		child.Region:SetPointsOffset(xOffset, 0)
-		child:Arrange(cxWidth, ySize)
+		local cxSize = i == 1 and s.labelWidth or child.xSize
+		child:Arrange(cxPos, 0, cxSize, self.ySize)
 
-		xOffset = xOffset + cxWidth
+		cxPos = cxPos + cxSize
 	end
 end
 
@@ -188,7 +224,11 @@ UI.Stack.__index = UI.Stack
 
 function UI.Stack.Create(parent, cfgTree, args)
 	local self = setmetatable({}, UI.Stack)
-	self.style = Config.GetBranch(cfgTree, args.styleName or "Stack")
+	self.style    = Config.GetBranch(cfgTree, args.styleName or "Stack")
+	self.xAlign   = args.xAlign
+	self.yAlign   = args.yAlign
+	self.xStretch = args.xStretch
+	self.yStretch = args.yStretch
 
 	self.Frame = CreateFrame("Frame", nil, parent.Region)
 	self.Frame:SetParentKey(args.name)
@@ -201,19 +241,20 @@ function UI.Stack.Create(parent, cfgTree, args)
 	return self
 end
 
-function UI.Stack:Measure(mxSize, mySize)
+function UI.Stack:Measure(xTargetSize, yTargetSize)
 	local s = self.style
 
-	local mcxSize  = self.xDir ~= 0 and UI.NO_LIMIT or mxSize
-	local mcySize  = self.yDir ~= 0 and UI.NO_LIMIT or mySize
-	local xLargest = 0
-	local yLargest = 0
+	xTargetSize = self.xDir == 0 and xTargetSize or UI.NO_LIMIT
+	yTargetSize = self.yDir == 0 and yTargetSize or UI.NO_LIMIT
 
 	self.xSize = 0
 	self.ySize = 0
 
+	local xLargest = 0
+	local yLargest = 0
+
 	for i, child in ipairs(self.Children) do
-		child:Measure(mcxSize, mcySize)
+		child:Measure(xTargetSize, yTargetSize)
 		xLargest = max(xLargest, child.xSize)
 		yLargest = max(yLargest, child.ySize)
 
@@ -226,19 +267,20 @@ function UI.Stack:Measure(mxSize, mySize)
 	self.ySize = self.yDir ~= 0 and self.ySize + gapSize or yLargest
 end
 
-function UI.Stack:Arrange(xSize, ySize)
+function UI.Stack:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
 	local s = self.style
-	self.Frame:SetSize(xSize, ySize)
+	self:Place(xCellPos, yCellPos, xCellSize, yCellSize)
 
-	local xOffset = 0
-	local yOffset = 0
+	local cxPos  = 0
+	local cyPos  = 0
 
 	for i, child in ipairs(self.Children) do
-		child.Region:SetPointsOffset(xOffset, -yOffset)
-		child:Arrange(child.xSize, child.ySize)
+		local cxSize = self.xDir ~= 0 and child.xSize or self.xSize
+		local cySize = self.yDir ~= 0 and child.ySize or self.ySize
+		child:Arrange(cxPos, cyPos, cxSize, cySize)
 
-		xOffset = xOffset + (child.xSize + s.gapSize) * self.xDir
-		yOffset = yOffset + (child.ySize + s.gapSize) * self.yDir
+		cxPos = cxPos + (child.xSize + s.gapSize) * self.xDir
+		cyPos = cyPos - (child.ySize + s.gapSize) * self.yDir
 	end
 end
 
@@ -250,7 +292,11 @@ UI.Label.__index = UI.Label
 
 function UI.Label.Create(parent, cfgTree, args)
 	local self = setmetatable({}, UI.Label)
-	self.style = Config.GetBranch(cfgTree, args.styleName or "Label")
+	self.style    = Config.GetBranch(cfgTree, args.styleName or "Label")
+	self.xAlign   = args.xAlign
+	self.yAlign   = args.yAlign
+	self.xStretch = args.xStretch
+	self.yStretch = args.yStretch
 
 	self.Text = parent.Region:CreateFontString(nil, "ARTWORK")
 	self.Text:SetParentKey(args.name)
@@ -258,26 +304,20 @@ function UI.Label.Create(parent, cfgTree, args)
 	self.Text:SetText(args.text)
 
 	self.Region = self.Text
-	self.Children = {}
 	table.insert(parent.Children, self)
 	return self
 end
 
-function UI.Label:Measure(mxSize, mySize)
+function UI.Label:Measure(xTargetSize, yTargetSize)
 	-- NOTE: There's no way to measure wrapping without mutating the string.
-	self.Text:SetMaxLines(0)
-	self.Text:SetWidth(mxSize == UI.NO_LIMIT and 0 or mxSize)
+	self.Text:SetWidth(xTargetSize == UI.NO_LIMIT and 0 or xTargetSize)
 
-	self.xSize = min(mxSize, self.Text:GetUnboundedStringWidth())
-	self.ySize = min(mySize, self.Text:GetStringHeight())
+	self.xSize = min(xTargetSize, self.Text:GetUnboundedStringWidth())
+	self.ySize = self.Text:GetStringHeight()
 end
 
-function UI.Label:Arrange(xSize, ySize)
-	local lineHeight = self.Text:GetLineHeight()
-	local maxLines = floor(ySize / lineHeight)
-
-	self.Text:SetMaxLines(maxLines)
-	self.Text:SetSize(xSize, ySize)
+function UI.Label:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
+	self:Place(xCellPos, yCellPos, xCellSize, yCellSize)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -288,7 +328,11 @@ UI.IconButton.__index = UI.IconButton
 
 function UI.IconButton.Create(parent, cfgTree, args)
 	local self = setmetatable({}, UI.IconButton)
-	self.style = Config.GetBranch(cfgTree, args.styleName or "IconButton")
+	self.style    = Config.GetBranch(cfgTree, args.styleName or "IconButton")
+	self.xAlign   = args.xAlign
+	self.yAlign   = args.yAlign
+	self.xStretch = args.xStretch
+	self.yStretch = args.yStretch
 
 	self.Button = CreateFrame("Button", nil, parent.Region, "BackdropTemplate")
 	self.Button:SetParentKey(args.name)
@@ -305,30 +349,34 @@ function UI.IconButton.Create(parent, cfgTree, args)
 	ht:ClearAllPoints()
 
 	self.FontString = self.Button:GetFontString()
-	self.FontString:SetJustifyH("LEFT")
-	self.FontString:SetJustifyV("TOP")
 	self.FontString:ClearAllPoints()
 	self.FontString:SetPoint("TOPLEFT")
 
 	self.Region = self.Button
-	self.Children = {}
 	table.insert(parent.Children, self)
 	return self
 end
 
-function UI.IconButton:Measure(mxSize, mySize)
+function UI.IconButton:ConstrainSize()
 	local s = self.style
-	local buttonSize = Util.SameParity(s.font.size, s.xSize)
-
-	self.xSize = buttonSize
-	self.ySize = buttonSize
+	self.xSize = Util.SameParity(s.font.size, self.xSize)
+	self.ySize = Util.SameParity(s.font.size, self.ySize)
 end
 
-function UI.IconButton:Arrange(xSize, ySize)
+function UI.IconButton:Measure(xTargetSize, yTargetSize)
 	local s = self.style
-	local xOffset, yOffset = Util.CenterIcon(s.font.info, xSize, ySize, s.font.size)
+	self.xSize = s.xSize
+	self.ySize = s.ySize
+	self:ConstrainSize()
+end
 
-	self.Button:SetSize(xSize, ySize)
+function UI.IconButton:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
+	local s = self.style
+	self:Place(xCellPos, yCellPos, xCellSize, yCellSize)
+
+	local xOffset, yOffset = Util.CenterIcon(s.font.info, self.xSize, self.ySize, s.font.size)
+	self.FontString:SetPointsOffset(xOffset, yOffset)
+
 	self.Button:SetBackdrop({
 		bgFile   = s.backgroundTexture,
 		edgeFile = s.backgroundTexture,
@@ -340,8 +388,6 @@ function UI.IconButton:Arrange(xSize, ySize)
 	local ht = self.Button:GetHighlightTexture()
 	ht:SetPoint("TOPLEFT",      s.borderSize, -s.borderSize)
 	ht:SetPoint("BOTTOMRIGHT", -s.borderSize,  s.borderSize)
-
-	self.FontString:SetPointsOffset(xOffset, yOffset)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -349,5 +395,7 @@ end
 
 UI.Load()
 
+-- TODO: Try nil for NO_LIMIT
+-- TODO: 4 float anchoring to handle extra space
 -- TODO: Maybe the hierarchy should split Containers and Widgets?
 -- TODO: Consider a declarative UI builder
