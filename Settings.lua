@@ -59,7 +59,7 @@ function Settings.Load()
 
 	Config.AddNode(Settings.cfgTree, "Default", "Stack",
 		{
-			gapSize = Config.UISize(rootSize, -7),
+			gapSize = Config.UISize(rootSize, -10),
 		})
 
 	Config.AddNode(Settings.cfgTree, "Default", "Label",
@@ -126,24 +126,42 @@ function Settings.Load()
 		})
 	Settings.Window.Content.Region:SetPoint("TOPLEFT")
 
-	for i = 1, 10 do
+	local iterBranch = "Essential"
+	for key, decl, branch, node in Config.Enumerate(Kami.CDM2.cfgTree, iterBranch) do
 		local row = UI.Row.Create(Settings.Window.Content, Settings.cfgTree,
 			{
 				name = "Row",
-				text = "Hello World",
+				text = key,
 			})
 		row.Region:SetPoint("TOPLEFT")
 		table.insert(Settings.Window.Content.Children, row)
 
-		row.Content = UI.IconButton.Create(row, Settings.cfgTree,
+		row.Content = UI.Stack.Create(row, Settings.cfgTree,
 			{
-				name      = "Control",
-				styleName = "CloseButton",
-				glyph     = 0xE5CD,
-				onClick   = function() end,
-				yAlign    = 0.5,
+				name     = "Content",
+				xDir     = 1,
+				yDir     = 0,
+				xStretch = 1,
+				yAlign   = 0.5,
 			})
 		row.Content.Region:SetPoint("TOPLEFT")
+
+		local source = UI.Label.Create(row.Content, Settings.cfgTree,
+			{
+				name = "Source",
+				text = branch,
+			})
+		source.Region:SetPoint("TOPLEFT")
+		table.insert(row.Content.Children, source)
+
+		local value = UI.Label.Create(row.Content, Settings.cfgTree,
+			{
+				name     = "Value",
+				text     = Config.Format(decl),
+				xStretch = 1,
+			})
+		value.Region:SetPoint("TOPLEFT")
+		table.insert(row.Content.Children, value)
 	end
 
 	-- TODO: Do we need to refresh scale?

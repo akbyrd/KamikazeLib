@@ -16,10 +16,10 @@ KamikazeLib.lua
 Util.lua
 Config.lua
 UI.lua
-Settings.lua
 PixelAnts.lua
 WorldMarkers.lua
 MouseCursor.lua
 CombatText.lua
 CDM.lua
 CDM2.lua
+Settings.lua

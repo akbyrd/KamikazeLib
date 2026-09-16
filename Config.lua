@@ -118,6 +118,31 @@ function Config.GetBranch(tree, branch)
 	return tree.nodeToDerived[node]
 end
 
+-- Iterates every key in the branch. Yields the key, decl, branch, and node that defines the value.
+function Config.Enumerate(tree, branch)
+	local node = tree.branchToTip[branch]
+	assert(node, ("Branch %s doesn't exist"):format(branch))
+
+	return coroutine.wrap(function()
+		local seen = {}
+		while node do
+			for key, decl in pairs(node) do
+				if not seen[key] then
+					seen[key] = true
+					local branch = tree.nodeToBranch[node]
+					coroutine.yield(key, decl, branch, node)
+				end
+			end
+			node = getmetatable(node).__index
+		end
+	end)
+end
+
+function Config.Format(decl)
+	local typeDef = Config.Impl.typeDefs[decl.type]
+	return typeDef.format(decl.value)
+end
+
 function Config.RefreshValues(tree, pixelsToUI)
 	local typeDefs = Config.Impl.typeDefs
 	for node, derived in pairs(tree.nodeToDerived) do
@@ -149,6 +174,9 @@ Config.Impl.typeDefs = {
 		resolve = function(derived, key, value)
 			derived[key] = value
 		end,
+		format = function(value)
+			return tostring(value)
+		end,
 	},
 
 	number = {
@@ -157,6 +185,9 @@ Config.Impl.typeDefs = {
 		end,
 		resolve = function(derived, key, value)
 			derived[key] = value
+		end,
+		format = function(value)
+			return tostring(value)
 		end,
 	},
 
@@ -168,6 +199,9 @@ Config.Impl.typeDefs = {
 		resolve = function(derived, key, value)
 			derived[key] = value
 		end,
+		format = function(value)
+			return value
+		end,
 	},
 
 	table = {
@@ -176,6 +210,9 @@ Config.Impl.typeDefs = {
 		end,
 		resolve = function(derived, key, value)
 			derived[key] = value
+		end,
+		format = function(value)
+			return "table"
 		end,
 	},
 
@@ -200,6 +237,9 @@ Config.Impl.typeDefs = {
 				derived[key .. "Rel"] = 0
 			end
 		end,
+		format = function(value)
+			return value
+		end,
 	},
 
 	color = {
@@ -208,6 +248,9 @@ Config.Impl.typeDefs = {
 		end,
 		resolve = function(derived, key, value)
 			derived[key] = CreateColorFromHexString(value)
+		end,
+		format = function(value)
+			return value
 		end,
 	},
 
@@ -231,10 +274,14 @@ Config.Impl.typeDefs = {
 				size   = size
 			}
 		end,
+		format = function(value)
+			return "font"
+		end,
 	},
 }
 
--- TODO: Support config types nested inside a table (e.g. the color mixin in a color table)
+-- TODO: Consider removing the format function
 -- TODO: How can we support ordering or grouping for a settings UI?
+-- TODO: Support config types nested inside a table (e.g. the color mixin in a color table)
 -- TODO: Parse color tables without checking every individual key
 -- TODO: Validate user nodes without erroring or discarding them

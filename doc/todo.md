@@ -1,5 +1,6 @@
 To Do
 -----
+Erase saved vars
 Procedurally fill settings
 	Default to empty row content
 	Create components as needed
@@ -8,6 +9,7 @@ Settings
 	Show in built-in Options > Addons?
 	Edit Mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
 	Implement search
+	Put file earlier in toc
 Profile performance
 	Appears to be a memory leak
 ----
