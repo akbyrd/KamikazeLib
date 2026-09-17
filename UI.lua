@@ -371,7 +371,7 @@ function UI.Label:ApplyRect()
 	-- do this as a separate step and don't modify the stored position because we don't want the
 	-- rendering fix to infect other layout concerns.
 	self.Text:SetSize(self.xSize, self.ySize)
-	self.Text:SetPointsOffset(self.xPos + 0.5, self.yPos + 0.5)
+	self.Text:SetPointsOffset(self.xPos + 0.25, self.yPos + 0.25)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -441,7 +441,7 @@ function UI.IconButton:ApplyRect()
 	UI.Component.ApplyRect(self)
 
 	local xStringPos, yStringPos = Util.CenterIcon(s.font.info, self.xSize, self.ySize, s.font.size)
-	self.FontString:SetPointsOffset(xStringPos + 0.5, yStringPos + 0.5)
+	self.FontString:SetPointsOffset(xStringPos + 0.25, yStringPos + 0.25)
 end
 
 ----------------------------------------------------------------------------------------------------
