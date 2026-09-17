@@ -130,8 +130,9 @@ function Settings.Load()
 	for key, decl, branch, node in Config.Enumerate(Kami.CDM2.cfgTree, iterBranch) do
 		local row = UI.Row.Create(Settings.Window.Content, Settings.cfgTree,
 			{
-				name = "Row",
-				text = key,
+				name     = "Row",
+				text     = key,
+				xStretch = 1,
 			})
 		row.Region:SetPoint("TOPLEFT")
 		table.insert(Settings.Window.Content.Children, row)
@@ -156,9 +157,9 @@ function Settings.Load()
 
 		local value = UI.Label.Create(row.Content, Settings.cfgTree,
 			{
-				name     = "Value",
-				text     = Config.Format(decl),
-				xStretch = 1,
+				name   = "Value",
+				text   = Config.Format(decl),
+				xAlign = 0.5,
 			})
 		value.Region:SetPoint("TOPLEFT")
 		table.insert(row.Content.Children, value)

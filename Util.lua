@@ -136,9 +136,7 @@ end
 
 -- TODO: Do we need to restrict to integers?
 function Util.SameParity(x, y)
-	local xParity = x % 2
-	local yParity = y % 2
-	return y - (xParity - yParity)
+	return y - abs(y - x) % 2
 end
 
 function Util.CenterIcon(font, xFrameSize, yFrameSize, fontSize)

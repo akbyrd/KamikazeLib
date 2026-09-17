@@ -36,6 +36,10 @@ end
 -- Component
 
 UI.Component = {
+	style    = nil,
+	Region   = nil,
+	xSize    = nil,
+	ySize    = nil,
 	xStretch = 0,
 	yStretch = 0,
 	xAlign   = 0,
@@ -43,28 +47,37 @@ UI.Component = {
 }
 UI.Component.__index = UI.Component
 
-function UI.Component:Place(xCellPos, yCellPos, xCellSize, yCellSize)
-	self.xSize = Round(self.xSize + max(0, xCellSize - self.xSize) * self.xStretch)
-	self.ySize = Round(self.ySize + max(0, yCellSize - self.ySize) * self.yStretch)
-	self:ConstrainSize()
-	self.Region:SetSize(self.xSize, self.ySize)
+function UI.Component:ExpandRect(xCellPos, yCellPos, xCellSize, yCellSize)
+	local xExtra = max(0, xCellSize - self.xSize)
+	local yExtra = max(0, yCellSize - self.ySize)
+	self.xSize = self.xSize + xExtra * self.xStretch
+	self.ySize = self.ySize + yExtra * self.yStretch
+	self.xPos  = xCellPos + self.xAlign * xExtra * (1 - self.xStretch)
+	self.yPos  = yCellPos - self.yAlign * yExtra * (1 - self.yStretch)
+end
 
-	self.xPos = Round(xCellPos + max(0, xCellSize - self.xSize) * self.xAlign)
-	self.yPos = Round(yCellPos - max(0, yCellSize - self.ySize) * self.yAlign)
+function UI.Component:RoundRect()
+	local xPos = Round(self.xPos)
+	local yPos = Round(self.yPos)
+	self.xSize = 0 + (Round(self.xPos + self.xSize) - xPos)
+	self.ySize = 0 - (Round(self.yPos - self.ySize) - yPos)
+	self.xPos  = xPos
+	self.yPos  = yPos
+end
+
+function UI.Component:ApplyRect()
+	self.Region:SetSize(self.xSize, self.ySize)
 	self.Region:SetPointsOffset(self.xPos, self.yPos)
 end
 
-function UI.Component:ConstrainSize()
+function UI.Component:ArrangeChildren()
 end
 
-function UI.AdjustString(string, xPos, yPos)
-	-- NOTE: Strings have their position floored to pixel positions before rendering. Floating point
-	-- noise from the scale chain causes tiny shifts above and below the desired integer value. A
-	-- half pixel offset turns the floor into a round. This fixes the position jitter visible on
-	-- strings, which is most obvious during dragging. Textures round and don't need the same fix. We
-	-- do this as a separate step and don't modify the stored position because we don't want the
-	-- rendering fix to infect other layout concerns.
-	string:SetPointsOffset(xPos + 0.5, yPos + 0.5)
+function UI.Component:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
+	self:ExpandRect(xCellPos, yCellPos, xCellSize, yCellSize)
+	self:RoundRect()
+	self:ApplyRect()
+	self:ArrangeChildren()
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -133,14 +146,14 @@ function UI.Window:Measure(xTargetSize, yTargetSize)
 	self.Close:Measure(UI.NO_LIMIT, UI.NO_LIMIT)
 
 	local cxTargetSize = s.xSize - 2 * s.padSize
-	local cyTargetSize = s.ySize - 3 * s.padSize - self.Close.ySize
+	local cyTargetSize = s.ySize - 3 * s.padSize - max(self.Title.ySize, self.Close.ySize)
 	self.Content:Measure(cxTargetSize, cyTargetSize)
 
 	self.xSize = s.xSize
 	self.ySize = s.ySize
 end
 
-function UI.Window:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
+function UI.Window:Arrange(xPos, yPos, xSize, ySize)
 	local s = self.style
 
 	self.Frame:SetSize(self.xSize, self.ySize)
@@ -151,20 +164,25 @@ function UI.Window:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
 	self.Frame:SetBackdropColor(s.backgroundColor:GetRGBA())
 	self.Frame:SetBackdropBorderColor(s.borderColor:GetRGBA())
 
-	local xPos  = s.padSize
-	local xSize = self.xSize - 2 * s.padSize
+	self:ArrangeChildren()
+end
+
+function UI.Window:ArrangeChildren()
+	local s = self.style
+	local cxPos  = s.padSize
+	local cxSize = self.xSize - 2 * s.padSize
 
 	local yTitlePos  = -s.padSize
 	local yTitleSize = self.Title.ySize
-	self.Title:Arrange(xPos, yTitlePos, xSize, yTitleSize)
+	self.Title:Arrange(cxPos, yTitlePos, cxSize, yTitleSize)
 
 	local yCloseSize = self.Close.ySize
-	self.Close:Arrange(xPos, yTitlePos, xSize, yCloseSize)
+	self.Close:Arrange(cxPos, yTitlePos, cxSize, yCloseSize)
 
 	local yHeaderSize  = max(yTitleSize, yCloseSize)
 	local yContentPos  = 0          - 2 * s.padSize - yHeaderSize
 	local yContentSize = self.ySize - 3 * s.padSize - yHeaderSize
-	self.Content:Arrange(xPos, yContentPos, xSize, yContentSize)
+	self.Content:Arrange(cxPos, yContentPos, cxSize, yContentSize)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -207,10 +225,8 @@ function UI.Row:Measure(xTargetSize, yTargetSize)
 	self.ySize = max(s.ySize, self.Label.ySize, self.Content.ySize)
 end
 
-function UI.Row:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
+function UI.Row:ArrangeChildren()
 	local s = self.style
-	self:Place(xCellPos, yCellPos, xCellSize, yCellSize)
-
 	self.Label:Arrange(0, 0, s.labelWidth, self.ySize)
 	self.Content:Arrange(s.labelWidth, 0, self.xSize - s.labelWidth, self.ySize)
 end
@@ -247,6 +263,8 @@ function UI.Stack:Measure(xTargetSize, yTargetSize)
 
 	self.xSize = 0
 	self.ySize = 0
+	self.xStretchSum = 0
+	self.yStretchSum = 0
 
 	local xLargest = 0
 	local yLargest = 0
@@ -258,27 +276,59 @@ function UI.Stack:Measure(xTargetSize, yTargetSize)
 
 		self.xSize = self.xSize + child.xSize
 		self.ySize = self.ySize + child.ySize
+		self.xStretchSum = self.xStretchSum + child.xStretch
+		self.yStretchSum = self.yStretchSum + child.yStretch
 	end
 
 	local gapSize = s.gapSize * max(0, #self.Children - 1)
 	self.xSize = self.xDir ~= 0 and self.xSize + gapSize or xLargest
 	self.ySize = self.yDir ~= 0 and self.ySize + gapSize or yLargest
+
+	self.xContent = self.xSize
+	self.yContent = self.ySize
 end
 
-function UI.Stack:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
+function UI.Stack:ArrangeChildren()
 	local s = self.style
-	self:Place(xCellPos, yCellPos, xCellSize, yCellSize)
 
-	local cxPos  = 0
-	local cyPos  = 0
+	-- TODO: Remove this max guard when window supports scrolling
+	local xExtra        = max(0, self.xSize - self.xContent)
+	local yExtra        = max(0, self.ySize - self.yContent)
+	local xStretchExtra = xExtra / max(1, self.xStretchSum)
+	local yStretchExtra = yExtra / max(1, self.yStretchSum)
+	local xAlignExtra   = xExtra - xStretchExtra * self.xStretchSum
+	local yAlignExtra   = yExtra - yStretchExtra * self.yStretchSum
+
+	local pxPos   = 0
+	local pyPos   = 0
+	local pxAlign = 0
+	local pyAlign = 0
 
 	for i, child in ipairs(self.Children) do
-		local cxSize = self.xDir ~= 0 and child.xSize or self.xSize
-		local cySize = self.yDir ~= 0 and child.ySize or self.ySize
-		child:Arrange(cxPos, cyPos, cxSize, cySize)
+		local cxContent = child.xSize
+		local cyContent = child.ySize
+		child:ExpandRect(0, 0, self.xSize, self.ySize)
 
-		cxPos = cxPos + (child.xSize + s.gapSize) * self.xDir
-		cyPos = cyPos - (child.ySize + s.gapSize) * self.yDir
+		-- TODO: A direction of -1 no longer works as a sign
+		if self.xDir ~= 0 then
+			local cxAlign = max(pxAlign, child.xAlign)
+			child.xSize = cxContent + child.xStretch * xStretchExtra
+			child.xPos  = pxPos + (cxAlign - pxAlign) * xAlignExtra
+			pxPos   = child.xPos + child.xSize + s.gapSize
+			pxAlign = cxAlign
+		end
+
+		if self.yDir ~= 0 then
+			local cyAlign = max(pyAlign, child.yAlign)
+			child.ySize = cyContent + child.yStretch * yStretchExtra
+			child.yPos  = pyPos - (cyAlign - pyAlign) * yAlignExtra
+			pyPos   = child.yPos - child.ySize - s.gapSize
+			pyAlign = cyAlign
+		end
+
+		child:RoundRect()
+		child:ApplyRect()
+		child:ArrangeChildren()
 	end
 end
 
@@ -309,13 +359,19 @@ function UI.Label:Measure(xTargetSize, yTargetSize)
 	-- NOTE: There's no way to measure wrapping without mutating the string.
 	self.Text:SetWidth(xTargetSize == UI.NO_LIMIT and 0 or xTargetSize)
 
-	self.xSize = min(xTargetSize, self.Text:GetUnboundedStringWidth())
-	self.ySize = self.Text:GetStringHeight()
+	self.xSize = min(xTargetSize, ceil(self.Text:GetUnboundedStringWidth()))
+	self.ySize = ceil(self.Text:GetStringHeight())
 end
 
-function UI.Label:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
-	self:Place(xCellPos, yCellPos, xCellSize, yCellSize)
-	UI.AdjustString(self.Text, self.xPos, self.yPos)
+function UI.Label:ApplyRect()
+	-- NOTE: Strings have their position floored to pixel positions before rendering. Floating point
+	-- noise from the scale chain causes tiny shifts above and below the desired integer value. A
+	-- half pixel offset turns the floor into a round. This fixes the position jitter visible on
+	-- strings, which is most obvious during dragging. Textures round and don't need the same fix. We
+	-- do this as a separate step and don't modify the stored position because we don't want the
+	-- rendering fix to infect other layout concerns.
+	self.Text:SetSize(self.xSize, self.ySize)
+	self.Text:SetPointsOffset(self.xPos + 0.5, self.yPos + 0.5)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -346,6 +402,7 @@ function UI.IconButton.Create(parent, cfgTree, args)
 	ht:SetVertexColor(self.style.hoverColor:GetRGBA())
 	ht:ClearAllPoints()
 
+	-- TODO: Try wrapping this in a label
 	self.FontString = self.Button:GetFontString()
 	self.FontString:ClearAllPoints()
 	self.FontString:SetPoint("TOPLEFT")
@@ -354,25 +411,15 @@ function UI.IconButton.Create(parent, cfgTree, args)
 	return self
 end
 
-function UI.IconButton:ConstrainSize()
-	local s = self.style
-	self.xSize = Util.SameParity(s.font.size, self.xSize)
-	self.ySize = Util.SameParity(s.font.size, self.ySize)
-end
-
 function UI.IconButton:Measure(xTargetSize, yTargetSize)
 	local s = self.style
-	self.xSize = s.xSize
-	self.ySize = s.ySize
-	self:ConstrainSize()
+	self.xSize = Util.SameParity(s.font.size, s.xSize)
+	self.ySize = Util.SameParity(s.font.size, s.ySize)
 end
 
 function UI.IconButton:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
 	local s = self.style
-	self:Place(xCellPos, yCellPos, xCellSize, yCellSize)
-
-	local xPos, yPos = Util.CenterIcon(s.font.info, self.xSize, self.ySize, s.font.size)
-	UI.AdjustString(self.FontString, xPos, yPos)
+	UI.Component.Arrange(self, xCellPos, yCellPos, xCellSize, yCellSize)
 
 	self.Button:SetBackdrop({
 		bgFile   = s.backgroundTexture,
@@ -385,6 +432,16 @@ function UI.IconButton:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
 	local ht = self.Button:GetHighlightTexture()
 	ht:SetPoint("TOPLEFT",      s.borderSize, -s.borderSize)
 	ht:SetPoint("BOTTOMRIGHT", -s.borderSize,  s.borderSize)
+end
+
+function UI.IconButton:ApplyRect()
+	local s = self.style
+	self.xSize = Util.SameParity(s.font.size, self.xSize)
+	self.ySize = Util.SameParity(s.font.size, self.ySize)
+	UI.Component.ApplyRect(self)
+
+	local xStringPos, yStringPos = Util.CenterIcon(s.font.info, self.xSize, self.ySize, s.font.size)
+	self.FontString:SetPointsOffset(xStringPos + 0.5, yStringPos + 0.5)
 end
 
 ----------------------------------------------------------------------------------------------------
