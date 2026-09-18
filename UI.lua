@@ -9,7 +9,7 @@ local Util   = Kami.Util
 -- NOTE: We assume frames are not re-anchored unexpectedly. No unnecessary ClearAllPoints.
 -- NOTE: The caller is responsible for anchoring, not Create (unless it's an internal component).
 -- NOTE: SetPointsOffset is used for positioning to avoid repeating anchors.
--- NOTE: Arrange may pass a larger size, but never a smaller size.
+-- NOTE: Place may pass a larger size, but never a smaller one.
 
 ----------------------------------------------------------------------------------------------------
 -- Constants
@@ -70,14 +70,14 @@ function UI.Component:ApplyRect()
 	self.Region:SetPointsOffset(self.xPos, self.yPos)
 end
 
-function UI.Component:ArrangeChildren()
+function UI.Component:Arrange()
 end
 
-function UI.Component:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
+function UI.Component:Place(xCellPos, yCellPos, xCellSize, yCellSize)
 	self:ExpandRect(xCellPos, yCellPos, xCellSize, yCellSize)
 	self:RoundRect()
 	self:ApplyRect()
-	self:ArrangeChildren()
+	self:Arrange()
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -153,7 +153,7 @@ function UI.Window:Measure(xTargetSize, yTargetSize)
 	self.ySize = s.ySize
 end
 
-function UI.Window:Arrange(xPos, yPos, xSize, ySize)
+function UI.Window:Arrange()
 	local s = self.style
 
 	self.Frame:SetSize(self.xSize, self.ySize)
@@ -164,25 +164,20 @@ function UI.Window:Arrange(xPos, yPos, xSize, ySize)
 	self.Frame:SetBackdropColor(s.backgroundColor:GetRGBA())
 	self.Frame:SetBackdropBorderColor(s.borderColor:GetRGBA())
 
-	self:ArrangeChildren()
-end
-
-function UI.Window:ArrangeChildren()
-	local s = self.style
 	local cxPos  = s.padSize
 	local cxSize = self.xSize - 2 * s.padSize
 
 	local yTitlePos  = -s.padSize
 	local yTitleSize = self.Title.ySize
-	self.Title:Arrange(cxPos, yTitlePos, cxSize, yTitleSize)
+	self.Title:Place(cxPos, yTitlePos, cxSize, yTitleSize)
 
 	local yCloseSize = self.Close.ySize
-	self.Close:Arrange(cxPos, yTitlePos, cxSize, yCloseSize)
+	self.Close:Place(cxPos, yTitlePos, cxSize, yCloseSize)
 
 	local yHeaderSize  = max(yTitleSize, yCloseSize)
 	local yContentPos  = 0          - 2 * s.padSize - yHeaderSize
 	local yContentSize = self.ySize - 3 * s.padSize - yHeaderSize
-	self.Content:Arrange(cxPos, yContentPos, cxSize, yContentSize)
+	self.Content:Place(cxPos, yContentPos, cxSize, yContentSize)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -225,10 +220,10 @@ function UI.Row:Measure(xTargetSize, yTargetSize)
 	self.ySize = max(s.ySize, self.Label.ySize, self.Content.ySize)
 end
 
-function UI.Row:ArrangeChildren()
+function UI.Row:Arrange()
 	local s = self.style
-	self.Label:Arrange(0, 0, s.labelWidth, self.ySize)
-	self.Content:Arrange(s.labelWidth, 0, self.xSize - s.labelWidth, self.ySize)
+	self.Label:Place(0, 0, s.labelWidth, self.ySize)
+	self.Content:Place(s.labelWidth, 0, self.xSize - s.labelWidth, self.ySize)
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -288,7 +283,7 @@ function UI.Stack:Measure(xTargetSize, yTargetSize)
 	self.yContent = self.ySize
 end
 
-function UI.Stack:ArrangeChildren()
+function UI.Stack:Arrange()
 	local s = self.style
 
 	-- TODO: Remove this max guard when window supports scrolling
@@ -328,7 +323,7 @@ function UI.Stack:ArrangeChildren()
 
 		child:RoundRect()
 		child:ApplyRect()
-		child:ArrangeChildren()
+		child:Arrange()
 	end
 end
 
@@ -417,9 +412,15 @@ function UI.IconButton:Measure(xTargetSize, yTargetSize)
 	self.ySize = Util.SameParity(s.font.size, s.ySize)
 end
 
-function UI.IconButton:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
+function UI.IconButton:RoundRect()
 	local s = self.style
-	UI.Component.Arrange(self, xCellPos, yCellPos, xCellSize, yCellSize)
+	UI.Component.RoundRect(self)
+	self.xSize = Util.SameParity(s.font.size, self.xSize)
+	self.ySize = Util.SameParity(s.font.size, self.ySize)
+end
+
+function UI.IconButton:Arrange()
+	local s = self.style
 
 	self.Button:SetBackdrop({
 		bgFile   = s.backgroundTexture,
@@ -432,16 +433,76 @@ function UI.IconButton:Arrange(xCellPos, yCellPos, xCellSize, yCellSize)
 	local ht = self.Button:GetHighlightTexture()
 	ht:SetPoint("TOPLEFT",      s.borderSize, -s.borderSize)
 	ht:SetPoint("BOTTOMRIGHT", -s.borderSize,  s.borderSize)
-end
-
-function UI.IconButton:ApplyRect()
-	local s = self.style
-	self.xSize = Util.SameParity(s.font.size, self.xSize)
-	self.ySize = Util.SameParity(s.font.size, self.ySize)
-	UI.Component.ApplyRect(self)
 
 	local xStringPos, yStringPos = Util.CenterIcon(s.font.info, self.xSize, self.ySize, s.font.size)
 	self.FontString:SetPointsOffset(xStringPos + 0.25, yStringPos + 0.25)
+end
+
+----------------------------------------------------------------------------------------------------
+-- Checkbox
+
+UI.Checkbox = setmetatable({}, { __index = UI.Component })
+UI.Checkbox.__index = UI.Checkbox
+
+function UI.Checkbox.Create(parent, cfgTree, args)
+	local self = setmetatable({}, UI.Checkbox)
+	self.style    = Config.GetBranch(cfgTree, args.styleName or "Checkbox")
+	self.xAlign   = args.xAlign
+	self.yAlign   = args.yAlign
+	self.xStretch = args.xStretch
+	self.yStretch = args.yStretch
+
+	self.Button = CreateFrame("Button", nil, parent.Region, "BackdropTemplate")
+	self.Button:SetParentKey(args.name)
+	self.Button:RegisterForClicks("LeftButtonDown")
+	-- TODO: This should probably be driven by the current value, in case validation prevents a change
+	self.Button:SetScript("OnClick", function()
+		self.Fill:SetShown(not self.Fill:IsShown())
+	end)
+	self.Button:SetHighlightTexture(self.style.hoverTexture, "BLEND")
+
+	local ht = self.Button:GetHighlightTexture()
+	ht:SetVertexColor(self.style.hoverColor:GetRGBA())
+	ht:ClearAllPoints()
+
+	self.Fill = self.Button:CreateTexture(nil, "OVERLAY")
+	self.Fill:SetColorTexture(self.style.accentColor:GetRGBA())
+	self.Fill:SetPoint("CENTER")
+	self.Fill:Hide()
+
+	self.Region = self.Button
+	return self
+end
+
+function UI.Checkbox:Measure(xTargetSize, yTargetSize)
+	local s = self.style
+	self.xSize = Util.SameParity(s.fillSize, s.xSize)
+	self.ySize = Util.SameParity(s.fillSize, s.ySize)
+end
+
+function UI.Checkbox:RoundRect()
+	local s = self.style
+	UI.Component.RoundRect(self)
+	self.xSize = Util.SameParity(s.fillSize, self.xSize)
+	self.ySize = Util.SameParity(s.fillSize, self.ySize)
+end
+
+function UI.Checkbox:Arrange()
+	local s = self.style
+
+	self.Button:SetBackdrop({
+		bgFile   = s.backgroundTexture,
+		edgeFile = s.backgroundTexture,
+		edgeSize = s.borderSize,
+		insets   = { left = s.borderSize, right = s.borderSize, top = s.borderSize, bottom = s.borderSize } })
+	self.Button:SetBackdropColor(s.backgroundColor:GetRGBA())
+	self.Button:SetBackdropBorderColor(s.borderColor:GetRGBA())
+
+	local ht = self.Button:GetHighlightTexture()
+	ht:SetPoint("TOPLEFT",      s.borderSize, -s.borderSize)
+	ht:SetPoint("BOTTOMRIGHT", -s.borderSize,  s.borderSize)
+
+	self.Fill:SetSize(s.fillSize, s.fillSize)
 end
 
 ----------------------------------------------------------------------------------------------------

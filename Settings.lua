@@ -36,6 +36,7 @@ function Settings.Load()
 			borderColor       = Config.Color("0FFFFFFF"),
 			backgroundTexture = Config.String("Interface\\Buttons\\WHITE8x8"),
 			backgroundColor   = Config.Color("FA1C1C1C"),
+			accentColor       = Config.Color("FFFFCC00"),
 			padSize           = Config.UISize(rootSize, -7),
 			font              = Config.Font({
 				info   = textFont,
@@ -111,6 +112,12 @@ function Settings.Load()
 			hoverColor = Config.Color("80E64D4D"),
 		})
 
+	Config.AddNode(Settings.cfgTree, "Button", "Checkbox",
+		{
+			backgroundColor = Config.Color("73000000"),
+			fillSize        = Config.UISize(rootSize, -8),
+		})
+
 	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
 	Config.RefreshValues(Settings.cfgTree, pixelsToUI)
 
@@ -147,10 +154,19 @@ function Settings.Load()
 			})
 		row.Content.Region:SetPoint("TOPLEFT")
 
+		local override = UI.Checkbox.Create(row.Content, Settings.cfgTree,
+			{
+				name   = "Override",
+				yAlign = 0.5,
+			})
+		override.Region:SetPoint("TOPLEFT")
+		table.insert(row.Content.Children, override)
+
 		local source = UI.Label.Create(row.Content, Settings.cfgTree,
 			{
-				name = "Source",
-				text = branch,
+				name   = "Source",
+				text   = branch,
+				yAlign = 0.5,
 			})
 		source.Region:SetPoint("TOPLEFT")
 		table.insert(row.Content.Children, source)
@@ -160,6 +176,7 @@ function Settings.Load()
 				name   = "Value",
 				text   = Config.Format(decl),
 				xAlign = 0.5,
+				yAlign = 0.5,
 			})
 		value.Region:SetPoint("TOPLEFT")
 		table.insert(row.Content.Children, value)
@@ -168,7 +185,7 @@ function Settings.Load()
 	-- TODO: Do we need to refresh scale?
 	--UI.RefreshScale()
 	Settings.Window:Measure(UI.NO_LIMIT, UI.NO_LIMIT)
-	Settings.Window:Arrange(0, 0, UI.NO_LIMIT, UI.NO_LIMIT)
+	Settings.Window:Arrange()
 	Settings.Window.Region:Hide()
 end
 
@@ -178,7 +195,7 @@ function Settings.RefreshScale()
 
 	UI.RefreshScale()
 	Settings.Window:Measure(UI.NO_LIMIT, UI.NO_LIMIT)
-	Settings.Window:Arrange(0, 0, UI.NO_LIMIT, UI.NO_LIMIT)
+	Settings.Window:Arrange()
 end
 
 function Settings.Toggle()
