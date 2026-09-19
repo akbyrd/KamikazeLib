@@ -515,7 +515,6 @@ function CDM.RefreshAllSizes()
 		local iconAspect = cfg.iconAspect
 
 		local xScale, yScale = Util.AspectScale(iconAspect)
-		vState.iconSize = iconSize -- TODO: Why do we need this?
 		vState.xSize    = Round(xScale * iconSize)
 		vState.ySize    = Round(yScale * iconSize)
 
@@ -551,10 +550,11 @@ function CDM.RefreshAllPositions()
 	local pxSize, pySize = GetPhysicalScreenSize()
 
 	for category, vState in pairs(CDM.viewers) do
-		local cfg     = vState.cfg
-		local vxPos   = Round(cfg.xPos    + cfg.xPosRel    * pxSize)
-		local vyPos   = Round(cfg.yPos    + cfg.yPosRel    * pySize)
-		local iconPad = Round(cfg.iconPad + cfg.iconPadRel * vState.iconSize)
+		local cfg      = vState.cfg
+		local vxPos    = Round(cfg.xPos     + cfg.xPosRel     * pxSize)
+		local vyPos    = Round(cfg.yPos     + cfg.yPosRel     * pySize)
+		local iconSize = Round(cfg.iconSize + cfg.iconSizeRel * pySize)
+		local iconPad  = Round(cfg.iconPad  + cfg.iconPadRel  * iconSize)
 
 		local iRow = 1
 		local iCol = 1
