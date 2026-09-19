@@ -15,7 +15,6 @@ function CDM.Load()
 
 	-- TODO: Rename profile?
 	-- TODO: Rename lastSource
-	-- TODO: Rename Base to Default?
 	CDM.savedVars.profile   = CDM.savedVars.profile   or {}
 	CDM.charVars.lastSource = CDM.charVars.lastSource or {}
 
@@ -161,12 +160,10 @@ function CDM.Load()
 		[1711] = "Interface/ICONS/Warlock_ Healthstone",
 		[2566] = "Interface/ICONS/Warlock_ Bloodstone",
 	}
-	CDM.mousePresses   = {}
-	CDM.spellPresses   = {}
-	CDM.pressCounts    = {}
-	CDM.dirty = { -- TODO: No longer needs to be a table
-		cooldown = false,
-	}
+	CDM.mousePresses        = {}
+	CDM.spellPresses        = {}
+	CDM.pressCounts         = {}
+	CDM.refreshAllCooldowns = false
 
 	local cdTypeface = LSM:Fetch("font", "PT Sans Narrow")
 	local chargeTypeface = LSM:Fetch("font", "Homespun")
@@ -185,8 +182,8 @@ function CDM.Load()
 end
 
 function CDM.Update()
-	if CDM.dirty.cooldown then
-		CDM.dirty.cooldown = false
+	if CDM.refreshAllCooldowns then
+		CDM.refreshAllCooldowns = false
 		CDM.RefreshAllCooldowns()
 	end
 
@@ -844,7 +841,7 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 	local fState = CDM.categoryLookup[category]
 	if fState then
 		if fState.spellID ~= spellID then
-			-- TODO: Do we need to save this to a account saved vars too?
+			-- TODO: Do we need to save this to an account saved vars too?
 			CDM.charVars.lastSource[category] = spellID
 			CDM.RefreshCategory(fState, spellID)
 			CDM.RefreshIcon(fState)
@@ -853,7 +850,7 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 
 	local startGCD = startRecoveryCategory == Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY
 	if startGCD or not spellID then
-		CDM.dirty.cooldown = true
+		CDM.refreshAllCooldowns = true
 	else
 		-- NOTE: Supposedly this event can arrive before the override event, so we need to check base
 		local fState = CDM.spellLookup[spellID] or CDM.spellLookup[baseSpellID]
