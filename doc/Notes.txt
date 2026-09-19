@@ -111,3 +111,49 @@ Aspect Ratios
 Essential - 1.65
 Utility   - 1.27
 Buff Bars - 1.5
+
+
+
+Cooldown Manager Control
+------------------------
+Mostly abandoned
+Got completely rewritten and sucks now
+Can't control row wrapping well
+No button press overlay
+No assistant highlight
+Can't anchor buff bar width to cooldowns
+Desaturation doesn't work properly on trinkets
+Bar color override linked to unrelated settings
+Can't track racial
+
+
+
+ClassUIEnhanced
+---------------
+Buggy as hell
+Can't track racial
+Can't track health potion / healthstone
+Can't change assistant highlight type
+Borders are uneven
+Mediocre control over row count
+Can't have non-square icons on bars
+Custom spell don't match style
+Can't reorder custom spells
+
+
+
+Ellesmere Cooldown Manager
+--------------------------
+Can't change assistant highlight type
+No button press overlay (Bug, there's a setting for it "Mirror Key Presses)
+Can't set highlight color
+Can't make rectangular icons
+
+
+
+Action Bars
+-----------
+Will it auto-center when button count changes?
+Won't get press highlight
+Doesn't work as well for utility bar
+Use unit frame aura bars for buff bars?

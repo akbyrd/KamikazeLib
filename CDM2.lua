@@ -30,7 +30,6 @@ function CDM.Load()
 			iconZoom   = Config.Number(0.08),
 			iconAspect = Config.Number(1.65),
 			iconPad    = Config.Size("1ui"),
-			iconLimit  = Config.Number(6),
 
 			usableColor   = Config.Color("FFFFFFFF"),
 			noManaColor   = Config.Color("FF8080FF"),
@@ -53,12 +52,15 @@ function CDM.Load()
 			assistColor = Config.Color("FF3399F2"),
 			assistSize  = Config.Size("1ui"),
 
-			procSize     = Config.Size("2ui"),
+			procSize     = Config.Size("1ui"),
 			procInset    = Config.Size("0ui"),
 			procColor    = Config.Color("FFFFFF00"),
 			procSpeed    = Config.Number(0.30),
 			procSegments = Config.Number(2),
 			procDuty     = Config.Number(0.6),
+
+			rowLimit  = Config.Number(6),
+			rowLimits = Config.Table({}),
 		})
 
 	Config.AddNode(CDM.cfgTree, "Default", "Essential",
@@ -68,8 +70,9 @@ function CDM.Load()
 
 	Config.AddNode(CDM.cfgTree, "Default", "Utility",
 		{
-			yPos     = Config.Size("-324ui"),
-			iconSize = Config.Size("30ui"),
+			yPos      = Config.Size("-310ui"),
+			iconSize  = Config.Size("30ui"),
+			rowLimits = Config.Table({ 4 }),
 		})
 
 	for branch, values in pairs(CDM.savedVars.profile) do
@@ -116,15 +119,17 @@ function CDM.Load()
 		Root:SetParentKey(("Kami.CDM.%s.Root"):format(categoryName))
 
 		local vState = {
-			name     = categoryName,
-			cfg      = Config.GetBranch(CDM.cfgTree, categoryName),
-			Root     = Root,
-			pool     = {},
-			cdvInfos = {},
-			cdFrames = {},
-			iconSize = nil,
-			xSize    = nil,
-			ySize    = nil,
+			name        = categoryName,
+			cfg         = Config.GetBranch(CDM.cfgTree, categoryName),
+			Root        = Root,
+			pool        = {},
+			cdvInfos    = {},
+			cdFrames    = {},
+			maxRowCount = 0,
+			rowCounts   = {},
+			iconSize    = nil,
+			xSize       = nil,
+			ySize       = nil,
 		}
 		CDM.viewers[category] = vState
 	end
@@ -192,8 +197,8 @@ function CDM.Rebuild()
 	print("Kami CDM Rebuild")
 
 	CDM.GatherCDs()
-	CDM.AssignFrames()
 	CDM.RefreshScale()
+	CDM.AssignFrames()
 	CDM.RefreshAllConfig()
 	CDM.RefreshAllSizes()
 	CDM.RefreshAllPositions()
@@ -448,6 +453,19 @@ function CDM.AssignFrames()
 				CDM.spellLookup[cdvInfo.spellID] = fState
 			end
 		end
+
+		-- Cache raw counts
+		vState.maxRowCount = 0
+		wipe(vState.rowCounts)
+		local remaining = #vState.cdFrames
+		while remaining > 0 do
+			local rowLimit = vState.cfg.rowLimits[#vState.rowCounts + 1] or vState.cfg.rowLimit
+			local nRow = min(remaining, rowLimit)
+
+			vState.maxRowCount = max(vState.maxRowCount, nRow)
+			table.insert(vState.rowCounts, nRow)
+			remaining = remaining - nRow
+		end
 	end
 end
 
@@ -533,35 +551,34 @@ function CDM.RefreshAllPositions()
 	local pxSize, pySize = GetPhysicalScreenSize()
 
 	for category, vState in pairs(CDM.viewers) do
-		local cfg       = vState.cfg
-		local xPos      = Round(cfg.xPos    + cfg.xPosRel    * pxSize)
-		local yPos      = Round(cfg.yPos    + cfg.yPosRel    * pySize)
-		local iconPad   = Round(cfg.iconPad + cfg.iconPadRel * vState.iconSize)
-		local iconLimit = cfg.iconLimit
+		local cfg     = vState.cfg
+		local vxPos   = Round(cfg.xPos    + cfg.xPosRel    * pxSize)
+		local vyPos   = Round(cfg.yPos    + cfg.yPosRel    * pySize)
+		local iconPad = Round(cfg.iconPad + cfg.iconPadRel * vState.iconSize)
 
+		local iRow = 1
+		local iCol = 1
 		local mxPos = 0
 		local myPos = 0
 
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			local iCol = (iFrame - 1) % iconLimit
-			local iRow = floor((iFrame - 1) / iconLimit)
+			local rowCount = vState.rowCounts[iRow]
+			local rxSize   = rowCount           * (vState.xSize + iconPad) - iconPad
+			local mxSize   = vState.maxRowCount * (vState.xSize + iconPad) - iconPad
+			local cxPos    = Round((mxSize - rxSize) / 2)
 
-			local nRow   = min(iconLimit, #vState.cdFrames - (iRow * iconLimit))
-			local nMax   = min(iconLimit, #vState.cdFrames)
-			local rxSize = nRow * (vState.xSize + iconPad) - iconPad
-			local lxSize = nMax * (vState.xSize + iconPad) - iconPad
-			local cxPos  = Round((lxSize - rxSize) / 2)
-
-			local xPos = 0 + iCol * (vState.xSize + iconPad) + cxPos
-			local yPos = 0 - iRow * (vState.ySize + iconPad)
+			local xPos = 0 + (iCol - 1) * (vState.xSize + iconPad) + cxPos
+			local yPos = 0 - (iRow - 1) * (vState.ySize + iconPad)
 			fState.Root:SetPoint("TOPLEFT", vState.Root, "TOPLEFT", xPos, yPos)
 
-			mxPos = math.max(mxPos, xPos + vState.xSize)
-			myPos = math.min(myPos, yPos - vState.ySize)
+			iRow  = iRow + floor(iCol / rowCount)
+			iCol  = iCol % rowCount + 1
+			mxPos = max(mxPos, xPos + vState.xSize)
+			myPos = min(myPos, yPos - vState.ySize)
 		end
 
-		local vxPos = Round((0 + pxSize - mxPos) / 2 + xPos)
-		local vyPos = Round((0 - pySize - myPos) / 2 + yPos)
+		vxPos = Round((0 + pxSize - mxPos) / 2 + vxPos)
+		vyPos = Round((0 - pySize - myPos) / 2 + vyPos)
 		vState.Root:SetPoint("TOPLEFT", UIParent, "TOPLEFT", vxPos, vyPos)
 		vState.Root:SetSize(mxPos, -myPos)
 	end
