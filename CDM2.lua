@@ -30,7 +30,7 @@ function CDM.Load()
 			iconZoom   = Config.Number(0.08),
 			iconAspect = Config.Number(1.65),
 			iconPad    = Config.Size("1ui"),
-			iconLimit  = Config.Number(5),
+			iconLimit  = Config.Number(6),
 
 			usableColor   = Config.Color("FFFFFFFF"),
 			noManaColor   = Config.Color("FF8080FF"),
@@ -79,24 +79,25 @@ function CDM.Load()
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
-	CDM.eventFrame:SetScript("OnEvent",                         CDM.DispatchEvent)
-	CDM.eventFrame:SetScript("OnUpdate",                        CDM.Update)
-	CDM.RegisterEvent("UI_SCALE_CHANGED",                       CDM.OnScaleChanged)
-	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                   CDM.OnScaleChanged)
-	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                    CDM.RefreshAllUsable)
-	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                   CDM.PLAYER_REGEN_ENABLED)
-	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                  CDM.SPELL_UPDATE_COOLDOWN)
-	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",               CDM.SPELL_RANGE_CHECK_UPDATE)
-	CDM.RegisterEvent("GLOBAL_MOUSE_DOWN",                      CDM.GLOBAL_MOUSE_DOWN)
-	CDM.RegisterEvent("GLOBAL_MOUSE_UP",                        CDM.GLOBAL_MOUSE_UP)
-	CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",             CDM.CURRENT_SPELL_CAST_CHANGED)
-	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",     CDM.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
-	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",     CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
-	CDM.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED", CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
-	CDM.RegisterEvent("SPELL_UPDATE_ICON",                      CDM.SPELL_UPDATE_ICON)
-	CDM.RegisterEvent("SPELL_UPDATE_USES",                      CDM.SPELL_UPDATE_USES)
-	hooksecurefunc(UIParent, "SetScale",                        CDM.OnScaleChanged)
-	hooksecurefunc("SecureActionButton_OnClick",                CDM.OnClick)
+	CDM.eventFrame:SetScript("OnEvent",                              CDM.DispatchEvent)
+	CDM.eventFrame:SetScript("OnUpdate",                             CDM.Update)
+	CDM.RegisterEvent("UI_SCALE_CHANGED",                            CDM.OnScaleChanged)
+	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                        CDM.OnScaleChanged)
+	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                         CDM.RefreshAllUsable)
+	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                        CDM.PLAYER_REGEN_ENABLED)
+	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                       CDM.SPELL_UPDATE_COOLDOWN)
+	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",                    CDM.SPELL_RANGE_CHECK_UPDATE)
+	CDM.RegisterEvent("GLOBAL_MOUSE_DOWN",                           CDM.GLOBAL_MOUSE_DOWN)
+	CDM.RegisterEvent("GLOBAL_MOUSE_UP",                             CDM.GLOBAL_MOUSE_UP)
+	CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",                  CDM.CURRENT_SPELL_CAST_CHANGED)
+	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",          CDM.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
+	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",          CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
+	CDM.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED",      CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
+	CDM.RegisterEvent("SPELL_UPDATE_ICON",                           CDM.SPELL_UPDATE_ICON)
+	CDM.RegisterEvent("SPELL_UPDATE_USES",                           CDM.SPELL_UPDATE_USES)
+	hooksecurefunc(UIParent, "SetScale",                             CDM.OnScaleChanged)
+	hooksecurefunc("SecureActionButton_OnClick",                     CDM.OnClick)
+	CVarCallbackRegistry:RegisterCallback("assistedCombatHighlight", CDM.OnAssistChange, CDM)
 
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.OnCDMChanged)
@@ -188,6 +189,8 @@ function CDM.Update()
 end
 
 function CDM.Rebuild()
+	print("Kami CDM Rebuild")
+
 	CDM.GatherCDs()
 	CDM.AssignFrames()
 	CDM.RefreshScale()
@@ -754,10 +757,17 @@ function CDM.RefreshAllProcs()
 	end
 end
 
+function CDM.OnAssistChange()
+	CDM.showAssist = GetCVarBool("assistedCombatHighlight")
+	CDM.RefreshAssist()
+end
+
 function CDM.RefreshAssist()
+
 	local spellID     = C_AssistedCombat.GetNextCastSpell(false)
 	local fState      = spellID and CDM.spellLookup[spellID]
 	local baseSpellID = fState and fState.baseSpellID
+	baseSpellID = CDM.showAssist and baseSpellID or nil
 
 	if baseSpellID ~= CDM.assistSpellID then
 		if CDM.assistSpellID then
@@ -793,6 +803,9 @@ function CDM.OnScaleChanged()
 end
 
 function CDM.PLAYER_REGEN_ENABLED()
+	-- Keys (and probably other content) are in lockdown the whole time.
+	if InCombatLockdown() then return end
+
 	CDM.Rebuild()
 end
 
@@ -966,7 +979,6 @@ function CDM.OnCDMChanged()
 	-- NOTE: Spell overrides trigger NotifyListeners
 	if InCombatLockdown() then return end
 
-	print("Kami CDM Rebuild")
 	CDM.Rebuild()
 end
 
