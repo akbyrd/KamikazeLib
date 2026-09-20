@@ -154,3 +154,8 @@ function Util.CenterIcon(font, xFrameSize, yFrameSize, fontSize)
 	local yPos = 0 - ((yFrameSize + fontSize) / 2 - baseline)
 	return xPos, yPos
 end
+
+-- TODO: Move to a Debug namespace?
+function Util.SpellToString(spellID)
+	return ("%s %s"):format(tostring(spellID), tostring(spellID and C_Spell.GetSpellName(spellID)))
+end

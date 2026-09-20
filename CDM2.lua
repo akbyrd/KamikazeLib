@@ -18,6 +18,27 @@ function CDM.Load()
 	CDM.savedVars.profile   = CDM.savedVars.profile   or {}
 	CDM.charVars.lastSource = CDM.charVars.lastSource or {}
 
+	local db = {
+		WARRIOR = {
+			MortalStrike = 12294,
+			Overpower    = 7384,
+			Execute      = 163201,
+			Cleave       = 845,
+			Slam         = 1464,
+			HeroicStrike = 1269383,
+			Bladestorm   = 227847,
+
+			MasterOfWarfareProc   = 1269391,
+			MasterOfWarfareBuff   = 1269394,
+			Opportunist           = 456120,
+			CollateralDamage      = 334783,
+			ImminentDemise        = 445606,
+			WindingUp             = 1300670,
+			Executioner           = 445584,
+			ExecutionersPrecision = 386633,
+		}
+	}
+
 	CDM.cfgTree = Config.Create()
 
 	Config.AddNode(CDM.cfgTree, nil, "Default",
@@ -60,6 +81,13 @@ function CDM.Load()
 
 			rowLimit  = Config.Number(6),
 			rowLimits = Config.Table({}),
+
+			overrideSize   = Config.Size("4px"),
+			overrideTimers = Config.Table({
+				WARRIOR = {
+					[db.WARRIOR.Slam] = { overrideSpellID = db.WARRIOR.HeroicStrike, duration = 15 },
+				},
+			}),
 		})
 
 	Config.AddNode(CDM.cfgTree, "Default", "Essential",
@@ -152,6 +180,7 @@ function CDM.Load()
 		{ threshold = 2  * SECONDS_PER_DAY,  format = dFmt,                      components = {{ div = SECONDS_PER_DAY,  step = 1,   rounding = round }} },
 	})
 
+	CDM.classToken     = select(2, UnitClass("player"))
 	CDM.spellLookup    = {}
 	CDM.categoryLookup = {}
 	CDM.categoryIcons  = {
@@ -363,7 +392,20 @@ function CDM.ConstructFrame(vState)
 	fState.Assist:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
 	fState.Assist:SetTextureSliceMargins(1, 1, 1, 1)
 
+	-- TODO: Does PixelAnts actually need to create a frame?
 	fState.Proc = PixelAnts.Create(fState.Outline)
+
+	fState.Override = CreateFrame("StatusBar", nil, fState.Outline)
+	fState.Override:SetParentKey("Override")
+	fState.Override:SetFrameLevel(fState.Override:GetParent():GetFrameLevel() + 2)
+	fState.Override:SetPoint("BOTTOMLEFT")
+	fState.Override:SetPoint("BOTTOMRIGHT")
+	fState.Override:SetTimerDuration(C_DurationUtil.CreateDuration(), nil, Enum.StatusBarTimerDirection.RemainingTime)
+
+	fState.OverrideBG = fState.Override:CreateTexture(nil, "BACKGROUND")
+	fState.OverrideBG:SetParentKey("Background")
+	fState.OverrideBG:SetAllPoints()
+	fState.OverrideBG:SetColorTexture(fState.cfg.borderColor:GetRGBA())
 
 	return fState
 end
@@ -374,10 +416,11 @@ function CDM.EnableFrame(fState, cdvInfo)
 	-- track it, but it could be an override and we always store the base spellID specifically to
 	-- avoid dealing with complexity from overrides. So it's not worth handling that edge case.
 
-	fState.baseSpellID = cdvInfo.spellID
-	fState.spellID     = cdvInfo.spellID
-	fState.categoryID  = cdvInfo.spellCategoryID
-	fState.equipSlot   = cdvInfo.equipSlot
+	fState.baseSpellID   = cdvInfo.spellID
+	fState.spellID       = cdvInfo.spellID
+	fState.categoryID    = cdvInfo.spellCategoryID
+	fState.equipSlot     = cdvInfo.equipSlot
+	fState.overrideTimer = fState.cfg.overrideTimers[CDM.classToken][fState.spellID]
 
 	if fState.categoryID then
 		CDM.categoryLookup[fState.categoryID] = fState
@@ -401,14 +444,15 @@ function CDM.DisableFrame(fState)
 	fState.Icon:SetTexture(nil)
 	fState.Icon:SetDesaturated(false)
 	fState.Icon:SetVertexColor(1, 1, 1, 1)
-	fState.Cooldown:Clear()
 	fState.Recharge:Clear()
+	fState.Cooldown:Clear()
 	fState.Press:Hide()
 	fState.Queued:Hide()
 	fState.Charges:SetText("")
 	fState.Bling:Clear()
 	fState.Assist:Hide()
 	fState.Proc:Hide()
+	fState.Override:Hide()
 
 	fState.spellID = nil
 	fState.baseSpellID = nil
@@ -480,6 +524,7 @@ function CDM.RefreshConfig(fState)
 	fState.Press:SetColorTexture(fState.cfg.pressColor:GetRGBA())
 	fState.Queued:SetColorTexture(fState.cfg.queuedColor:GetRGBA())
 	fState.Assist:SetVertexColor(fState.cfg.assistColor:GetRGBA())
+	fState.Override:SetColorFill(fState.cfg.procColor:GetRGBA())
 
 	fState.Proc:SetConfig(
 		nil,
@@ -502,14 +547,15 @@ function CDM.RefreshAllSizes()
 	local pxSize, pySize = GetPhysicalScreenSize()
 
 	for category, vState in pairs(CDM.viewers) do
-		local cfg        = vState.cfg
-		local iconSize   = Round(cfg.iconSize   + cfg.iconSizeRel   * pySize)
-		local borderSize = Round(cfg.borderSize + cfg.borderSizeRel * iconSize)
-		local assistSize = Round(cfg.assistSize + cfg.assistSizeRel * iconSize)
-		local procSize   = Round(cfg.procSize   + cfg.procSizeRel   * iconSize)
-		local procInset  = Round(cfg.procInset  + cfg.procInsetRel  * iconSize)
-		local iconZoom   = cfg.iconZoom
-		local iconAspect = cfg.iconAspect
+		local cfg          = vState.cfg
+		local iconZoom     = cfg.iconZoom
+		local iconAspect   = cfg.iconAspect
+		local iconSize     = Round(cfg.iconSize     + cfg.iconSizeRel     * pySize)
+		local borderSize   = Round(cfg.borderSize   + cfg.borderSizeRel   * iconSize)
+		local assistSize   = Round(cfg.assistSize   + cfg.assistSizeRel   * iconSize)
+		local procSize     = Round(cfg.procSize     + cfg.procSizeRel     * iconSize)
+		local procInset    = Round(cfg.procInset    + cfg.procInsetRel    * iconSize)
+		local overrideSize = Round(cfg.overrideSize + cfg.overrideSizeRel * iconSize)
 
 		local xScale, yScale = Util.AspectScale(iconAspect)
 		vState.xSize    = Round(xScale * iconSize)
@@ -535,6 +581,7 @@ function CDM.RefreshAllSizes()
 			fState.Bling:SetSize(diagSize, diagSize)
 			fState.Proc:SetConfig(procSize, procInset, nil, nil, nil, nil)
 			fState.Proc:RefreshSize()
+			fState.Override:SetHeight(overrideSize)
 
 			Util.ZoomIcon(fState.Icon, iconZoom, cxSize, cySize)
 			Util.SetSliceScale(fState.Border, borderSize)
@@ -592,6 +639,18 @@ function CDM.RefreshOverride(fState, spellID)
 	if spellID and spellID ~= fState.spellID then
 		CDM.spellLookup[spellID] = fState
 		fState.spellID = spellID
+	end
+end
+
+function CDM.RefreshOverrideTimer(fState, overrideSpellID)
+	if fState.overrideTimer then
+		if fState.overrideTimer.overrideSpellID == overrideSpellID then
+			local duration = fState.Override:GetTimerDuration()
+			duration:SetTimeFromStart(GetTime(), fState.overrideTimer.duration)
+			fState.Override:Show()
+		else
+			fState.Override:Hide()
+		end
 	end
 end
 
@@ -905,6 +964,7 @@ function CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID
 	local fState = CDM.spellLookup[baseSpellID]
 	if fState then
 		CDM.RefreshOverride(fState, overrideSpellID)
+		CDM.RefreshOverrideTimer(fState, overrideSpellID)
 	end
 end
 

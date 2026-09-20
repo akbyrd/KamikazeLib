@@ -1,6 +1,9 @@
 To Do
 -----
-Show bar for heroic strike
+Dots/bars for stacks of key buffs
+	Re-use ants texture for bars?
+	Outlines on bars?
+Did get a stuck button once. Think it was happening on ElvUI bars too though?
 ----
 Settings
 	Row highlights

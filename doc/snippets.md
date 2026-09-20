@@ -39,6 +39,7 @@ local canvas_to_local = 1 / frame:GetEffectiveScale()
 ```lua
 local isSecure, taint = issecurevariable(table, "member")
 InCombatLockdown()
+secretwrap()
 ```
 
 ``` lua
