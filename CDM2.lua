@@ -220,6 +220,12 @@ function CDM.Update()
 end
 
 function CDM.Rebuild()
+	-- TODO: Attempt to remove this check. I think C_Spell.GetLastCategoryCooldownSource is the only
+	-- place where secret values are problematic.
+
+	-- NOTE: Keys (and certain other content) are restricted the whole time.
+	if C_Secrets.ShouldCooldownsBeSecret() then return end
+
 	print("Kami CDM Rebuild")
 
 	CDM.GatherCDs()
@@ -876,9 +882,6 @@ function CDM.OnScaleChanged()
 end
 
 function CDM.PLAYER_REGEN_ENABLED()
-	-- Keys (and probably other content) are in lockdown the whole time.
-	if InCombatLockdown() then return end
-
 	CDM.Rebuild()
 end
 
@@ -1050,7 +1053,7 @@ function CDM.OnCDMChanged()
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	if layoutMgr:AreNotificationsLocked() then return end
 
-	-- NOTE: Spell overrides trigger NotifyListeners
+	-- NOTE: Spell overrides trigger NotifyListeners during combat
 	if InCombatLockdown() then return end
 
 	CDM.Rebuild()
