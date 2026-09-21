@@ -85,9 +85,23 @@ function CDM.Load()
 			overrideSize   = Config.Size("4px"),
 			overrideTimers = Config.Table({
 				WARRIOR = {
-					[db.WARRIOR.Slam] = { overrideSpellID = db.WARRIOR.HeroicStrike, duration = 15 },
+					--[db.WARRIOR.Slam] = { overrideSpellID = db.WARRIOR.HeroicStrike, duration = 15 },
 				},
 			}),
+
+			empowerSize       = Config.Size("7px"),
+			empowerGapSize    = Config.Size("3px"),
+			empowerBorderSize = Config.Size("2px"),
+			empowerBuffs      = Config.Table({
+				WARRIOR = {
+					[db.WARRIOR.Overpower]    = db.WARRIOR.Opportunist,
+					[db.WARRIOR.Cleave]       = db.WARRIOR.CollateralDamage,
+					[db.WARRIOR.Bladestorm]   = db.WARRIOR.ImminentDemise,
+					[db.WARRIOR.Slam]         = db.WARRIOR.WindingUp,
+					[db.WARRIOR.Execute]      = db.WARRIOR.Executioner,
+					[db.WARRIOR.MortalStrike] = db.WARRIOR.ExecutionersPrecision,
+				},
+			})
 		})
 
 	Config.AddNode(CDM.cfgTree, "Default", "Essential",
@@ -181,6 +195,7 @@ function CDM.Load()
 	})
 
 	CDM.classToken     = select(2, UnitClass("player"))
+	CDM.classColor     = C_ClassColor.GetClassColor(CDM.classToken)
 	CDM.spellLookup    = {}
 	CDM.categoryLookup = {}
 	CDM.categoryIcons  = {
@@ -220,8 +235,9 @@ function CDM.Update()
 end
 
 function CDM.Rebuild()
-	-- TODO: Attempt to remove this check. I think C_Spell.GetLastCategoryCooldownSource is the only
-	-- place where secret values are problematic.
+	-- TODO: Attempt to remove this check. Only a couple of places need to be hardened against secrets:
+	-- * C_Spell.GetLastCategoryCooldownSource
+	-- * C_Spell.GetSpellMaxCumulativeAuraApplications
 
 	-- NOTE: Keys (and certain other content) are restricted the whole time.
 	if C_Secrets.ShouldCooldownsBeSecret() then return end
@@ -335,6 +351,41 @@ function CDM.ConstructFrame(vState)
 	fState.Icon:SetParentKey("Icon")
 	fState.Icon:SetAllPoints()
 
+	fState.Empower = CreateFrame("AuraContainer", nil, fState.Content, "CustomAuraContainerTemplate")
+	fState.Empower:SetParentKey("Empower")
+	fState.Empower:SetPoint("BOTTOMLEFT")
+	fState.Empower:SetPoint("BOTTOMRIGHT")
+	fState.Empower:SetUnit("player")
+	fState.Empower:AddAuraSlot(tostring(fState), "HELPFUL",
+		{
+			initializeFrame = function(button)
+				fState.EmpowerButton = button
+				fState.EmpowerButton:SetAllPoints()
+
+				fState.EmpowerBar = CreateFrame("StatusBar", nil, fState.EmpowerButton)
+
+				fState.EmpowerFill = fState.EmpowerBar:CreateTexture(nil, "ARTWORK")
+				fState.EmpowerFill:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\PixelAnts.tga", "REPEAT", "REPEAT", "NEAREST")
+				fState.EmpowerFill:SetHorizTile(true)
+				fState.EmpowerBar:SetStatusBarTexture(fState.EmpowerFill)
+
+				fState.EmpowerBorder = fState.EmpowerBar:CreateTexture(nil, "BORDER")
+				fState.EmpowerBorder:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\PixelAnts.tga", "REPEAT", "REPEAT", "NEAREST")
+				fState.EmpowerBorder:SetHorizTile(true)
+
+				-- BUG: This works around a 1-frame flicker. The bar is shown in OnUpdate, but the
+				-- layout happens before and is skipped for hidden frames. The first time the bar is
+				-- shown it has its default, full width. Next frame it gets resized to the proper width.
+				-- So we force a texture to be created and manually position it outside the clipping
+				-- range of the icon. The aura container re-anchors it, so our anchors here will get
+				-- undone.
+				fState.EmpowerFill:ClearAllPoints()
+				fState.EmpowerFill:SetPoint("TOPRIGHT",    fState.EmpowerButton, "TOPLEFT")
+				fState.EmpowerFill:SetPoint("BOTTOMRIGHT", fState.EmpowerButton, "BOTTOMLEFT")
+				fState.EmpowerFill:SetWidth(1)
+			end,
+		})
+
 	fState.Recharge = CreateFrame("Cooldown", nil, fState.Content)
 	fState.Recharge:SetParentKey("Recharge")
 	fState.Recharge:SetPoint("CENTER")
@@ -376,7 +427,6 @@ function CDM.ConstructFrame(vState)
 	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
 	-- Ideally it would be above the Outline / Assist, but it needs to be clipped by Content
 
-	-- Bling
 	fState.Bling = CreateFrame("Cooldown", nil, fState.Content, "CooldownFrameTemplate")
 	fState.Bling:SetParentKey("Bling")
 	fState.Bling:ClearAllPoints() -- Template sets points
@@ -411,7 +461,6 @@ function CDM.ConstructFrame(vState)
 	fState.OverrideBG = fState.Override:CreateTexture(nil, "BACKGROUND")
 	fState.OverrideBG:SetParentKey("Background")
 	fState.OverrideBG:SetAllPoints()
-	fState.OverrideBG:SetColorTexture(fState.cfg.borderColor:GetRGBA())
 
 	return fState
 end
@@ -427,6 +476,16 @@ function CDM.EnableFrame(fState, cdvInfo)
 	fState.categoryID    = cdvInfo.spellCategoryID
 	fState.equipSlot     = cdvInfo.equipSlot
 	fState.overrideTimer = fState.cfg.overrideTimers[CDM.classToken][fState.spellID]
+	fState.empowerBuff   = fState.cfg.empowerBuffs[CDM.classToken][fState.spellID]
+
+	if fState.empowerBuff then
+		-- NOTE: GetSpellMaxCumulativeAuraApplications returns secrets
+		fState.empowerMaxStacks = C_Spell.GetSpellMaxCumulativeAuraApplications(fState.empowerBuff)
+		fState.empowerMaxStacks = max(1, fState.empowerMaxStacks)
+
+		fState.Empower:SetAuraSlotCandidateFilters(tostring(fState), { includeSpellIDs = { [fState.empowerBuff] = true } })
+		fState.EmpowerButton:SetApplicationBar(fState.EmpowerBar, { maxApplications = fState.empowerMaxStacks })
+	end
 
 	if fState.categoryID then
 		CDM.categoryLookup[fState.categoryID] = fState
@@ -459,12 +518,14 @@ function CDM.DisableFrame(fState)
 	fState.Assist:Hide()
 	fState.Proc:Hide()
 	fState.Override:Hide()
+	fState.Empower:SetAuraSlotCandidateFilters(tostring(fState), { includeSpellIDs = {} })
 
 	fState.spellID = nil
 	fState.baseSpellID = nil
 	fState.categoryID = nil
 	fState.equipSlot = nil
 	fState.hasBling = nil
+	fState.empowerMaxStacks = 1
 end
 
 function CDM.AssignFrames()
@@ -531,6 +592,9 @@ function CDM.RefreshConfig(fState)
 	fState.Queued:SetColorTexture(fState.cfg.queuedColor:GetRGBA())
 	fState.Assist:SetVertexColor(fState.cfg.assistColor:GetRGBA())
 	fState.Override:SetColorFill(fState.cfg.procColor:GetRGBA())
+	fState.OverrideBG:SetColorTexture(fState.cfg.borderColor:GetRGBA())
+	fState.EmpowerBorder:SetVertexColor(fState.cfg.borderColor:GetRGBA())
+	fState.EmpowerFill:SetVertexColor(CDM.classColor:GetRGBA())
 
 	fState.Proc:SetConfig(
 		nil,
@@ -553,19 +617,22 @@ function CDM.RefreshAllSizes()
 	local pxSize, pySize = GetPhysicalScreenSize()
 
 	for category, vState in pairs(CDM.viewers) do
-		local cfg          = vState.cfg
-		local iconZoom     = cfg.iconZoom
-		local iconAspect   = cfg.iconAspect
-		local iconSize     = Round(cfg.iconSize     + cfg.iconSizeRel     * pySize)
-		local borderSize   = Round(cfg.borderSize   + cfg.borderSizeRel   * iconSize)
-		local assistSize   = Round(cfg.assistSize   + cfg.assistSizeRel   * iconSize)
-		local procSize     = Round(cfg.procSize     + cfg.procSizeRel     * iconSize)
-		local procInset    = Round(cfg.procInset    + cfg.procInsetRel    * iconSize)
-		local overrideSize = Round(cfg.overrideSize + cfg.overrideSizeRel * iconSize)
+		local cfg               = vState.cfg
+		local iconZoom          = cfg.iconZoom
+		local iconAspect        = cfg.iconAspect
+		local iconSize          = Round(cfg.iconSize          + cfg.iconSizeRel          * pySize)
+		local borderSize        = Round(cfg.borderSize        + cfg.borderSizeRel        * iconSize)
+		local assistSize        = Round(cfg.assistSize        + cfg.assistSizeRel        * iconSize)
+		local procSize          = Round(cfg.procSize          + cfg.procSizeRel          * iconSize)
+		local procInset         = Round(cfg.procInset         + cfg.procInsetRel         * iconSize)
+		local overrideSize      = Round(cfg.overrideSize      + cfg.overrideSizeRel      * iconSize)
+		local empowerSize       = Round(cfg.empowerSize       + cfg.empowerSizeRel       * iconSize)
+		local empowerGapSize    = Round(cfg.empowerGapSize    + cfg.empowerGapSizeRel    * iconSize)
+		local empowerBorderSize = Round(cfg.empowerBorderSize + cfg.empowerBorderSizeRel * iconSize)
 
 		local xScale, yScale = Util.AspectScale(iconAspect)
-		vState.xSize    = Round(xScale * iconSize)
-		vState.ySize    = Round(yScale * iconSize)
+		vState.xSize = Round(xScale * iconSize)
+		vState.ySize = Round(yScale * iconSize)
 
 		local cxSize   = vState.xSize - 2*borderSize
 		local cySize   = vState.ySize - 2*borderSize
@@ -592,6 +659,32 @@ function CDM.RefreshAllSizes()
 			Util.ZoomIcon(fState.Icon, iconZoom, cxSize, cySize)
 			Util.SetSliceScale(fState.Border, borderSize)
 			Util.SetSliceScale(fState.Assist, assistSize)
+
+			if fState.empowerBuff then
+				-- TODO: This is no longer pixel perfect if tiles are wider than 64, which happens with
+				-- a 1 stack buff. Consider increasing the texture size to 128 or 256.
+				local xTileSize     = floor((cxSize + empowerGapSize - 6) / fState.empowerMaxStacks)
+				local xBorderSize   = xTileSize - empowerGapSize
+				local xFillSize     = xBorderSize - 2*empowerBorderSize
+				local xTotalSize    = xTileSize * fState.empowerMaxStacks - empowerGapSize
+				local barScale      = xTileSize / 64
+				local borderSize    = empowerBorderSize / barScale
+				local xCenterOffset = floor((cxSize - xTotalSize) / 2) / barScale
+				local yOffset       = 1 / barScale
+				local xBarSize      = fState.empowerMaxStacks * 64
+				local yBarSize      = (empowerSize - 2*empowerBorderSize) / barScale
+				local vFill         = (Round(xFillSize   / barScale) - 0.5) / 64
+				local vBorder       = (Round(xBorderSize / barScale) - 0.5) / 64
+
+				fState.Empower:SetPoint("TOPLEFT", fState.Content, "BOTTOMLEFT", 0, empowerSize)
+				fState.EmpowerBar:SetScale(barScale)
+				fState.EmpowerBar:SetPoint("TOPLEFT", borderSize + xCenterOffset, -borderSize + yOffset)
+				fState.EmpowerBar:SetSize(xBarSize, yBarSize)
+				fState.EmpowerFill:SetTexCoord(0, 1, vFill, vFill)
+				fState.EmpowerBorder:SetTexCoord(0, 1, vBorder, vBorder)
+				fState.EmpowerBorder:SetPoint("TOPLEFT",     fState.EmpowerFill, "TOPLEFT",     -borderSize,  borderSize)
+				fState.EmpowerBorder:SetPoint("BOTTOMRIGHT", fState.EmpowerFill, "BOTTOMRIGHT", -borderSize, -borderSize)
+			end
 		end
 	end
 end

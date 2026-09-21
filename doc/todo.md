@@ -1,36 +1,37 @@
 To Do
 -----
-Dots/bars for stacks of key buffs
-	Re-use ants texture for bars?
-	Outlines on bars?
-Did get a stuck button once. Think it was happening on ElvUI bars too though?
-----
-Settings
-	Row highlights
-	Show in built-in Options > Addons?
-	Edit Mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
-	Implement search
-	Put file earlier in toc
+Trinket isn't working
+Health potion isn't working?
+Delete saved vars
+Delete CDM1
 Profile performance
 	Appears to be a memory leak
-----
-Track active duration
-Anchoring
-Disable ability highlight on specific spells
-Per-talent layout
 Buff Bars
 	Skin
 	Custom spell color (classify?)
 	Show permanent buff bars as full
 	Hide pip
 	Pandemic support
+PixelAnts twitch during a rebuild
 Sweeping strikes bar
 Whirlwind bar
 Rage bar
-----
-Tooltips
+Skyriding
+Settings
+	Row highlights
+	Tooltips
+	Show in built-in Options > Addons?
+	Edit Mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
+	Implement search
+	Put file earlier in toc
+	Versioning
+Track active duration
+Anchoring
+Disable ability highlight on specific spells
+Per-talent layout
 Track any item
 Track any spell
-Skyriding
-Settings versioning
 Out-of-game harness
+Button occasionally gets stuck
+	Happens on ElvUI too
+	Suspect the hold-to-cast addon
