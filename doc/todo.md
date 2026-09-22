@@ -1,13 +1,12 @@
 To Do
 -----
 Buff Bars
-	bar
-	layout
-	icon
-	Custom spell color (classify?)
-	Show permanent buff bars as full
+	target debuffs
 	Pandemic support
+	anchoring / positioning
+	Custom spell color (classify?)
 	"show all" for edit mode
+ElvUI texture on empower bars
 PixelAnts twitch during a rebuild
 Rage bar
 Sweeping strikes bar
