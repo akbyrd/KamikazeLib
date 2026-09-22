@@ -14,9 +14,8 @@ function CDM.Load()
 	CDM.charVars    = KLCharVars.CDM
 
 	-- TODO: Rename profile?
-	-- TODO: Rename lastSource
-	CDM.savedVars.profile   = CDM.savedVars.profile   or {}
-	CDM.charVars.lastSource = CDM.charVars.lastSource or {}
+	CDM.savedVars.profile           = CDM.savedVars.profile           or {}
+	CDM.charVars.lastCategorySource = CDM.charVars.lastCategorySource or {}
 
 	local db = {
 		WARRIOR = {
@@ -200,10 +199,10 @@ function CDM.Load()
 	CDM.spellLookup    = {}
 	CDM.categoryLookup = {}
 	CDM.categoryIcons  = {
-		[4]    = "Interface/ICONS/INV_POTION_114",
-		[30]   = "Interface/ICONS/INV_POTION_54",
-		[1711] = "Interface/ICONS/Warlock_ Healthstone",
-		[2566] = "Interface/ICONS/Warlock_ Bloodstone",
+		[4]    = "Interface/ICONS/INV_POTION_114",       -- Combat Potion
+		[30]   = "Interface/ICONS/INV_POTION_54",        -- Health Potion
+		[1711] = "Interface/ICONS/Warlock_ Healthstone", -- Healthstone
+		[2566] = "Interface/ICONS/Warlock_ Bloodstone",  -- Demonic Healthstone
 	}
 	CDM.mousePresses        = {}
 	CDM.spellPresses        = {}
@@ -525,6 +524,7 @@ function CDM.DisableFrame(fState)
 	fState.spellID = nil
 	fState.baseSpellID = nil
 	fState.categoryID = nil
+	fState.itemID = nil
 	fState.equipSlot = nil
 	fState.hasBling = nil
 	fState.empowerMaxStacks = 1
@@ -836,13 +836,14 @@ function CDM.RefreshAllCooldowns()
 	end
 end
 
-function CDM.RefreshCategory(fState, spellID)
+function CDM.RefreshCategory(fState, spellID, itemID)
 	if fState.spellID then
 		CDM.spellLookup[fState.spellID] = nil
 	end
 
-	fState.baseSpellID = spellID
-	fState.spellID     = spellID
+	fState.baseSpellID       = spellID
+	fState.spellID           = spellID
+	fState.itemID            = itemID
 	CDM.spellLookup[spellID] = fState
 end
 
@@ -850,11 +851,12 @@ function CDM.RefreshAllCategories()
 	for category, vState in pairs(CDM.viewers) do
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			if fState.categoryID then
-				local uiLastSpellID = C_Spell.GetLastCategoryCooldownSource(fState.categoryID)
-				local klLastSpellID = CDM.charVars.lastSource[fState.categoryID]
-				local spellID = uiLastSpellID or klLastSpellID
-				if spellID then
-					CDM.RefreshCategory(fState, spellID)
+				local spellID, itemID = C_Spell.GetLastCategoryCooldownSource(fState.categoryID)
+				local lastSource = CDM.charVars.lastCategorySource[fState.categoryID]
+				if spellID and itemID then
+					CDM.RefreshCategory(fState, spellID, itemID)
+				elseif lastSource then
+					CDM.RefreshCategory(fState, lastSource.spellID, lastSource.itemID)
 				end
 			end
 		end
@@ -862,7 +864,11 @@ function CDM.RefreshAllCategories()
 end
 
 function CDM.RefreshIcon(fState)
-	if fState.spellID then
+	if fState.itemID then
+		local texture = C_Item.GetItemIconByID(fState.itemID)
+		fState.Icon:SetTexture(texture)
+
+	elseif fState.spellID then
 		local texture = C_Spell.GetSpellTexture(fState.spellID)
 		fState.Icon:SetTexture(texture)
 
@@ -1024,8 +1030,8 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 	if fState then
 		if fState.spellID ~= spellID then
 			-- TODO: Do we need to save this to an account saved vars too?
-			CDM.charVars.lastSource[category] = spellID
-			CDM.RefreshCategory(fState, spellID)
+			CDM.charVars.lastCategorySource[category] = { spellID = spellID, itemID = itemID }
+			CDM.RefreshCategory(fState, spellID, itemID)
 			CDM.RefreshIcon(fState)
 		end
 	end
