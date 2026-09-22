@@ -10,7 +10,7 @@ New-Item `
 /console taintLog 1
 /dump GetBuildInfo()
 /dump GetCVar("useUiScale"), GetCVar("uiScale")
-/dump Kami.CDM.cfg
+/dump Kami.CDM.Cooldowns.cfg
 ```
 
 ```

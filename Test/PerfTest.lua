@@ -112,9 +112,9 @@ function Perf.Lookup()
 
 	-- The real tree, for a reality check on the synthetic figures. branchToTip is Config's own
 	-- field; reaching into it is fine here and nowhere else.
-	local CDM = Kami.CDM2
+	local CDM = Kami.CDM.Cooldowns
 	if not (CDM and CDM.cfgTree) then
-		Print("CDM2 has no config tree yet, skipping the real-tree arm")
+		Print("CDM has no config tree yet, skipping the real-tree arm")
 		return
 	end
 
@@ -192,7 +192,7 @@ end
 ----------------------------------------------------------------------------------------------------
 -- Event rates
 
--- NOTE: These are the events CDM2 refreshes on. RefreshAllUsable runs directly off
+-- NOTE: These are the events CDM refreshes on. RefreshAllUsable runs directly off
 -- SPELL_UPDATE_USABLE and reads one color per cooldown frame. Cooldown work is dirty-gated through
 -- OnUpdate, so its reads are capped by frame rate no matter how often the event fires.
 local events = {
@@ -243,7 +243,7 @@ function Perf.Rates()
 	local combat  = CombatSeconds()
 
 	local frames = 0
-	local CDM = Kami.CDM2
+	local CDM = Kami.CDM.Cooldowns
 	if CDM and CDM.viewers then
 		for category, vState in pairs(CDM.viewers) do
 			frames = frames + #vState.cdFrames

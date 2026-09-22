@@ -133,8 +133,7 @@ function Settings.Load()
 		})
 	Settings.Window.Content.Region:SetPoint("TOPLEFT")
 
-	local iterBranch = "Essential"
-	for key, decl, branch, node in Config.Enumerate(Kami.CDM2.cfgTree, iterBranch) do
+	for key, decl, branch, node in Config.Enumerate(Kami.CDM.Cooldowns.cfgTree, "Essential") do
 		local row = UI.Row.Create(Settings.Window.Content, Settings.cfgTree,
 			{
 				name     = "Row",

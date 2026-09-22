@@ -1,6 +1,7 @@
 local Kami = select(2, ...)
 local CDM = {}
-Kami.CDM = CDM
+Kami.CDM = Kami.CDM or {}
+Kami.CDM.Cooldowns = CDM
 
 local Config    = Kami.Config
 local PixelAnts = Kami.PixelAnts
@@ -121,7 +122,7 @@ function CDM.Load()
 
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
-	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
+	CDM.eventFrame:SetParentKey("Kami.CDM.Cooldowns.Event")
 	CDM.eventFrame:SetScript("OnEvent",                              CDM.DispatchEvent)
 	CDM.eventFrame:SetScript("OnUpdate",                             CDM.Update)
 	CDM.RegisterEvent("UI_SCALE_CHANGED",                            CDM.OnScaleChanged)
@@ -160,13 +161,13 @@ function CDM.Load()
 		local categoryName = categoryToName(category)
 
 		local Root = CreateFrame("Frame", nil, UIParent)
-		Root:SetParentKey(("Kami.CDM.%s.Root"):format(categoryName))
+		Root:SetParentKey(("Kami.CDM.Cooldowns.%s.Root"):format(categoryName))
 
-		local cdFontName = ("Kami.CDM.CDFont.%s"):format(categoryName)
+		local cdFontName = ("Kami.CDM.Cooldowns.CDFont.%s"):format(categoryName)
 		local cdFont = CreateFont(cdFontName)
 		cdFont:SetFont(cdTypeface, 18, "OUTLINE")
 
-		local chargeFontName = ("Kami.CDM.ChargeFont.%s"):format(categoryName)
+		local chargeFontName = ("Kami.CDM.Cooldowns.ChargeFont.%s"):format(categoryName)
 		local chargeFont = CreateFont(chargeFontName)
 		chargeFont:SetFont(chargeTypeface, 18, "OUTLINE")
 
