@@ -146,29 +146,42 @@ function CDM.Load()
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.OnCDMChanged)
 
-	local viewers = {
+	local categoryToName = EnumUtil.GenerateNameTranslation(Enum.CooldownViewerCategory)
+	local cdTypeface = LSM:Fetch("font", "PT Sans Narrow")
+	local chargeTypeface = LSM:Fetch("font", "Homespun")
+
+	local categories = {
 		Enum.CooldownViewerCategory.Essential,
 		Enum.CooldownViewerCategory.Utility,
 	}
-	local categoryToName = EnumUtil.GenerateNameTranslation(Enum.CooldownViewerCategory)
 
 	CDM.viewers = {}
-	for index, category in ipairs(viewers) do
+	for index, category in ipairs(categories) do
 		local categoryName = categoryToName(category)
 
 		local Root = CreateFrame("Frame", nil, UIParent)
 		Root:SetParentKey(("Kami.CDM.%s.Root"):format(categoryName))
 
+		local cdFontName = ("Kami.CDM.CDFont.%s"):format(categoryName)
+		local cdFont = CreateFont(cdFontName)
+		cdFont:SetFont(cdTypeface, 18, "OUTLINE")
+
+		local chargeFontName = ("Kami.CDM.ChargeFont.%s"):format(categoryName)
+		local chargeFont = CreateFont(chargeFontName)
+		chargeFont:SetFont(chargeTypeface, 18, "OUTLINE")
+
 		local vState = {
 			name        = categoryName,
 			cfg         = Config.GetBranch(CDM.cfgTree, categoryName),
 			Root        = Root,
+			cdFontName  = cdFontName,
+			cdFont      = cdFont,
+			chargeFont  = chargeFont,
 			pool        = {},
 			cdvInfos    = {},
 			cdFrames    = {},
 			maxRowCount = 0,
 			rowCounts   = {},
-			iconSize    = nil,
 			xSize       = nil,
 			ySize       = nil,
 		}
@@ -209,19 +222,6 @@ function CDM.Load()
 	CDM.pressCounts         = {}
 	CDM.refreshAllCooldowns = false
 
-	local cdTypeface = LSM:Fetch("font", "PT Sans Narrow")
-	local chargeTypeface = LSM:Fetch("font", "Homespun")
-
-	for category, vState in pairs(CDM.viewers) do
-		vState.cdFontName = ("Kami.CDM.CDFont.%s"):format(vState.name)
-		vState.cdFont = CreateFont(vState.cdFontName)
-		vState.cdFont:SetFont(cdTypeface, 18, "OUTLINE")
-
-		local chargeFontName = ("Kami.CDM.ChargeFont.%s"):format(vState.name)
-		vState.chargeFont = CreateFont(chargeFontName)
-		vState.chargeFont:SetFont(chargeTypeface, 18, "OUTLINE")
-	end
-
 	CDM.Rebuild()
 end
 
@@ -241,8 +241,6 @@ function CDM.Rebuild()
 
 	-- NOTE: Keys (and certain other content) are restricted the whole time.
 	if C_Secrets.ShouldCooldownsBeSecret() then return end
-
-	print("Kami CDM Rebuild")
 
 	CDM.GatherCDs()
 	CDM.RefreshScale()
