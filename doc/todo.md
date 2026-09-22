@@ -1,11 +1,7 @@
 To Do
 -----
-Trinket isn't working
 Health potion isn't working?
-Delete saved vars
-Delete CDM1
-Profile performance
-	Appears to be a memory leak
+Remove empower tooltip
 Buff Bars
 	Skin
 	Custom spell color (classify?)
@@ -31,6 +27,7 @@ Disable ability highlight on specific spells
 Per-talent layout
 Track any item
 Track any spell
+Profile performance
 Out-of-game harness
 Button occasionally gets stuck
 	Happens on ElvUI too

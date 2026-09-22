@@ -129,6 +129,7 @@ function CDM.Load()
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                        CDM.OnScaleChanged)
 	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                         CDM.RefreshAllUsable)
 	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                        CDM.PLAYER_REGEN_ENABLED)
+	CDM.RegisterEvent("BAG_UPDATE_COOLDOWN",                         CDM.BAG_UPDATE_COOLDOWN)
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                       CDM.SPELL_UPDATE_COOLDOWN)
 	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",                    CDM.SPELL_RANGE_CHECK_UPDATE)
 	CDM.RegisterEvent("GLOBAL_MOUSE_DOWN",                           CDM.GLOBAL_MOUSE_DOWN)
@@ -320,6 +321,7 @@ end
 function CDM.ConstructFrame(vState)
 	local fState = {}
 	fState.cfg = vState.cfg
+	fState.itemDuration = C_DurationUtil.CreateDuration()
 
 	-- Frame        | Textures/Text          | Purpose
 	-- -------------|------------------------|--------
@@ -766,9 +768,23 @@ end
 
 function CDM.RefreshCooldown(fState)
 	local cdInfo   = C_Spell.GetSpellCooldown(fState.spellID) -- SpellCooldownInfo
+	local duration = C_Spell.GetSpellCooldownDuration(fState.spellID)
 	local onCD     = cdInfo.isActive and not cdInfo.isOnGCD
 	local onGCD    = cdInfo.isOnGCD
-	local duration = C_Spell.GetSpellCooldownDuration(fState.spellID)
+
+	-- TODO: Test with a trinket on the GCD (Algeth'ar Puzzle Box)
+	if fState.equipSlot then
+		-- NOTE: GetSpellCooldown[Duration] is the item burst category cooldown for items
+		local start, duration2, enable = GetInventoryItemCooldown("player", fState.equipSlot)
+		if enable == 1 and duration2 > 0 then
+			fState.itemDuration:SetTimeFromStart(start, duration2)
+			duration = fState.itemDuration
+			onCD     = true
+			onGCD    = false
+		else
+			onCD = false
+		end
+	end
 
 	if onCD then
 		fState.Cooldown:SetHideCountdownNumbers(not fState.cfg.cdShowTime)
@@ -982,6 +998,17 @@ function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
 	local fState = CDM.spellLookup[spellID]
 	if fState then
 		CDM.RefreshUsable(fState)
+	end
+end
+
+function CDM.BAG_UPDATE_COOLDOWN()
+	-- TODO: Do we want an equipSlot lookup?
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			if fState.equipSlot then
+				CDM.RefreshCooldown(fState)
+			end
+		end
 	end
 end
 
