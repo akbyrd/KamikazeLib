@@ -1,7 +1,5 @@
 To Do
 -----
-Health potion isn't working?
-Remove empower tooltip
 Buff Bars
 	Skin
 	Custom spell color (classify?)

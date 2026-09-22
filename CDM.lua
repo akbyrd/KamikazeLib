@@ -362,17 +362,17 @@ function CDM.ConstructFrame(vState)
 			initializeFrame = function(button)
 				fState.EmpowerButton = button
 				fState.EmpowerButton:SetAllPoints()
+				fState.EmpowerButton:EnableMouse(false)
 
 				fState.EmpowerBar = CreateFrame("StatusBar", nil, fState.EmpowerButton)
-
-				fState.EmpowerFill = fState.EmpowerBar:CreateTexture(nil, "ARTWORK")
-				fState.EmpowerFill:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\PixelAnts.tga", "REPEAT", "REPEAT", "NEAREST")
-				fState.EmpowerFill:SetHorizTile(true)
-				fState.EmpowerBar:SetStatusBarTexture(fState.EmpowerFill)
 
 				fState.EmpowerBorder = fState.EmpowerBar:CreateTexture(nil, "BORDER")
 				fState.EmpowerBorder:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\PixelAnts.tga", "REPEAT", "REPEAT", "NEAREST")
 				fState.EmpowerBorder:SetHorizTile(true)
+
+				fState.EmpowerFill = fState.EmpowerBar:CreateTexture(nil, "ARTWORK")
+				fState.EmpowerFill:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\PixelAnts.tga", "REPEAT", "REPEAT", "NEAREST")
+				fState.EmpowerFill:SetHorizTile(true)
 
 				-- BUG: This works around a 1-frame flicker. The bar is shown in OnUpdate, but the
 				-- layout happens before and is skipped for hidden frames. The first time the bar is
@@ -384,6 +384,8 @@ function CDM.ConstructFrame(vState)
 				fState.EmpowerFill:SetPoint("TOPRIGHT",    fState.EmpowerButton, "TOPLEFT")
 				fState.EmpowerFill:SetPoint("BOTTOMRIGHT", fState.EmpowerButton, "BOTTOMLEFT")
 				fState.EmpowerFill:SetWidth(1)
+
+				fState.EmpowerBar:SetStatusBarTexture(fState.EmpowerFill)
 			end,
 		})
 
