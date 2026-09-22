@@ -19,6 +19,7 @@ PixelAnts.lua
 WorldMarkers.lua
 MouseCursor.lua
 CombatText.lua
+CDM.lua
 CDMCooldowns.lua
 CDMBuffs.lua
 Settings.lua

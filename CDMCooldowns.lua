@@ -1,6 +1,5 @@
 local Kami = select(2, ...)
 local CDM = {}
-Kami.CDM = Kami.CDM or {}
 Kami.CDM.Cooldowns = CDM
 
 local Config    = Kami.Config
@@ -243,7 +242,8 @@ function CDM.Rebuild()
 	-- NOTE: Keys (and certain other content) are restricted the whole time.
 	if C_Secrets.ShouldCooldownsBeSecret() then return end
 
-	CDM.GatherCDs()
+	Kami.CDM.GatherCDs(CDM.viewers)
+
 	CDM.RefreshScale()
 	CDM.AssignFrames()
 	CDM.RefreshAllConfig()
@@ -258,62 +258,6 @@ function CDM.Rebuild()
 	CDM.RefreshAllQueued()
 	CDM.RefreshAllProcs()
 	CDM.RefreshAssist()
-end
-
-function CDM.GatherCDs()
-	for category, vState in pairs(CDM.viewers) do
-		wipe(vState.cdvInfos)
-	end
-
-	local categoryOverrides = {} -- cooldownID -> user category, deviations from the default
-	local positionOverrides = {} -- cooldownID -> boolean,       deviations from the default
-
-	local function AddCD(cooldownID)
-		local cdvInfo = C_CooldownViewer.GetCooldownViewerCooldownInfo(cooldownID) -- CooldownViewerCooldown
-		if cdvInfo and cdvInfo.isKnown then
-			local hidden   = FlagsUtil.IsSet(cdvInfo.flags, Enum.CooldownSetSpellFlags.HideByDefault)
-			local category = categoryOverrides[cooldownID] or (hidden and -1 or cdvInfo.category)
-
-			local vState = CDM.viewers[category]
-			if vState then
-				table.insert(vState.cdvInfos, cdvInfo)
-			end
-		end
-	end
-
-	-- Don't use dataProvider:GetLayoutManager(). It has a lazy resolve and will taint.
-	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
-	local layout    = layoutMgr:GetActiveLayout(Enum.CDMLayoutMode.AccessOnly)
-	if layout then
-
-		-- User category overrides
-		local layoutInfo = CooldownManagerLayout_GetCooldownInfo(layout, false)
-		if layoutInfo then -- nil when no user overrides
-			for cooldownID, block in pairs(layoutInfo) do
-				-- Apparently block.category can be a string sometimes?
-				categoryOverrides[cooldownID] = tonumber(block.category)
-			end
-		end
-
-		-- User position overrides
-		local orderedCooldownIDs = CooldownManagerLayout_GetOrderedCooldownIDs(layout)
-		if orderedCooldownIDs then -- nil when no user overrides
-			for iCooldown, cooldownID in ipairs(orderedCooldownIDs) do
-				positionOverrides[cooldownID] = true
-				AddCD(cooldownID)
-			end
-		end
-	end
-
-	-- All spells/items, default ordering
-	for iCategory, category in ipairs(CooldownViewerSettingsDataProvider_GetCategories()) do
-		local cooldownIDs = C_CooldownViewer.GetCooldownViewerCategorySet(category, true)
-		for iCooldown, cooldownID in ipairs(cooldownIDs) do
-			if not positionOverrides[cooldownID] then
-				AddCD(cooldownID)
-			end
-		end
-	end
 end
 
 function CDM.ConstructFrame(vState)
@@ -539,7 +483,6 @@ function CDM.AssignFrames()
 	for category, vState in pairs(CDM.viewers) do
 		-- Disable existing frames
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			-- TODO: Not sure if this is a good idea
 			CDM.DisableFrame(fState)
 			table.insert(vState.pool, fState)
 		end
@@ -550,6 +493,7 @@ function CDM.AssignFrames()
 		local need = #vState.cdvInfos
 		for iNeed = have + 1, need do
 			local fState = CDM.ConstructFrame(vState)
+			-- TODO: Not sure if this is a good idea
 			CDM.DisableFrame(fState)
 			table.insert(vState.pool, fState)
 		end

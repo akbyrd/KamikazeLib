@@ -1,16 +1,19 @@
 To Do
 -----
 Buff Bars
-	Skin
+	bar
+	layout
+	icon
 	Custom spell color (classify?)
 	Show permanent buff bars as full
-	Hide pip
 	Pandemic support
+	"show all" for edit mode
 PixelAnts twitch during a rebuild
+Rage bar
 Sweeping strikes bar
 Whirlwind bar
-Rage bar
 Skyriding
+Possess bar
 Settings
 	Row highlights
 	Tooltips
@@ -30,3 +33,10 @@ Out-of-game harness
 Button occasionally gets stuck
 	Happens on ElvUI too
 	Suspect the hold-to-cast addon
+
+
+
+Other Ideas
+-----------
+Combat Text
+Reflect damage
