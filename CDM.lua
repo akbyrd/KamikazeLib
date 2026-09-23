@@ -2,6 +2,13 @@ local Kami = select(2, ...)
 local CDM = {}
 Kami.CDM = CDM
 
+function CDM.Load()
+	KLSavedVars.CDM = KLSavedVars.CDM or {}
+	KLCharVars.CDM  = KLCharVars.CDM  or {}
+
+	KLCharVars.CDM.lastCategorySource = KLCharVars.CDM.lastCategorySource or {}
+end
+
 function CDM.GatherCDs(viewers)
 	for category, vState in pairs(viewers) do
 		wipe(vState.cdvInfos)
@@ -57,3 +64,5 @@ function CDM.GatherCDs(viewers)
 		end
 	end
 end
+
+CDM.Load()

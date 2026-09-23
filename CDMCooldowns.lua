@@ -8,14 +8,10 @@ local Util      = Kami.Util
 local LSM       = LibStub("LibSharedMedia-3.0")
 
 function CDM.Load()
-	KLSavedVars.CDM = KLSavedVars.CDM or {}
-	KLCharVars.CDM  = KLCharVars.CDM  or {}
-	CDM.savedVars   = KLSavedVars.CDM
-	CDM.charVars    = KLCharVars.CDM
-
+	CDM.savedVars = KLSavedVars.CDM
+	CDM.charVars  = KLCharVars.CDM
 	-- TODO: Rename profile?
-	CDM.savedVars.profile           = CDM.savedVars.profile           or {}
-	CDM.charVars.lastCategorySource = CDM.charVars.lastCategorySource or {}
+	CDM.savedVars.profile = CDM.savedVars.profile or {}
 
 	local db = {
 		WARRIOR = {
@@ -975,6 +971,7 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 	if fState then
 		if fState.spellID ~= spellID then
 			-- TODO: Do we need to save this to an account saved vars too?
+			-- TODO: Move the saved var update to CDM.lua
 			CDM.charVars.lastCategorySource[category] = { spellID = spellID, itemID = itemID }
 			CDM.RefreshCategory(fState, spellID, itemID)
 			CDM.RefreshIcon(fState)

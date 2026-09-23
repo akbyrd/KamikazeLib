@@ -6,6 +6,8 @@ local Config = Kami.Config
 local Util   = Kami.Util
 
 function CDM.Load()
+	CDM.charVars = KLCharVars.CDM
+
 	CDM.cfgTree = Config.Create()
 	Config.AddNode(CDM.cfgTree, nil, "Default",
 		{
@@ -13,23 +15,27 @@ function CDM.Load()
 			iconAspect = Config.Number(1.65),
 
 			borderColor = Config.Color("FF000000"),
-			borderSize  = Config.Size("1px"),
+			borderSize  = Config.Size("1ui"),
 		})
 	Config.AddNode(CDM.cfgTree, "Default", "TrackedBar",
 		{
-			xSize    = Config.Size("200px"),
-			ySize    = Config.Size("20px"),
-			padSize  = Config.Size("2px"),
+			xPos     = Config.Size("0px"),
+			yPos     = Config.Size("-272px"),
+			xSize    = Config.Size("514px"),
+			ySize    = Config.Size("16px"),
+			padSize  = Config.Size("-1ui"),
 			barColor = Config.Color("FF4F4F4F"),
 		})
 
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Buffs.Event")
-	CDM.eventFrame:SetScript("OnEvent",       CDM.DispatchEvent)
-	CDM.RegisterEvent("UI_SCALE_CHANGED",     CDM.OnScaleChanged)
-	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED", CDM.OnScaleChanged)
-	hooksecurefunc(UIParent, "SetScale",      CDM.OnScaleChanged)
+	CDM.eventFrame:SetScript("OnEvent",        CDM.DispatchEvent)
+	CDM.RegisterEvent("UI_SCALE_CHANGED",      CDM.OnScaleChanged)
+	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",  CDM.OnScaleChanged)
+	CDM.RegisterEvent("PLAYER_TARGET_CHANGED", CDM.PLAYER_TARGET_CHANGED)
+	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN", CDM.SPELL_UPDATE_COOLDOWN)
+	hooksecurefunc(UIParent, "SetScale",       CDM.OnScaleChanged)
 
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.OnCDMChanged)
@@ -44,26 +50,22 @@ function CDM.Load()
 	for index, category in ipairs(categories) do
 		local categoryName = categoryToName(category)
 
-		-- TODO: Debug background
 		local Root = CreateFrame("Frame", nil, UIParent)
 		Root:SetParentKey(("Kami.CDM.Buffs.%s.Root"):format(categoryName))
 
-		-- TODO: Debug background
-		local Container = CreateFrame("AuraContainer", nil, Root, "CustomAuraContainerTemplate")
-		Container:SetAllPoints()
-		Container:SetUnit("player")
-
 		local vState = {
-			name      = categoryName,
-			cfg       = Config.GetBranch(CDM.cfgTree, categoryName),
-			Root      = Root,
-			Container = Container,
-			cdvInfos  = {},
-			cdFrames  = {},
-			pool      = {},
+			name     = categoryName,
+			cfg      = Config.GetBranch(CDM.cfgTree, categoryName),
+			Root     = Root,
+			cdvInfos = {},
+			cdFrames = {},
+			pool     = {},
 		}
 		CDM.viewers[category] = vState
 	end
+
+	CDM.categoryLookup = {}
+	CDM.onTargetLookup = {}
 
 	CDM.Rebuild()
 end
@@ -79,6 +81,8 @@ function CDM.Rebuild()
 	CDM.AssignFrames()
 	CDM.RefreshAllConfig()
 	CDM.RefreshLayout()
+	CDM.RefreshAllCategories()
+	CDM.RefreshAllAuras()
 end
 
 -- TODO: There are 2 bars on top of each other at the top
@@ -99,7 +103,10 @@ function CDM.ConstructFrame(vState)
 	fState.CellBg:SetAllPoints()
 	fState.CellBg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
 
-	vState.Container:AddAuraSlot(fState.slotKey, "HELPFUL",
+	fState.Container = CreateFrame("AuraContainer", nil, fState.Cell, "CustomAuraContainerTemplate")
+	fState.Container:SetAllPoints()
+
+	fState.Container:AddAuraSlot(fState.slotKey, "HELPFUL",
 		{
 			initializeFrame = function(button)
 				-- NOTE: Errors here are swallowed silently. This runs under securecallfunction.
@@ -134,8 +141,12 @@ function CDM.ConstructFrame(vState)
 	return fState
 end
 
--- TODO: When do we grab the spell for categories? When/how do we update the slot?
-function CDM.EnableFrame(vState, fState, cdvInfo)
+function CDM.EnableFrame(fState, cdvInfo)
+	fState.categoryID = cdvInfo.spellCategoryID
+	if fState.categoryID then
+		CDM.categoryLookup[fState.categoryID] = fState
+	end
+
 	-- NOTE: Category slots (e.g. Combat Potion) don't have a spell id
 	if cdvInfo.spellID then
 		fState.spellIDs[cdvInfo.spellID] = true
@@ -143,20 +154,25 @@ function CDM.EnableFrame(vState, fState, cdvInfo)
 	for iLinked, linkedSpellID in ipairs(cdvInfo.linkedSpellIDs) do
 		fState.spellIDs[linkedSpellID] = true
 	end
-
-	vState.Container:SetAuraSlotCandidateFilters(fState.slotKey, { includeSpellIDs = fState.spellIDs })
 end
 
-function CDM.DisableFrame(vState, fState)
+function CDM.DisableFrame(fState)
 	wipe(fState.spellIDs)
-	vState.Container:SetAuraSlotCandidateFilters(fState.slotKey, { includeSpellIDs = fState.spellIDs })
+	fState.categoryID = nil
+	fState.onTarget = nil
+	fState.Container:SetUnit("none")
+	fState.Container:SetAuraSlotFilterString(fState.slotKey, "")
+	fState.Container:SetAuraSlotCandidateFilters(fState.slotKey, { includeSpellIDs = fState.spellIDs })
 end
 
 function CDM.AssignFrames()
+	wipe(CDM.categoryLookup)
+	wipe(CDM.onTargetLookup)
+
 	for category, vState in pairs(CDM.viewers) do
 		-- Disable existing frames
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			CDM.DisableFrame(vState, fState)
+			CDM.DisableFrame(fState)
 			table.insert(vState.pool, fState)
 		end
 		wipe(vState.cdFrames)
@@ -172,7 +188,7 @@ function CDM.AssignFrames()
 		-- Enable new frames
 		for iInfo, cdvInfo in ipairs(vState.cdvInfos) do
 			local fState = table.remove(vState.pool)
-			CDM.EnableFrame(vState, fState, cdvInfo)
+			CDM.EnableFrame(fState, cdvInfo)
 			table.insert(vState.cdFrames, fState)
 		end
 	end
@@ -206,6 +222,8 @@ function CDM.RefreshLayout()
 	for category, vState in pairs(CDM.viewers) do
 		-- TODO: Handle relative sizes
 		local cfg        = vState.cfg
+		local xPos       = Round(cfg.xPos       + cfg.xPosRel       * 0)
+		local yPos       = Round(cfg.yPos       + cfg.yPosRel       * 0)
 		local xSize      = Round(cfg.xSize      + cfg.xSizeRel      * 0)
 		local ySize      = Round(cfg.ySize      + cfg.ySizeRel      * 0)
 		local padSize    = Round(cfg.padSize    + cfg.padSizeRel    * 0)
@@ -215,8 +233,8 @@ function CDM.RefreshLayout()
 
 		local vxSize = cfg.xSize
 		local vySize = #vState.cdFrames * (ySize + padSize) - padSize
-		local vxPos  = 0 + Round((pxSize - vxSize) / 2)
-		local vyPos  = 0 - Round((pySize - vySize) / 2)
+		local vxPos  = xPos + Round((pxSize - vxSize) / 2)
+		local vyPos  = yPos - Round((pySize - vySize) / 2)
 		vState.Root:SetPoint("TOPLEFT", UIParent, "TOPLEFT", vxPos, vyPos)
 		vState.Root:SetSize(vxSize, vySize)
 
@@ -247,6 +265,53 @@ function CDM.RefreshLayout()
 	end
 end
 
+function CDM.RefreshCategory(fState, spellID)
+	wipe(fState.spellIDs)
+	fState.spellIDs[spellID] = true
+end
+
+function CDM.RefreshAllCategories()
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			if fState.categoryID then
+				local lastSource = CDM.charVars.lastCategorySource[fState.categoryID]
+				if lastSource then
+					CDM.RefreshCategory(fState, lastSource.spellID)
+				end
+			end
+		end
+	end
+end
+
+function CDM.RefreshAuras(fState)
+	-- NOTE: selfAura and hasAura are unreliable. Colossus Smash selfAura is true. Avatar hasAura is
+	-- false. These are not sensible values. So we check IsSpellHarmful/Helpful instead.
+
+	local harmful = false
+	local helpful = false
+	for spellID in pairs(fState.spellIDs) do
+		harmful = harmful or C_Spell.IsSpellHarmful(spellID)
+		helpful = helpful or C_Spell.IsSpellHelpful(spellID)
+	end
+
+	fState.onTarget = harmful and not helpful
+	CDM.onTargetLookup[fState] = fState.onTarget or nil
+
+	local unit   = fState.onTarget and "target"          or "player"
+	local filter = fState.onTarget and "HARMFUL|PLAYER"  or "HELPFUL|PLAYER" -- AuraUtil.AuraFilters
+	fState.Container:SetUnit(unit)
+	fState.Container:SetAuraSlotFilterString(fState.slotKey, filter)
+	fState.Container:SetAuraSlotCandidateFilters(fState.slotKey, { includeSpellIDs = fState.spellIDs })
+end
+
+function CDM.RefreshAllAuras()
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			CDM.RefreshAuras(fState)
+		end
+	end
+end
+
 ----------------------------------------------------------------------------------------------------
 -- Event Handlers
 
@@ -258,6 +323,22 @@ end
 function CDM.DispatchEvent(frame, event, ...)
 	local func = CDM.handlers[event]
 	func(...)
+end
+
+function CDM.PLAYER_TARGET_CHANGED()
+	for fState, onTarget in pairs(CDM.onTargetLookup) do
+		fState.Container:UpdateAllAuras()
+	end
+end
+
+function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
+	local fState = CDM.categoryLookup[category]
+	if fState then
+		if not fState.spellIDs[spellID] then
+			CDM.RefreshCategory(fState, spellID)
+			CDM.RefreshAuras(fState)
+		end
+	end
 end
 
 function CDM.OnScaleChanged()
@@ -277,4 +358,6 @@ end
 
 CDM.Load()
 
+-- TODO: The flicker happens when tabbing between targets with Rend
+-- TODO: Order is unstable (flip-flops when a proc occurs)
 -- TODO: Come up with better naming. self? buffs/cds?

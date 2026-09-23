@@ -1,7 +1,7 @@
 To Do
 -----
 Buff Bars
-	target debuffs
+	Layout
 	Pandemic support
 	anchoring / positioning
 	Custom spell color (classify?)
