@@ -12,10 +12,10 @@ function CDM.Load()
 	Config.AddNode(CDM.cfgTree, nil, "Default",
 		{
 			iconZoom   = Config.Number(0.08),
-			iconAspect = Config.Number(1.65),
+			iconAspect = Config.Number(2.5), -- TODO: Try making this width instead
 
 			borderColor = Config.Color("FF000000"),
-			borderSize  = Config.Size("1ui"),
+			borderSize  = Config.Size("1px"),
 		})
 	Config.AddNode(CDM.cfgTree, "Default", "TrackedBar",
 		{
@@ -23,7 +23,7 @@ function CDM.Load()
 			yPos     = Config.Size("-272px"),
 			xSize    = Config.Size("514px"),
 			ySize    = Config.Size("16px"),
-			padSize  = Config.Size("-1ui"),
+			padSize  = Config.Size("-1px"),
 			barColor = Config.Color("FF4F4F4F"),
 		})
 
@@ -85,25 +85,13 @@ function CDM.Rebuild()
 	CDM.RefreshAllAuras()
 end
 
--- TODO: There are 2 bars on top of each other at the top
--- add item, then remove it
--- layout leaves orphaned item at the top, still visible
--- This probably goes away when we hide inactive buffs
-
--- TODO: ElvUI texture
 function CDM.ConstructFrame(vState)
 	local fState = {}
 	fState.cfg      = vState.cfg
 	fState.slotKey  = tostring(fState)
 	fState.spellIDs = {}
 
-	fState.Cell = CreateFrame("Frame", nil, vState.Root)
-
-	fState.CellBg = fState.Cell:CreateTexture(nil, "BACKGROUND")
-	fState.CellBg:SetAllPoints()
-	fState.CellBg:SetColorTexture(0.1, 0.1, 0.1, 0.8)
-
-	fState.Container = CreateFrame("AuraContainer", nil, fState.Cell, "CustomAuraContainerTemplate")
+	fState.Container = CreateFrame("AuraContainer", nil, vState.Root, "CustomAuraContainerTemplate")
 	fState.Container:SetAllPoints()
 
 	fState.Container:AddAuraSlot(fState.slotKey, "HELPFUL",
@@ -112,15 +100,14 @@ function CDM.ConstructFrame(vState)
 				-- NOTE: Errors here are swallowed silently. This runs under securecallfunction.
 
 				fState.Button = button
-				fState.Button:SetAllPoints(fState.Cell)
 				fState.Button:EnableMouse(false)
+				fState.Button:SetCollapsesLayout(true)
 
 				fState.Icon = fState.Button:CreateTexture(nil, "ARTWORK")
 				fState.Button:SetIcon(fState.Icon)
 
 				fState.IconBorder = fState.Button:CreateTexture(nil, "OVERLAY")
 				fState.IconBorder:SetParentKey("IconBorder")
-				fState.IconBorder:SetPoint("TOPLEFT")
 				fState.IconBorder:SetPoint("BOTTOMLEFT")
 				fState.IconBorder:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
 				fState.IconBorder:SetTextureSliceMargins(1, 1, 1, 1)
@@ -131,7 +118,6 @@ function CDM.ConstructFrame(vState)
 
 				fState.BarBorder = fState.Button:CreateTexture(nil, "OVERLAY")
 				fState.BarBorder:SetParentKey("BarBorder")
-				fState.BarBorder:SetPoint("TOPLEFT")
 				fState.BarBorder:SetPoint("BOTTOMLEFT")
 				fState.BarBorder:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
 				fState.BarBorder:SetTextureSliceMargins(1, 1, 1, 1)
@@ -160,6 +146,7 @@ function CDM.DisableFrame(fState)
 	wipe(fState.spellIDs)
 	fState.categoryID = nil
 	fState.onTarget = nil
+	fState.Button:ClearAllPoints()
 	fState.Container:SetUnit("none")
 	fState.Container:SetAuraSlotFilterString(fState.slotKey, "")
 	fState.Container:SetAuraSlotCandidateFilters(fState.slotKey, { includeSpellIDs = fState.spellIDs })
@@ -239,9 +226,15 @@ function CDM.RefreshLayout()
 		vState.Root:SetSize(vxSize, vySize)
 
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			local cyOffset = -(iFrame - 1) * (ySize + padSize)
-			fState.Cell:SetSize(xSize, ySize)
-			fState.Cell:SetPoint("TOPLEFT", vState.Root, "TOPLEFT", 0, cyOffset)
+			fState.Button:ClearAllPoints()
+		end
+
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			local below  = vState.cdFrames[iFrame + 1]
+			local anchor = below and below.Button or vState.Root
+			local point  = below and "TOPLEFT" or "BOTTOMLEFT"
+			fState.Button:SetSize(xSize, ySize + padSize)
+			fState.Button:SetPoint("BOTTOMLEFT", anchor, point)
 
 			local xScale, yScale = Util.AspectScale(iconAspect)
 			local ibxSize = Round(xScale / yScale * ySize)
@@ -251,7 +244,7 @@ function CDM.RefreshLayout()
 			Util.ZoomIcon(fState.Icon, iconZoom, ixSize, iySize)
 			fState.Icon:SetPoint("TOPLEFT",     fState.IconBorder, "TOPLEFT",      borderSize, -borderSize)
 			fState.Icon:SetPoint("BOTTOMRIGHT", fState.IconBorder, "BOTTOMRIGHT", -borderSize,  borderSize)
-			fState.IconBorder:SetWidth(ibxSize / borderSize)
+			fState.IconBorder:SetSize(ibxSize / borderSize, ibySize / borderSize)
 			fState.IconBorder:SetScale(borderSize)
 
 			local bbxPos  = (ibxSize - borderSize)
@@ -259,7 +252,7 @@ function CDM.RefreshLayout()
 			fState.Bar:SetPoint("TOPLEFT",     fState.BarBorder, "TOPLEFT",      borderSize, -borderSize)
 			fState.Bar:SetPoint("BOTTOMRIGHT", fState.BarBorder, "BOTTOMRIGHT", -borderSize,  borderSize)
 			fState.BarBorder:SetPointsOffset(bbxPos / borderSize, 0)
-			fState.BarBorder:SetWidth(bbxSize / borderSize)
+			fState.BarBorder:SetSize(bbxSize / borderSize, ibySize / borderSize)
 			fState.BarBorder:SetScale(borderSize)
 		end
 	end
@@ -343,6 +336,7 @@ end
 
 function CDM.OnScaleChanged()
 	CDM.RefreshScale()
+	CDM.RefreshLayout()
 end
 
 function CDM.OnCDMChanged()

@@ -1,12 +1,13 @@
 To Do
 -----
 Buff Bars
-	Layout
 	Pandemic support
-	anchoring / positioning
+	Rebuild
 	Custom spell color (classify?)
 	"show all" for edit mode
-ElvUI texture on empower bars
+ElvUI texture
+	buff bars
+	empower bars
 PixelAnts twitch during a rebuild
 Rage bar
 Sweeping strikes bar
