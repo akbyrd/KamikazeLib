@@ -713,17 +713,15 @@ function CDM.RefreshCooldown(fState)
 	local onCD     = cdInfo.isActive and not cdInfo.isOnGCD
 	local onGCD    = cdInfo.isOnGCD
 
-	-- TODO: Test with a trinket on the GCD (Algeth'ar Puzzle Box)
 	if fState.equipSlot then
 		-- NOTE: GetSpellCooldown[Duration] is the item burst category cooldown for items
 		local start, duration2, enable = GetInventoryItemCooldown("player", fState.equipSlot)
 		if enable == 1 and duration2 > 0 then
+			local BASE_GCD = 1.5
 			fState.itemDuration:SetTimeFromStart(start, duration2)
 			duration = fState.itemDuration
-			onCD     = true
-			onGCD    = false
-		else
-			onCD = false
+			onCD     = duration2 > BASE_GCD
+			onGCD    = not onCD
 		end
 	end
 
@@ -1120,10 +1118,6 @@ function CDM.OnCDMChanged()
 	-- NOTE: Hook fires when events are being throttled. Wait for the unlock.
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	if layoutMgr:AreNotificationsLocked() then return end
-
-	-- TODO: Is this needed?
-	-- NOTE: Spell overrides trigger NotifyListeners during combat
-	--if InCombatLockdown() then return end
 
 	CDM.Rebuild()
 end

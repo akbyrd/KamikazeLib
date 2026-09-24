@@ -22,6 +22,7 @@ Settings
 	Versioning
 Track active duration
 Anchoring
+Custom glow when ready
 Disable ability highlight on specific spells
 Per-talent layout
 Track any item
