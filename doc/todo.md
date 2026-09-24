@@ -1,5 +1,6 @@
 To Do
 -----
+Fatal Mark doesn't work?
 Buff Bars
 	Custom spell color (classify?)
 	"show all" for edit mode

@@ -126,7 +126,6 @@ function CDM.ConstructFrame(vState)
 				fState.IconBorder:SetTextureSliceMargins(1, 1, 1, 1)
 
 				fState.Bar = CreateFrame("StatusBar", nil, fState.Button)
-				fState.Bar:SetFillStyle(Enum.StatusBarFillStyle.StandardNoRangeFill)
 				fState.Button:SetDurationBar(fState.Bar, { direction = Enum.StatusBarTimerDirection.RemainingTime })
 
 				fState.BarBorder = fState.Button:CreateTexture(nil, "OVERLAY")
@@ -325,6 +324,10 @@ function CDM.RefreshAuras(fState)
 	fState.Container:SetUnit(unit)
 	fState.Container:SetAuraSlotFilterString(fState.slotKey, filter)
 	fState.Container:SetAuraSlotCandidateFilters(fState.slotKey, { includeSpellIDs = fState.spellIDs })
+
+	if not C_Secrets.ShouldAurasBeSecret() then
+		fState.Bar:SetFillStyle(fState.onTarget and Enum.StatusBarFillStyle.Standard or Enum.StatusBarFillStyle.StandardNoRangeFill)
+	end
 end
 
 function CDM.RefreshAllAuras()
@@ -387,5 +390,4 @@ end
 CDM.Load()
 
 -- TODO: The flicker happens when tabbing between targets with Rend
--- TODO: Order is unstable (flip-flops when a proc occurs)
 -- TODO: Come up with better naming. self? buffs/cds?
