@@ -33,6 +33,7 @@ function CDM.Load()
 	CDM.eventFrame:SetScript("OnEvent",        CDM.DispatchEvent)
 	CDM.RegisterEvent("UI_SCALE_CHANGED",      CDM.OnScaleChanged)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",  CDM.OnScaleChanged)
+	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",  CDM.PLAYER_REGEN_ENABLED)
 	CDM.RegisterEvent("PLAYER_TARGET_CHANGED", CDM.PLAYER_TARGET_CHANGED)
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN", CDM.SPELL_UPDATE_COOLDOWN)
 	hooksecurefunc(UIParent, "SetScale",       CDM.OnScaleChanged)
@@ -71,6 +72,10 @@ function CDM.Load()
 end
 
 function CDM.Rebuild()
+	-- NOTE: Keys (and certain other content) are restricted the whole time. We can't touch the Aura
+	-- Containers.
+	if C_Secrets.ShouldAurasBeSecret() then return end
+
 	Kami.CDM.GatherCDs(CDM.viewers)
 
 	-- TODO: RefreshScale is first because it's responsible for Config.RefreshValues. That seems a
@@ -316,6 +321,10 @@ end
 function CDM.DispatchEvent(frame, event, ...)
 	local func = CDM.handlers[event]
 	func(...)
+end
+
+function CDM.PLAYER_REGEN_ENABLED()
+	CDM.Rebuild()
 end
 
 function CDM.PLAYER_TARGET_CHANGED()

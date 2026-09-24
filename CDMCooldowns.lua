@@ -1121,8 +1121,9 @@ function CDM.OnCDMChanged()
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	if layoutMgr:AreNotificationsLocked() then return end
 
+	-- TODO: Is this needed?
 	-- NOTE: Spell overrides trigger NotifyListeners during combat
-	if InCombatLockdown() then return end
+	--if InCombatLockdown() then return end
 
 	CDM.Rebuild()
 end

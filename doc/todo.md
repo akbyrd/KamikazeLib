@@ -2,7 +2,6 @@ To Do
 -----
 Buff Bars
 	Pandemic support
-	Rebuild
 	Custom spell color (classify?)
 	"show all" for edit mode
 ElvUI texture
