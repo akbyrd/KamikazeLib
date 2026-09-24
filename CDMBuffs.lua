@@ -28,7 +28,7 @@ function CDM.Load()
 	Config.AddNode(CDM.cfgTree, "Default", "TrackedBar",
 		{
 			xPos     = Config.Size("0px"),
-			yPos     = Config.Size("-268px"),
+			yPos     = Config.Size("-335px"),
 			xSize    = Config.Size("514px"),
 			ySize    = Config.Size("16px"),
 			padSize  = Config.Size("-1px"),
@@ -247,7 +247,7 @@ function CDM.RefreshLayout()
 		local vxSize = cfg.xSize
 		local vySize = #vState.cdFrames * (ySize + padSize) - padSize
 		local vxPos  = xPos + Round((pxSize - vxSize) / 2)
-		local vyPos  = yPos - Round((pySize - vySize) / 2)
+		local vyPos  = yPos - Round(pySize / 2) + vySize
 		vState.Root:SetPoint("TOPLEFT", UIParent, "TOPLEFT", vxPos, vyPos)
 		vState.Root:SetSize(vxSize, vySize)
 
