@@ -52,7 +52,7 @@ function PixelAnts.SetConfig(f, thickness, inset, color, speed, segments, duty)
 end
 
 -- TODO: Hoist the size getters and check to the caller?
-function PixelAnts.RefreshSize(f)
+function PixelAnts.RefreshSize(f, xSize, ySize)
 	f:SetPoint("TOPLEFT",      f.inset, -f.inset)
 	f:SetPoint("BOTTOMRIGHT", -f.inset,  f.inset)
 
@@ -65,8 +65,8 @@ function PixelAnts.RefreshSize(f)
 		tex:SetSize(f.thickness, f.thickness)
 	end
 
-	local xSize = f:GetWidth()
-	local ySize = f:GetHeight()
+	xSize = xSize and (xSize - 2*f.inset) or f:GetWidth()
+	ySize = ySize and (ySize - 2*f.inset) or f:GetHeight()
 	if not (xSize > 0 and ySize > 0) then return end
 
 	local perim = 2 * (xSize + ySize)

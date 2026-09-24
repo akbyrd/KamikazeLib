@@ -2,8 +2,9 @@ local Kami = select(2, ...)
 local CDM = {}
 Kami.CDM.Buffs = CDM
 
-local Config = Kami.Config
-local Util   = Kami.Util
+local Config    = Kami.Config
+local PixelAnts = Kami.PixelAnts
+local Util      = Kami.Util
 
 function CDM.Load()
 	CDM.charVars = KLCharVars.CDM
@@ -16,11 +17,18 @@ function CDM.Load()
 
 			borderColor = Config.Color("FF000000"),
 			borderSize  = Config.Size("1px"),
+
+			pandemicColor    = Config.Color("FFFF3030"),
+			pandemicInset    = Config.Size("0px"),
+			pandemicSize     = Config.Size("1px"),
+			pandemicSpeed    = Config.Number(0.05),
+			pandemicSegments = Config.Number(8),
+			pandemicDuty     = Config.Number(0.6),
 		})
 	Config.AddNode(CDM.cfgTree, "Default", "TrackedBar",
 		{
 			xPos     = Config.Size("0px"),
-			yPos     = Config.Size("-272px"),
+			yPos     = Config.Size("-268px"),
 			xSize    = Config.Size("514px"),
 			ySize    = Config.Size("16px"),
 			padSize  = Config.Size("-1px"),
@@ -126,6 +134,10 @@ function CDM.ConstructFrame(vState)
 				fState.BarBorder:SetPoint("BOTTOMLEFT")
 				fState.BarBorder:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
 				fState.BarBorder:SetTextureSliceMargins(1, 1, 1, 1)
+
+				fState.Pandemic = PixelAnts.Create(fState.Button)
+				fState.Pandemic:SetParentKey("Pandemic")
+				fState.Button:AddPandemicRegion(fState.Pandemic)
 			end,
 		})
 
@@ -203,6 +215,14 @@ function CDM.RefreshAllConfig()
 			fState.Bar:SetColorFill(cfg.barColor:GetRGBA())
 			fState.IconBorder:SetVertexColor(cfg.borderColor:GetRGBA())
 			fState.BarBorder:SetVertexColor(cfg.borderColor:GetRGBA())
+
+			fState.Pandemic:SetConfig(
+				nil,
+				nil,
+				fState.cfg.pandemicColor,
+				fState.cfg.pandemicSpeed,
+				fState.cfg.pandemicSegments,
+				fState.cfg.pandemicDuty)
 		end
 	end
 
@@ -213,15 +233,17 @@ function CDM.RefreshLayout()
 
 	for category, vState in pairs(CDM.viewers) do
 		-- TODO: Handle relative sizes
-		local cfg        = vState.cfg
-		local xPos       = Round(cfg.xPos       + cfg.xPosRel       * 0)
-		local yPos       = Round(cfg.yPos       + cfg.yPosRel       * 0)
-		local xSize      = Round(cfg.xSize      + cfg.xSizeRel      * 0)
-		local ySize      = Round(cfg.ySize      + cfg.ySizeRel      * 0)
-		local padSize    = Round(cfg.padSize    + cfg.padSizeRel    * 0)
-		local borderSize = Round(cfg.borderSize + cfg.borderSizeRel * 0)
-		local iconAspect = cfg.iconAspect
-		local iconZoom   = cfg.iconZoom
+		local cfg           = vState.cfg
+		local xPos          = Round(cfg.xPos          + cfg.xPosRel          * 0)
+		local yPos          = Round(cfg.yPos          + cfg.yPosRel          * 0)
+		local xSize         = Round(cfg.xSize         + cfg.xSizeRel         * 0)
+		local ySize         = Round(cfg.ySize         + cfg.ySizeRel         * 0)
+		local padSize       = Round(cfg.padSize       + cfg.padSizeRel       * 0)
+		local borderSize    = Round(cfg.borderSize    + cfg.borderSizeRel    * 0)
+		local pandemicSize  = Round(cfg.pandemicSize  + cfg.pandemicSizeRel  * 0)
+		local pandemicInset = Round(cfg.pandemicInset + cfg.pandemicInsetRel * 0)
+		local iconAspect    = cfg.iconAspect
+		local iconZoom      = cfg.iconZoom
 
 		local vxSize = cfg.xSize
 		local vySize = #vState.cdFrames * (ySize + padSize) - padSize
@@ -238,18 +260,18 @@ function CDM.RefreshLayout()
 			local below  = vState.cdFrames[iFrame + 1]
 			local anchor = below and below.Button or vState.Root
 			local point  = below and "TOPLEFT" or "BOTTOMLEFT"
-			fState.Button:SetSize(xSize, ySize + padSize)
+			fState.Button:SetSize(xSize, ySize)
 			fState.Button:SetPoint("BOTTOMLEFT", anchor, point)
+			fState.Button:SetPointsOffset(0, padSize)
 
 			local xScale, yScale = Util.AspectScale(iconAspect)
 			local ibxSize = Round(xScale / yScale * ySize)
-			local ibySize = Round(yScale / yScale * ySize)
 			local ixSize  = ibxSize - 2*borderSize
-			local iySize  = ibySize - 2*borderSize
+			local iySize  = ySize   - 2*borderSize
 			Util.ZoomIcon(fState.Icon, iconZoom, ixSize, iySize)
 			fState.Icon:SetPoint("TOPLEFT",     fState.IconBorder, "TOPLEFT",      borderSize, -borderSize)
 			fState.Icon:SetPoint("BOTTOMRIGHT", fState.IconBorder, "BOTTOMRIGHT", -borderSize,  borderSize)
-			fState.IconBorder:SetSize(ibxSize / borderSize, ibySize / borderSize)
+			fState.IconBorder:SetSize(ibxSize / borderSize, ySize / borderSize)
 			fState.IconBorder:SetScale(borderSize)
 
 			local bbxPos  = (ibxSize - borderSize)
@@ -257,8 +279,11 @@ function CDM.RefreshLayout()
 			fState.Bar:SetPoint("TOPLEFT",     fState.BarBorder, "TOPLEFT",      borderSize, -borderSize)
 			fState.Bar:SetPoint("BOTTOMRIGHT", fState.BarBorder, "BOTTOMRIGHT", -borderSize,  borderSize)
 			fState.BarBorder:SetPointsOffset(bbxPos / borderSize, 0)
-			fState.BarBorder:SetSize(bbxSize / borderSize, ibySize / borderSize)
+			fState.BarBorder:SetSize(bbxSize / borderSize, ySize / borderSize)
 			fState.BarBorder:SetScale(borderSize)
+
+			fState.Pandemic:SetConfig(pandemicSize, pandemicInset, nil, nil, nil, nil)
+			fState.Pandemic:RefreshSize(xSize, ySize)
 		end
 	end
 end
