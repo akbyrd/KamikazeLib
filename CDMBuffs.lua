@@ -150,6 +150,8 @@ function CDM.EnableFrame(fState, cdvInfo)
 		CDM.categoryLookup[fState.categoryID] = fState
 	end
 
+	fState.auraSpellID = cdvInfo.linkedSpellIDs[1] or cdvInfo.spellID
+
 	-- NOTE: Category slots (e.g. Combat Potion) don't have a spell id
 	if cdvInfo.spellID then
 		fState.spellIDs[cdvInfo.spellID] = true
@@ -161,6 +163,7 @@ end
 
 function CDM.DisableFrame(fState)
 	wipe(fState.spellIDs)
+	fState.auraSpellID = nil
 	fState.categoryID = nil
 	fState.onTarget = nil
 	fState.Button:ClearAllPoints()
@@ -291,6 +294,7 @@ end
 
 function CDM.RefreshCategory(fState, spellID)
 	wipe(fState.spellIDs)
+	fState.auraSpellID = spellID
 	fState.spellIDs[spellID] = true
 end
 
@@ -311,14 +315,15 @@ function CDM.RefreshAuras(fState)
 	-- NOTE: selfAura and hasAura are unreliable. Colossus Smash selfAura is true. Avatar hasAura is
 	-- false. These are not sensible values. So we check IsSpellHarmful/Helpful instead.
 
-	local harmful = false
-	local helpful = false
-	for spellID in pairs(fState.spellIDs) do
-		harmful = harmful or C_Spell.IsSpellHarmful(spellID)
-		helpful = helpful or C_Spell.IsSpellHelpful(spellID)
-	end
+	-- NOTE: The list of spell ids can include both helpful and harmful spells. Usually this is a
+	-- helpful ability as the main spell id and the harmful debuff it applies. But sometimes there's
+	-- a spell that genuinely has both a helpful and harmful effect, like Piercing Howl. Blizzard
+	-- will show both on the same bar (player first, then target). We prioritize the first linked
+	-- spell, which appears to always give us the expected result. There are two Piercing Howl
+	-- entires in the CDM settings specifically so you can choose between the helpful and harmful
+	-- buffs and that works correctly with this approach.
 
-	fState.onTarget = harmful and not helpful
+	fState.onTarget = fState.auraSpellID and C_Spell.IsSpellHarmful(fState.auraSpellID)
 	CDM.onTargetLookup[fState] = fState.onTarget or nil
 
 	local unit   = fState.onTarget and "target"          or "player"

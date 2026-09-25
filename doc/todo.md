@@ -1,7 +1,5 @@
 To Do
 -----
--1 padding doesn't work whe borders are 1ui
-Fatal Mark doesn't work?
 Buff Bars
 	Custom spell color (classify?)
 	"show all" for edit mode
