@@ -34,7 +34,7 @@ function Settings.Load()
 		{
 			borderSize        = Config.Size("1px"),
 			borderColor       = Config.Color("0FFFFFFF"),
-			backgroundTexture = Config.String("Interface\\Buttons\\WHITE8x8"),
+			backgroundTexture = Config.Texture("background", "Solid"),
 			backgroundColor   = Config.Color("FA1C1C1C"),
 			accentColor       = Config.Color("FFFFCC00"),
 			padSize           = Config.UISize(rootSize, -7),
@@ -80,7 +80,7 @@ function Settings.Load()
 			xSize           = Config.UISize(rootSize, -7),
 			ySize           = Config.UISize(rootSize, -7),
 			backgroundColor = Config.Color("08FFFFFF"),
-			hoverTexture    = Config.String("Interface\\Buttons\\WHITE8x8"),
+			hoverTexture    = Config.Texture("background", "Solid"),
 			hoverColor      = Config.Color("14FFFFFF"),
 		})
 

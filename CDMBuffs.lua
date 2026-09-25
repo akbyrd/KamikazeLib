@@ -27,12 +27,13 @@ function CDM.Load()
 		})
 	Config.AddNode(CDM.cfgTree, "Default", "TrackedBar",
 		{
-			xPos     = Config.Size("0px"),
-			yPos     = Config.Size("-335px"),
-			xSize    = Config.Size("514px"),
-			ySize    = Config.Size("16px"),
-			padSize  = Config.Size("-1px"),
-			barColor = Config.Color("FF4F4F4F"),
+			xPos       = Config.Size("0px"),
+			yPos       = Config.Size("-335px"),
+			xSize      = Config.Size("514px"),
+			ySize      = Config.Size("16px"),
+			padSize    = Config.Size("-1px"),
+			barColor   = Config.Color("FF4F4F4F"),
+			barTexture = Config.Texture("statusbar", "ElvUI Norm", "Solid"),
 		})
 
 	CDM.handlers = {}
@@ -211,7 +212,8 @@ function CDM.RefreshAllConfig()
 		local cfg = vState.cfg
 
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			fState.Bar:SetColorFill(cfg.barColor:GetRGBA())
+			fState.Bar:SetStatusBarColor(cfg.barColor:GetRGBA())
+			fState.Bar:SetStatusBarTexture(cfg.barTexture)
 			fState.IconBorder:SetVertexColor(cfg.borderColor:GetRGBA())
 			fState.BarBorder:SetVertexColor(cfg.borderColor:GetRGBA())
 

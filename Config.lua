@@ -3,15 +3,17 @@ local Config = { Impl = {} }
 Kami.Config = Config
 
 local Util = Kami.Util
+local LSM  = LibStub("LibSharedMedia-3.0")
 
-function Config.Bool(value)      return { type = "boolean", value = value                 } end
-function Config.Number(value)    return { type = "number",  value = value                 } end
-function Config.String(value)    return { type = "string",  value = value                 } end
-function Config.Table(value)     return { type = "table",   value = value                 } end
-function Config.Size(value)      return { type = "size",    value = value                 } end
-function Config.UISize(value, e) return { type = "size",    value = Util.UISize(value, e) } end
-function Config.Color(value)     return { type = "color",   value = value                 } end
-function Config.Font(value)      return { type = "font",    value = value                 } end
+function Config.Bool(value)                        return { type = "boolean", value = value                 } end
+function Config.Number(value)                      return { type = "number",  value = value                 } end
+function Config.String(value)                      return { type = "string",  value = value                 } end
+function Config.Table(value)                       return { type = "table",   value = value                 } end
+function Config.Size(value)                        return { type = "size",    value = value                 } end
+function Config.UISize(value, e)                   return { type = "size",    value = Util.UISize(value, e) } end
+function Config.Color(value)                       return { type = "color",   value = value                 } end
+function Config.Font(value)                        return { type = "font",    value = value                 } end
+function Config.Texture(mediaType, name, fallback) return { type = "texture", value = { mediaType = mediaType, name = name, fallback = fallback } } end
 
 function Config.Create()
 	local tree = {
@@ -251,6 +253,23 @@ Config.Impl.typeDefs = {
 		end,
 		format = function(value)
 			return value
+		end,
+	},
+
+	texture = {
+		parse = function(key, value)
+			local validType = LSM:IsValid(value.mediaType)
+			local validName = type(value.name) == "string"
+			assert(validType and validName, ("Invalid texture %s: %s"):format(key, tostring(value.name)))
+		end,
+		resolve = function(derived, key, value)
+			local path = LSM:Fetch(value.mediaType, value.name, true)
+			path = path or LSM:Fetch(value.mediaType, value.fallback, true)
+			assert(path, ("No texture for %s: %s"):format(key, tostring(value.name)))
+			derived[key] = path
+		end,
+		format = function(value)
+			return value.name
 		end,
 	},
 
