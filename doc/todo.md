@@ -6,7 +6,6 @@ Buff Bars
 	Custom spell color (classify?)
 	"show all" for edit mode
 ElvUI texture on empower bars?
-PixelAnts twitch during a rebuild
 Rage bar
 Sweeping strikes bar
 Whirlwind bar
@@ -30,9 +29,9 @@ Track any item
 Track any spell
 Profile performance
 Out-of-game harness
-Button occasionally gets stuck
-	Happens on ElvUI too
-	Suspect the hold-to-cast addon
+Empower flickers when rebuilding
+	Consider minimizing unnecessary rebuilds?
+	Only if CD data changes?
 
 
 

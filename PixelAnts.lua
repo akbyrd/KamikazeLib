@@ -95,9 +95,10 @@ function PixelAnts.RefreshSize(f, xSize, ySize)
 	for iEdge, tex in ipairs(f.edges) do
 		tex.Scroll:Stop()
 		if f.speed ~= 0 then
+			local duration = 1 / (abs(f.speed) * tiles)
 			tex.Anim:SetOffset(f.speed > 0 and -1 or 1, 0)
-			tex.Anim:SetDuration(1 / (abs(f.speed) * tiles))
-			tex.Scroll:Play()
+			tex.Anim:SetDuration(duration)
+			tex.Scroll:Play(false, GetTime() % duration)
 		end
 	end
 end
