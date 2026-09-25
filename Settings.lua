@@ -54,7 +54,7 @@ function Settings.Load()
 
 	Config.AddNode(Settings.cfgTree, "Default", "Row",
 		{
-			ySize      = Config.UISize(rootSize, -6),
+			ySize      = Config.UISize(rootSize, -7),
 			labelWidth = Config.UISize(rootSize, -2),
 		})
 
@@ -218,17 +218,7 @@ end
 -- File Load
 
 Settings.Load()
-Settings.Toggle()
-
-local login = CreateFrame("Frame")
---login:RegisterEvent("PLAYER_ENTERING_WORLD")
-login:SetScript("OnEvent", function(self)
-	self:UnregisterEvent("PLAYER_ENTERING_WORLD")
-	C_Timer.After(0, function()
-		DandersFrames:ToggleGUI()
-		SlashCmdList.SOURCERY("")
-	end)
-end)
+--Settings.Toggle()
 
 -- TODO: Refine cfg and construction ordering
 -- TODO: Improve slash command handling

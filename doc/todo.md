@@ -1,12 +1,11 @@
 To Do
 -----
+-1 padding doesn't work whe borders are 1ui
 Fatal Mark doesn't work?
 Buff Bars
 	Custom spell color (classify?)
 	"show all" for edit mode
-ElvUI texture
-	buff bars
-	empower bars
+ElvUI texture on empower bars?
 PixelAnts twitch during a rebuild
 Rage bar
 Sweeping strikes bar
@@ -21,6 +20,7 @@ Settings
 	Implement search
 	Put file earlier in toc
 	Versioning
+Figure out how profiles should work
 Track active duration
 Anchoring
 Custom glow when ready

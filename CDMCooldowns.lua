@@ -10,8 +10,6 @@ local LSM       = LibStub("LibSharedMedia-3.0")
 function CDM.Load()
 	CDM.savedVars = KLSavedVars.CDM
 	CDM.charVars  = KLCharVars.CDM
-	-- TODO: Rename profile?
-	CDM.savedVars.profile = CDM.savedVars.profile or {}
 
 	local db = {
 		WARRIOR = {
@@ -110,10 +108,6 @@ function CDM.Load()
 			iconSize  = Config.Size("30ui"),
 			rowLimits = Config.Table({ 4 }),
 		})
-
-	for branch, values in pairs(CDM.savedVars.profile) do
-		Config.AddNode(CDM.cfgTree, branch, nil, values)
-	end
 
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
