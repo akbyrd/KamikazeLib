@@ -9,7 +9,9 @@ local Util      = Kami.Util
 function CDM.Load()
 	CDM.charVars = KLCharVars.CDM
 
+	local db = Kami.CDM.db
 	CDM.cfgTree = Config.Create()
+
 	Config.AddNode(CDM.cfgTree, nil, "Default",
 		{
 			iconZoom   = Config.Number(0.08),
@@ -36,6 +38,35 @@ function CDM.Load()
 			barTexture = Config.Texture("statusbar", "ElvUI Norm", "Solid"),
 		})
 
+	Config.AddNode(CDM.cfgTree, "TrackedBar", "Defensive",
+		{
+			barColor = Config.Color("FF4232C6"),
+		})
+
+	Config.AddNode(CDM.cfgTree, "TrackedBar", "Offensive",
+		{
+			barColor = Config.Color("FFC91309"),
+		})
+
+	Config.AddNode(CDM.cfgTree, nil, "FilterCategories",
+		{
+			SpellCategory = Config.Table({
+				[db.Category.CombatPotion] = "Offensive",
+			}),
+
+			Ability = Config.Table({
+				[db.WARRIOR.Ability.Avatar]        = "Offensive",
+				[db.WARRIOR.Ability.Bladestorm]    = "Offensive",
+				[db.WARRIOR.Ability.ColossusSmash] = "Offensive",
+
+				[db.WARRIOR.Ability.DieByTheSword]   = "Defensive",
+				[db.WARRIOR.Ability.RallyingCry]     = "Defensive",
+				[db.WARRIOR.Ability.SpellReflection] = "Defensive",
+				[db.WARRIOR.Ability.Rend]            = "Defensive",
+				[db.WARRIOR.Ability.DefensiveStance] = "Defensive",
+			}),
+		})
+
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Buffs.Event")
@@ -52,12 +83,12 @@ function CDM.Load()
 
 	local categoryToName = EnumUtil.GenerateNameTranslation(Enum.CooldownViewerCategory)
 
-	local categories = {
+	local viewerCategories = {
 		Enum.CooldownViewerCategory.TrackedBar,
 	}
 
 	CDM.viewers = {}
-	for index, category in ipairs(categories) do
+	for index, category in ipairs(viewerCategories) do
 		local categoryName = categoryToName(category)
 
 		local Root = CreateFrame("Frame", nil, UIParent)
@@ -74,8 +105,9 @@ function CDM.Load()
 		CDM.viewers[category] = vState
 	end
 
-	CDM.categoryLookup = {}
-	CDM.onTargetLookup = {}
+	CDM.categoryLookup   = {}
+	CDM.onTargetLookup   = {}
+	CDM.filterCategories = Config.GetBranch(CDM.cfgTree, "FilterCategories")
 
 	CDM.Rebuild()
 end
@@ -101,7 +133,6 @@ end
 
 function CDM.ConstructFrame(vState)
 	local fState = {}
-	fState.cfg      = vState.cfg
 	fState.slotKey  = tostring(fState)
 	fState.spellIDs = {}
 
@@ -144,13 +175,11 @@ function CDM.ConstructFrame(vState)
 	return fState
 end
 
-function CDM.EnableFrame(fState, cdvInfo)
-	fState.categoryID = cdvInfo.spellCategoryID
-	if fState.categoryID then
-		CDM.categoryLookup[fState.categoryID] = fState
+function CDM.EnableFrame(fState, cdvInfo, vState)
+	fState.spellCategory = cdvInfo.spellCategoryID
+	if fState.spellCategory then
+		CDM.categoryLookup[fState.spellCategory] = fState
 	end
-
-	fState.auraSpellID = cdvInfo.linkedSpellIDs[1] or cdvInfo.spellID
 
 	-- NOTE: Category slots (e.g. Combat Potion) don't have a spell id
 	if cdvInfo.spellID then
@@ -159,12 +188,21 @@ function CDM.EnableFrame(fState, cdvInfo)
 	for iLinked, linkedSpellID in ipairs(cdvInfo.linkedSpellIDs) do
 		fState.spellIDs[linkedSpellID] = true
 	end
+
+	fState.auraSpellID = cdvInfo.linkedSpellIDs[1] or cdvInfo.spellID
+
+	local filterCategory = CDM.filterCategories.SpellCategory[fState.spellCategory]
+	for spellID, v in pairs(fState.spellIDs) do
+		filterCategory = filterCategory or CDM.filterCategories.Ability[spellID]
+	end
+	fState.cfg = filterCategory and Config.GetBranch(CDM.cfgTree, filterCategory) or vState.cfg
 end
 
 function CDM.DisableFrame(fState)
 	wipe(fState.spellIDs)
+	fState.cfg = nil
 	fState.auraSpellID = nil
-	fState.categoryID = nil
+	fState.spellCategory = nil
 	fState.onTarget = nil
 	fState.Button:ClearAllPoints()
 	fState.Container:SetUnit("none")
@@ -195,7 +233,7 @@ function CDM.AssignFrames()
 		-- Enable new frames
 		for iInfo, cdvInfo in ipairs(vState.cdvInfos) do
 			local fState = table.remove(vState.pool)
-			CDM.EnableFrame(fState, cdvInfo)
+			CDM.EnableFrame(fState, cdvInfo, vState)
 			table.insert(vState.cdFrames, fState)
 		end
 	end
@@ -212,9 +250,9 @@ end
 
 function CDM.RefreshAllConfig()
 	for category, vState in pairs(CDM.viewers) do
-		local cfg = vState.cfg
-
 		for iFrame, fState in ipairs(vState.cdFrames) do
+			local cfg = fState.cfg
+
 			fState.Bar:SetStatusBarColor(cfg.barColor:GetRGBA())
 			fState.Bar:SetStatusBarTexture(cfg.barTexture)
 			fState.IconBorder:SetVertexColor(cfg.borderColor:GetRGBA())
@@ -301,8 +339,8 @@ end
 function CDM.RefreshAllCategories()
 	for category, vState in pairs(CDM.viewers) do
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			if fState.categoryID then
-				local lastSource = CDM.charVars.lastCategorySource[fState.categoryID]
+			if fState.spellCategory then
+				local lastSource = CDM.charVars.lastCategorySource[fState.spellCategory]
 				if lastSource then
 					CDM.RefreshCategory(fState, lastSource.spellID)
 				end

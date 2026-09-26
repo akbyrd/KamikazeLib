@@ -1,8 +1,5 @@
 To Do
 -----
-Buff Bars
-	Custom spell color (classify?)
-	"show all" for edit mode
 ElvUI texture on empower bars?
 Rage bar
 Sweeping strikes bar
@@ -17,6 +14,7 @@ Settings
 	Implement search
 	Put file earlier in toc
 	Versioning
+	"show all" buff bars for edit mode
 Figure out how profiles should work
 Track active duration
 Anchoring
@@ -25,8 +23,8 @@ Disable ability highlight on specific spells
 Per-talent layout
 Track any item
 Track any spell
+Find a suitable spell category database (Danders if loaded?)
 Profile performance
-Out-of-game harness
 Empower flickers when rebuilding
 	Consider minimizing unnecessary rebuilds?
 	Only if CD data changes?
@@ -37,3 +35,4 @@ Other Ideas
 -----------
 Combat Text
 Reflect damage
+Out-of-game harness

@@ -11,27 +11,7 @@ function CDM.Load()
 	CDM.savedVars = KLSavedVars.CDM
 	CDM.charVars  = KLCharVars.CDM
 
-	local db = {
-		WARRIOR = {
-			MortalStrike = 12294,
-			Overpower    = 7384,
-			Execute      = 163201,
-			Cleave       = 845,
-			Slam         = 1464,
-			HeroicStrike = 1269383,
-			Bladestorm   = 227847,
-
-			MasterOfWarfareProc   = 1269391,
-			MasterOfWarfareBuff   = 1269394,
-			Opportunist           = 456120,
-			CollateralDamage      = 334783,
-			ImminentDemise        = 445606,
-			WindingUp             = 1300670,
-			Executioner           = 445584,
-			ExecutionersPrecision = 386633,
-		}
-	}
-
+	local db = Kami.CDM.db
 	CDM.cfgTree = Config.Create()
 
 	Config.AddNode(CDM.cfgTree, nil, "Default",
@@ -78,7 +58,7 @@ function CDM.Load()
 			overrideSize   = Config.Size("4px"),
 			overrideTimers = Config.Table({
 				WARRIOR = {
-					--[db.WARRIOR.Slam] = { overrideSpellID = db.WARRIOR.HeroicStrike, duration = 15 },
+					--[db.WARRIOR.Ability.Slam] = { overrideSpellID = db.WARRIOR.Ability.HeroicStrike, duration = 15 },
 				},
 			}),
 
@@ -87,12 +67,12 @@ function CDM.Load()
 			empowerBorderSize = Config.Size("2px"),
 			empowerBuffs      = Config.Table({
 				WARRIOR = {
-					[db.WARRIOR.Overpower]    = db.WARRIOR.Opportunist,
-					[db.WARRIOR.Cleave]       = db.WARRIOR.CollateralDamage,
-					[db.WARRIOR.Bladestorm]   = db.WARRIOR.ImminentDemise,
-					[db.WARRIOR.Slam]         = db.WARRIOR.WindingUp,
-					[db.WARRIOR.Execute]      = db.WARRIOR.Executioner,
-					[db.WARRIOR.MortalStrike] = db.WARRIOR.ExecutionersPrecision,
+					[db.WARRIOR.Ability.Overpower]    = db.WARRIOR.Aura.Opportunist,
+					[db.WARRIOR.Ability.Cleave]       = db.WARRIOR.Aura.CollateralDamage,
+					[db.WARRIOR.Ability.Bladestorm]   = db.WARRIOR.Aura.ImminentDemise,
+					[db.WARRIOR.Ability.Slam]         = db.WARRIOR.Aura.WindingUp,
+					[db.WARRIOR.Ability.Execute]      = db.WARRIOR.Aura.Executioner,
+					[db.WARRIOR.Ability.MortalStrike] = db.WARRIOR.Aura.ExecutionersPrecision,
 				},
 			})
 		})
@@ -202,10 +182,10 @@ function CDM.Load()
 	CDM.spellLookup    = {}
 	CDM.categoryLookup = {}
 	CDM.categoryIcons  = {
-		[4]    = "Interface/ICONS/INV_POTION_114",       -- Combat Potion
-		[30]   = "Interface/ICONS/INV_POTION_54",        -- Health Potion
-		[1711] = "Interface/ICONS/Warlock_ Healthstone", -- Healthstone
-		[2566] = "Interface/ICONS/Warlock_ Bloodstone",  -- Demonic Healthstone
+		[db.Category.GCD]          = "Interface/ICONS/INV_POTION_114",
+		[db.Category.CombatPotion] = "Interface/ICONS/INV_POTION_54",
+		[db.Category.HealthPotion] = "Interface/ICONS/Warlock_ Healthstone",
+		[db.Category.Healthstone]  = "Interface/ICONS/Warlock_ Bloodstone",
 	}
 	CDM.mousePresses        = {}
 	CDM.spellPresses        = {}

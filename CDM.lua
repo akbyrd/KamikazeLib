@@ -7,6 +7,49 @@ function CDM.Load()
 	KLCharVars.CDM  = KLCharVars.CDM  or {}
 
 	KLCharVars.CDM.lastCategorySource = KLCharVars.CDM.lastCategorySource or {}
+
+	CDM.db = {
+		Category = {
+			GCD          = Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY,
+			CombatPotion = Constants.SpellCooldownConsts.COMBAT_POTION_CATEGORY,
+			HealthPotion = Constants.SpellCooldownConsts.HEALTH_POTION_CATEGORY,
+			Healthstone  = Constants.SpellCooldownConsts.HEALTHSTONE_CATEGORY,
+		},
+
+		WARRIOR = {
+			Ability = {
+				Avatar          = 107574,
+				Bladestorm      = 446035,
+				ColossusSmash   = 167105,
+				DieByTheSword   = 118038,
+				RallyingCry     = 97462,
+				SpellReflection = 23920,
+				Rend            = 772,
+				DefensiveStance = 386208,
+				MortalStrike    = 12294,
+				Overpower       = 7384,
+				Execute         = 163201,
+				Cleave          = 845,
+				Slam            = 1464,
+				HeroicStrike    = 1269383,
+			},
+
+			Aura = {
+				MasterOfWarfareProc   = 1269391,
+				MasterOfWarfareBuff   = 1269394,
+				Opportunist           = 456120,
+				CollateralDamage      = 334783,
+				ImminentDemise        = 445606,
+				WindingUp             = 1300670,
+				Executioner           = 445584,
+				ExecutionersPrecision = 386633,
+			},
+
+			Talent = {
+				Bladestorm = 227847,
+			},
+		},
+	}
 end
 
 function CDM.GatherCDs(viewers)
