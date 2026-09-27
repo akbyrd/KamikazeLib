@@ -30,6 +30,8 @@ function CDM.Load()
 			markerColor = Config.Color("FF000000"),
 			markerSize  = Config.Size("1px"),
 
+			predictionColor = Config.Color("80000000"),
+
 			powerColors = Config.Table({
 				MANA           = "FF0000FF",
 				RAGE           = "FFFF0000",
@@ -75,29 +77,49 @@ function CDM.Load()
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Resources.Event")
-	CDM.eventFrame:SetScript("OnEvent",                    CDM.DispatchEvent)
-	CDM.RegisterEvent("PLAYER_ENTERING_WORLD",             CDM.Init)
+	CDM.eventFrame:SetScript("OnEvent",        CDM.DispatchEvent)
+	CDM.RegisterEvent("PLAYER_ENTERING_WORLD", CDM.Init)
 end
 
 function CDM.Init()
-	CDM.RegisterEvent("PLAYER_ENTERING_WORLD",             CDM.PLAYER_ENTERING_WORLD)
-	CDM.RegisterEvent("UI_SCALE_CHANGED",                  CDM.OnScaleChanged)
-	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",              CDM.OnScaleChanged)
-	CDM.RegisterUnitEvent("UNIT_DISPLAYPOWER",   "player", CDM.UNIT_DISPLAYPOWER)
-	CDM.RegisterUnitEvent("UNIT_MAXPOWER",       "player", CDM.UNIT_MAXPOWER)
-	CDM.RegisterUnitEvent("UNIT_POWER_FREQUENT", "player", CDM.UNIT_POWER_FREQUENT)
-	hooksecurefunc(UIParent, "SetScale",                   CDM.OnScaleChanged)
+	CDM.RegisterEvent("PLAYER_ENTERING_WORLD",     CDM.PLAYER_ENTERING_WORLD)
+	CDM.RegisterEvent("UI_SCALE_CHANGED",          CDM.OnScaleChanged)
+	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",      CDM.OnScaleChanged)
+	CDM.RegisterUnitEvent("UNIT_DISPLAYPOWER",     CDM.UNIT_DISPLAYPOWER,     "player", "vehicle")
+	CDM.RegisterUnitEvent("UNIT_MAXPOWER",         CDM.UNIT_MAXPOWER,         "player", "vehicle")
+	CDM.RegisterUnitEvent("UNIT_POWER_FREQUENT",   CDM.UNIT_POWER_FREQUENT,   "player", "vehicle")
+	CDM.RegisterUnitEvent("UNIT_SPELLCAST_START",  CDM.UNIT_SPELLCAST_START,  "player", "vehicle")
+	CDM.RegisterUnitEvent("UNIT_SPELLCAST_STOP",   CDM.UNIT_SPELLCAST_STOP,   "player", "vehicle")
+	CDM.RegisterUnitEvent("UNIT_SPELLCAST_FAILED", CDM.UNIT_SPELLCAST_FAILED, "player", "vehicle")
+	CDM.RegisterUnitEvent("UNIT_ENTERED_VEHICLE",  CDM.UNIT_ENTERED_VEHICLE,  "player")
+	CDM.RegisterUnitEvent("UNIT_EXITED_VEHICLE",   CDM.UNIT_EXITED_VEHICLE,   "player")
+	hooksecurefunc(UIParent, "SetScale",           CDM.OnScaleChanged)
 
-	CDM.cfg  = Config.GetBranch(CDM.cfgTree, "Default")
+	CDM.cfg           = Config.GetBranch(CDM.cfgTree, "Default")
+	CDM.unit          = "player"
+	CDM.predictedCost = 0
+	CDM.textConfig    = {
+		config = CreateAbbreviateConfig({
+			{ breakpoint = 1e9, abbreviation = "B", significandDivisor = 1e8, fractionDivisor = 10, abbreviationIsGlobal = false },
+			{ breakpoint = 1e6, abbreviation = "M", significandDivisor = 1e5, fractionDivisor = 10, abbreviationIsGlobal = false },
+			{ breakpoint = 1e3, abbreviation = "K", significandDivisor = 1e2, fractionDivisor = 10, abbreviationIsGlobal = false },
+		})
+	}
+
 	CDM.Root = CreateFrame("Frame", nil, UIParent)
 	CDM.Root:SetParentKey("Kami.CDM.Resources.Root")
 
 	CDM.Bar = CreateFrame("StatusBar", nil, CDM.Root)
 	CDM.Bar:SetParentKey("Bar")
+	CDM.Bar:SetClipsChildren(true)
+
+	CDM.Prediction = CDM.Bar:CreateTexture(nil, "ARTWORK", nil, 1)
+	CDM.Prediction:SetParentKey("Prediction")
 
 	CDM.Marker = CDM.Bar:CreateTexture(nil, "OVERLAY")
 	CDM.Marker:SetParentKey("Marker")
 
+	-- TODO: This needs a fallback
 	local typeface = LSM:Fetch("font", "Homespun")
 	CDM.PowerFont = CreateFont("Kami.CDM.Resources.PowerFont")
 	CDM.PowerFont:SetFont(typeface, 18, "OUTLINE, MONOCHROME")
@@ -105,13 +127,6 @@ function CDM.Init()
 	CDM.Text = CDM.Bar:CreateFontString(nil, "OVERLAY")
 	CDM.Text:SetParentKey("Text")
 	CDM.Text:SetFontObject(CDM.PowerFont)
-	CDM.textConfig = {
-		config = CreateAbbreviateConfig({
-			{ breakpoint = 1e9, abbreviation = "B", significandDivisor = 1e8, fractionDivisor = 10, abbreviationIsGlobal = false },
-			{ breakpoint = 1e6, abbreviation = "M", significandDivisor = 1e5, fractionDivisor = 10, abbreviationIsGlobal = false },
-			{ breakpoint = 1e3, abbreviation = "K", significandDivisor = 1e2, fractionDivisor = 10, abbreviationIsGlobal = false },
-		})
-	}
 
 	CDM.Background = CDM.Root:CreateTexture(nil, "BACKGROUND")
 	CDM.Background:SetParentKey("Background")
@@ -133,6 +148,7 @@ function CDM.Rebuild()
 	CDM.RefreshPowerType()
 	CDM.RefreshMaxPower()
 	CDM.RefreshMarker()
+	CDM.RefreshPrediction()
 	CDM.RefreshCurrentPower()
 end
 
@@ -145,6 +161,9 @@ end
 
 function CDM.RefreshConfig()
 	CDM.Bar:SetStatusBarTexture(CDM.cfg.barTexture)
+	CDM.Prediction:SetColorTexture(CDM.cfg.predictionColor:GetRGBA())
+	CDM.Prediction:SetPoint("TOPRIGHT",    CDM.Bar:GetStatusBarTexture(), "TOPRIGHT")
+	CDM.Prediction:SetPoint("BOTTOMRIGHT", CDM.Bar:GetStatusBarTexture(), "BOTTOMRIGHT")
 	CDM.Background:SetColorTexture(CDM.cfg.backgroundColor:GetRGBA())
 	CDM.Border:SetVertexColor(CDM.cfg.borderColor:GetRGBA())
 	CDM.Text:SetTextColor(CDM.cfg.textColor:GetRGBA())
@@ -186,9 +205,11 @@ function CDM.RefreshLayout()
 end
 
 function CDM.RefreshMaxPower()
-	local maxPower = UnitPowerMax("player", CDM.powerType)
-	CDM.maxPower = maxPower
+	local maxPower = UnitPowerMax(CDM.unit, CDM.powerType)
 	CDM.Bar:SetMinMaxValues(0, maxPower)
+	CDM.Root:SetShown(maxPower > 0)
+
+	CDM.maxPower = max(maxPower, 1)
 	CDM.formatPower = maxPower >= 1000 and CDM.AbbreviatePower or C_StringUtil.TruncateWhenZero
 end
 
@@ -197,11 +218,16 @@ function CDM.RefreshMarker()
 	local xSize = CDM.Bar:GetWidth()
 	local xPos  = Round(cfg.markerValue / CDM.maxPower * xSize)
 	CDM.Marker:SetPoint("TOPLEFT", xPos, 0)
-	CDM.Marker:SetShown(cfg.markerValue <= CDM.maxPower)
+end
+
+function CDM.RefreshPrediction()
+	local xSize = Round(CDM.predictedCost / CDM.maxPower * CDM.Bar:GetWidth())
+	CDM.Prediction:SetWidth(xSize)
+	CDM.Prediction:SetShown(xSize > 0)
 end
 
 function CDM.RefreshCurrentPower()
-	local power = UnitPower("player", CDM.powerType)
+	local power = UnitPower(CDM.unit, CDM.powerType)
 	CDM.Bar:SetValue(power)
 
 	local powerText = CDM.formatPower(power)
@@ -209,13 +235,16 @@ function CDM.RefreshCurrentPower()
 end
 
 function CDM.RefreshPowerType()
-	local type, token = UnitPowerType("player")
-	CDM.powerType  = type
-	CDM.powerToken = token
+	local type, token, r, g, b = UnitPowerType(CDM.unit)
+	CDM.powerType = type
 
 	-- TODO: Simplify this when Config supports nested values
 	local powerColor = CDM.cfg.elvUIPowerColors[token] or CDM.cfg.powerColors[token]
-	CDM.Bar:SetStatusBarColor(CreateColorFromHexString(powerColor):GetRGBA())
+	if powerColor then
+		CDM.Bar:SetStatusBarColor(CreateColorFromHexString(powerColor):GetRGBA())
+	else
+		CDM.Bar:SetStatusBarColor(r, g, b)
+	end
 end
 
 function CDM.AbbreviatePower(power)
@@ -230,8 +259,8 @@ function CDM.RegisterEvent(event, func)
 	CDM.handlers[event] = func
 end
 
-function CDM.RegisterUnitEvent(event, unit, func)
-	CDM.eventFrame:RegisterUnitEvent(event, unit)
+function CDM.RegisterUnitEvent(event, func, ...)
+	CDM.eventFrame:RegisterUnitEvent(event, ...)
 	CDM.handlers[event] = func
 end
 
@@ -244,6 +273,7 @@ function CDM.OnScaleChanged()
 	CDM.RefreshScale()
 	CDM.RefreshLayout()
 	CDM.RefreshMarker()
+	CDM.RefreshPrediction()
 end
 
 function CDM.PLAYER_ENTERING_WORLD()
@@ -251,19 +281,61 @@ function CDM.PLAYER_ENTERING_WORLD()
 end
 
 function CDM.UNIT_DISPLAYPOWER(unit)
-	CDM.Rebuild()
-end
-
-function CDM.UNIT_MAXPOWER(unit, powerToken)
-	if powerToken == CDM.powerToken then
-		CDM.RefreshMaxPower()
-		CDM.RefreshMarker()
+	if unit == CDM.unit then
+		CDM.Rebuild()
 	end
 end
 
-function CDM.UNIT_POWER_FREQUENT(unit, powerToken)
-	if powerToken == CDM.powerToken then
+function CDM.UNIT_ENTERED_VEHICLE(unit, showVehicleFrame)
+	CDM.unit = showVehicleFrame and "vehicle" or "player"
+	CDM.Rebuild()
+end
+
+function CDM.UNIT_EXITED_VEHICLE()
+	CDM.unit = "player"
+	CDM.Rebuild()
+end
+
+function CDM.UNIT_MAXPOWER(unit)
+	if unit == CDM.unit then
+		CDM.RefreshMaxPower()
+		CDM.RefreshMarker()
+		CDM.RefreshPrediction()
+	end
+end
+
+function CDM.UNIT_POWER_FREQUENT(unit)
+	if unit == CDM.unit then
 		CDM.RefreshCurrentPower()
+	end
+end
+
+function CDM.UNIT_SPELLCAST_START(unit, castGUID, spellID)
+	if unit == CDM.unit then
+		local costs = C_Spell.GetSpellPowerCost(spellID)
+		if costs then
+			for iCost, costInfo in ipairs(costs) do
+				if costInfo.type == CDM.powerType and (costInfo.requiredAuraID == 0 or costInfo.hasRequiredAura) then
+					CDM.predictedCost = costInfo.cost
+					CDM.RefreshPrediction()
+					break
+				end
+			end
+		end
+	end
+end
+
+function CDM.UNIT_SPELLCAST_STOP(unit)
+	if unit == CDM.unit then
+		CDM.predictedCost = 0
+		CDM.RefreshPrediction()
+	end
+end
+
+function CDM.UNIT_SPELLCAST_FAILED(unit)
+	if unit == CDM.unit then
+		CDM.predictedCost = 0
+		CDM.RefreshPrediction()
 	end
 end
 
@@ -271,7 +343,3 @@ end
 -- File Load
 
 CDM.Load()
-
--- TODO:
--- Cost prediction
--- Test possession / vehicles

@@ -1,7 +1,7 @@
 To Do
 -----
+Tie marker to specific power type (or player only?)
 
-Fix bug
 Nested Config values
 
 Resources
@@ -40,6 +40,7 @@ Profile performance
 Empower flickers when rebuilding
 	Consider minimizing unnecessary rebuilds?
 	Only if CD data changes?
+Test vehicle power prediction
 
 
 
