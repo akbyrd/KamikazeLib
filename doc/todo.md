@@ -1,21 +1,33 @@
 To Do
 -----
-ElvUI texture on empower bars?
-Rage bar
-Sweeping strikes bar
-Whirlwind bar
+
+Fix bug
+Nested Config values
+
+Resources
+	Sweeping strikes bar
+	Whirlwind bar
+
+Generalize CDM infrastructure
+	Root frame and pixel perfect scaling
+	Scale change events
+	Rebuild events
+	Share more config by default?
+	Maybe event handling?
+
 Skyriding
 Possess bar
 Settings
 	Row highlights
 	Tooltips
+	Put file earlier in toc
+	Figure out how profiles should work
 	Show in built-in Options > Addons?
 	Edit Mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
-	Implement search
-	Put file earlier in toc
-	Versioning
 	"show all" buff bars for edit mode
-Figure out how profiles should work
+	Implement search
+	Versioning
+Auto-hide
 Track active duration
 Anchoring
 Custom glow when ready

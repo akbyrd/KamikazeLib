@@ -22,4 +22,5 @@ CombatText.lua
 CDM.lua
 CDMCooldowns.lua
 CDMBuffs.lua
+CDMResources.lua
 Settings.lua
