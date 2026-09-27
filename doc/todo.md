@@ -1,7 +1,5 @@
 To Do
 -----
-Tie marker to specific power type (or player only?)
-
 Nested Config values
 
 Resources

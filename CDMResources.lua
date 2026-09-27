@@ -26,7 +26,7 @@ function CDM.Load()
 			textSize    = Config.Size("78%"),
 			textYOffset = Config.Size("1px"),
 
-			markerValue = Config.Number(70),
+			markers     = Config.Table({ RAGE = 70 }),
 			markerColor = Config.Color("FF000000"),
 			markerSize  = Config.Size("1px"),
 
@@ -214,10 +214,12 @@ function CDM.RefreshMaxPower()
 end
 
 function CDM.RefreshMarker()
-	local cfg   = CDM.cfg
-	local xSize = CDM.Bar:GetWidth()
-	local xPos  = Round(cfg.markerValue / CDM.maxPower * xSize)
+	local cfg         = CDM.cfg
+	local markerValue = cfg.markers[CDM.powerToken]
+	local xSize       = CDM.Bar:GetWidth()
+	local xPos        = Round((markerValue or 0) / CDM.maxPower * xSize)
 	CDM.Marker:SetPoint("TOPLEFT", xPos, 0)
+	CDM.Marker:SetShown(markerValue ~= nil)
 end
 
 function CDM.RefreshPrediction()
@@ -236,7 +238,8 @@ end
 
 function CDM.RefreshPowerType()
 	local type, token, r, g, b = UnitPowerType(CDM.unit)
-	CDM.powerType = type
+	CDM.powerType  = type
+	CDM.powerToken = token
 
 	-- TODO: Simplify this when Config supports nested values
 	local powerColor = CDM.cfg.elvUIPowerColors[token] or CDM.cfg.powerColors[token]
