@@ -30,12 +30,14 @@ function CDM.Load()
 	Config.AddNode(CDM.cfgTree, "Default", "TrackedBar",
 		{
 			xPos       = Config.Size("0px"),
-			yPos       = Config.Size("-335px"),
+			yPos       = Config.Size("-336px"),
 			xSize      = Config.Size("514px"),
 			ySize      = Config.Size("16px"),
 			padSize    = Config.Size("-1px"),
-			barColor   = Config.Color("FF4F4F4F"),
-			barTexture = Config.Texture("statusbar", "ElvUI Norm", "Solid"),
+
+			barColor        = Config.Color("FF4F4F4F"),
+			barTexture      = Config.Texture("statusbar", "ElvUI Norm", "Solid"),
+			backgroundColor = Config.Color("80000000"),
 		})
 
 	Config.AddNode(CDM.cfgTree, "TrackedBar", "Defensive",
@@ -62,7 +64,6 @@ function CDM.Load()
 				[db.WARRIOR.Ability.DieByTheSword]   = "Defensive",
 				[db.WARRIOR.Ability.RallyingCry]     = "Defensive",
 				[db.WARRIOR.Ability.SpellReflection] = "Defensive",
-				[db.WARRIOR.Ability.Rend]            = "Defensive",
 				[db.WARRIOR.Ability.DefensiveStance] = "Defensive",
 			}),
 		})
@@ -160,6 +161,10 @@ function CDM.ConstructFrame(vState)
 				fState.Bar = CreateFrame("StatusBar", nil, fState.Button)
 				fState.Button:SetDurationBar(fState.Bar, { direction = Enum.StatusBarTimerDirection.RemainingTime })
 
+				fState.BarBackground = fState.Bar:CreateTexture(nil, "BACKGROUND")
+				fState.BarBackground:SetParentKey("Background")
+				fState.BarBackground:SetAllPoints()
+
 				fState.BarBorder = fState.Button:CreateTexture(nil, "OVERLAY")
 				fState.BarBorder:SetParentKey("BarBorder")
 				fState.BarBorder:SetPoint("BOTTOMLEFT")
@@ -253,10 +258,11 @@ function CDM.RefreshAllConfig()
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			local cfg = fState.cfg
 
-			fState.Bar:SetStatusBarColor(cfg.barColor:GetRGBA())
 			fState.Bar:SetStatusBarTexture(cfg.barTexture)
-			fState.IconBorder:SetVertexColor(cfg.borderColor:GetRGBA())
+			fState.Bar:SetStatusBarColor(cfg.barColor:GetRGBA())
+			fState.BarBackground:SetColorTexture(cfg.backgroundColor:GetRGBA())
 			fState.BarBorder:SetVertexColor(cfg.borderColor:GetRGBA())
+			fState.IconBorder:SetVertexColor(cfg.borderColor:GetRGBA())
 
 			fState.Pandemic:SetConfig(
 				nil,
