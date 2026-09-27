@@ -57,16 +57,28 @@ function CDM.Load()
 
 			overrideSize   = Config.Size("4px"),
 			overrideTimers = Config.Table({
-				WARRIOR = {
+				WARRIOR     = {
 					--[db.WARRIOR.Ability.Slam] = { overrideSpellID = db.WARRIOR.Ability.HeroicStrike, duration = 15 },
 				},
+				PALADIN     = {},
+				HUNTER      = {},
+				ROGUE       = {},
+				PRIEST      = {},
+				DEATHKNIGHT = {},
+				SHAMAN      = {},
+				MAGE        = {},
+				WARLOCK     = {},
+				MONK        = {},
+				DRUID       = {},
+				DEMONHUNTER = {},
+				EVOKER      = {},
 			}),
 
 			empowerSize       = Config.Size("7px"),
 			empowerGapSize    = Config.Size("3px"),
 			empowerBorderSize = Config.Size("2px"),
 			empowerBuffs      = Config.Table({
-				WARRIOR = {
+				WARRIOR     = {
 					[db.WARRIOR.Ability.Overpower]    = db.WARRIOR.Aura.Opportunist,
 					[db.WARRIOR.Ability.Cleave]       = db.WARRIOR.Aura.CollateralDamage,
 					[db.WARRIOR.Ability.Bladestorm]   = db.WARRIOR.Aura.ImminentDemise,
@@ -74,6 +86,18 @@ function CDM.Load()
 					[db.WARRIOR.Ability.Execute]      = db.WARRIOR.Aura.Executioner,
 					[db.WARRIOR.Ability.MortalStrike] = db.WARRIOR.Aura.ExecutionersPrecision,
 				},
+				PALADIN     = {},
+				HUNTER      = {},
+				ROGUE       = {},
+				PRIEST      = {},
+				DEATHKNIGHT = {},
+				SHAMAN      = {},
+				MAGE        = {},
+				WARLOCK     = {},
+				MONK        = {},
+				DRUID       = {},
+				DEMONHUNTER = {},
+				EVOKER      = {},
 			})
 		})
 
