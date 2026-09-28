@@ -26,51 +26,78 @@ function CDM.Load()
 			textSize    = Config.Size("78%"),
 			textYOffset = Config.Size("1px"),
 
-			markers     = Config.Table({ RAGE = 70 }),
+			markers     = Config.Table({ RAGE = Config.Number(70) }),
 			markerColor = Config.Color("FF000000"),
 			markerSize  = Config.Size("1px"),
 
 			predictionColor = Config.Color("80000000"),
 
 			powerColors = Config.Table({
-				MANA           = "FF0000FF",
-				RAGE           = "FFFF0000",
-				FOCUS          = "FFFF8040",
-				ENERGY         = "FFFFFF00",
-				COMBO_POINTS   = "FFFFF569",
-				RUNES          = "FF808080",
-				RUNIC_POWER    = "FF00D1FF",
-				SOUL_SHARDS    = "FF80528C",
-				LUNAR_POWER    = "FF4D85E6",
-				HOLY_POWER     = "FFF2E699",
-				MAELSTROM      = "FF0080FF",
-				INSANITY       = "FF6600CC",
-				CHI            = "FFB5FFEB",
-				ARCANE_CHARGES = "FF1A1AFA",
-				FURY           = "FFC942FD",
-				PAIN           = "FFFF9C00",
-				ESSENCE        = "FF5AF3FC",
+				MANA           = Config.Color("FF0000FF"),
+				RAGE           = Config.Color("FFFF0000"),
+				FOCUS          = Config.Color("FFFF8040"),
+				ENERGY         = Config.Color("FFFFFF00"),
+				COMBO_POINTS   = Config.Color("FFFFF569"),
+				RUNES          = Config.Color("FF808080"),
+				RUNIC_POWER    = Config.Color("FF00D1FF"),
+				SOUL_SHARDS    = Config.Color("FF80528C"),
+				LUNAR_POWER    = Config.Color("FF4D85E6"),
+				HOLY_POWER     = Config.Color("FFF2E699"),
+				MAELSTROM      = Config.Color("FF0080FF"),
+				INSANITY       = Config.Color("FF6600CC"),
+				CHI            = Config.Color("FFB5FFEB"),
+				ARCANE_CHARGES = Config.Color("FF1A1AFA"),
+				FURY           = Config.Color("FFC942FD"),
+				PAIN           = Config.Color("FFFF9C00"),
+				ESSENCE        = Config.Color("FF5AF3FC"),
 			}),
 
 			elvUIPowerColors = Config.Table({
-				MANA           = "FF4F73A1",
-				RAGE           = "FFC74040",
-				ENERGY         = "FFFFF569",
-				COMBO_POINTS   = "FFCFCF4F",
-				RUNES          = "FFCC66FF",
-				SOUL_SHARDS    = "FF8040CC",
-				HOLY_POWER     = "FFE3E00F",
-				CHI            = "FF94BA5C",
-				ARCANE_CHARGES = "FF0066FF",
-				ESSENCE        = "FF2BF0D6",
-				ALT_POWER      = "FF3366CC",
+				MANA           = Config.Color("FF4F73A1"),
+				RAGE           = Config.Color("FFC74040"),
+				ENERGY         = Config.Color("FFFFF569"),
+				COMBO_POINTS   = Config.Color("FFCFCF4F"),
+				RUNES          = Config.Color("FFCC66FF"),
+				SOUL_SHARDS    = Config.Color("FF8040CC"),
+				HOLY_POWER     = Config.Color("FFE3E00F"),
+				CHI            = Config.Color("FF94BA5C"),
+				ARCANE_CHARGES = Config.Color("FF0066FF"),
+				ESSENCE        = Config.Color("FF2BF0D6"),
+				ALT_POWER      = Config.Color("FF3366CC"),
 			}),
 
 			elvUIPointColors = Config.Table({
-				COMBO_POINTS = { "FFBF4F4F", "FFC78F4F", "FFCFCF4F", "FF8FC74F", "FF6EC24F", "FF4FBF4F", "FF5CCF8A" },
-				RUNES        = { "FFFF4040", "FF40FFFF", "FF40FF40", "FFCC66FF" },
-				CHI          = { "FFB5C252", "FF94BA5C", "FF7DB563", "FF63B06B", "FF45A875", "FF24A180" },
-				ESSENCE      = { "FF1AEBFF", "FF2BF0D6", "FF3DF5B0", "FF4FFA87", "FF57FC73", "FF61FF61" },
+				COMBO_POINTS = Config.Table({
+					Config.Color("FFBF4F4F"),
+					Config.Color("FFC78F4F"),
+					Config.Color("FFCFCF4F"),
+					Config.Color("FF8FC74F"),
+					Config.Color("FF6EC24F"),
+					Config.Color("FF4FBF4F"),
+					Config.Color("FF5CCF8A"),
+				}),
+				RUNES        = Config.Table({
+					Config.Color("FFFF4040"),
+					Config.Color("FF40FFFF"),
+					Config.Color("FF40FF40"),
+					Config.Color("FFCC66FF"),
+				}),
+				CHI          = Config.Table({
+					Config.Color("FFB5C252"),
+					Config.Color("FF94BA5C"),
+					Config.Color("FF7DB563"),
+					Config.Color("FF63B06B"),
+					Config.Color("FF45A875"),
+					Config.Color("FF24A180"),
+				}),
+				ESSENCE      = Config.Table({
+					Config.Color("FF1AEBFF"),
+					Config.Color("FF2BF0D6"),
+					Config.Color("FF3DF5B0"),
+					Config.Color("FF4FFA87"),
+					Config.Color("FF57FC73"),
+					Config.Color("FF61FF61"),
+				}),
 			}),
 		})
 
@@ -241,10 +268,10 @@ function CDM.RefreshPowerType()
 	CDM.powerType  = type
 	CDM.powerToken = token
 
-	-- TODO: Simplify this when Config supports nested values
+	-- TODO: Simplify this by having elvUIPowerColors inherit from powerColors
 	local powerColor = CDM.cfg.elvUIPowerColors[token] or CDM.cfg.powerColors[token]
 	if powerColor then
-		CDM.Bar:SetStatusBarColor(CreateColorFromHexString(powerColor):GetRGBA())
+		CDM.Bar:SetStatusBarColor(powerColor:GetRGBA())
 	else
 		CDM.Bar:SetStatusBarColor(r, g, b)
 	end

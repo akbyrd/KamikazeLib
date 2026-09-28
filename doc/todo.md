@@ -1,10 +1,11 @@
 To Do
 -----
-Nested Config values
-
 Resources
 	Sweeping strikes bar
 	Whirlwind bar
+
+Skyriding
+Possess bar
 
 Generalize CDM infrastructure
 	Root frame and pixel perfect scaling
@@ -13,8 +14,6 @@ Generalize CDM infrastructure
 	Share more config by default?
 	Maybe event handling?
 
-Skyriding
-Possess bar
 Settings
 	Row highlights
 	Tooltips
@@ -39,6 +38,7 @@ Empower flickers when rebuilding
 	Consider minimizing unnecessary rebuilds?
 	Only if CD data changes?
 Test vehicle power prediction
+Alerts
 
 
 

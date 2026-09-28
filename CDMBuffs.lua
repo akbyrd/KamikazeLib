@@ -53,18 +53,18 @@ function CDM.Load()
 	Config.AddNode(CDM.cfgTree, nil, "FilterCategories",
 		{
 			SpellCategory = Config.Table({
-				[db.Category.CombatPotion] = "Offensive",
+				[db.Category.CombatPotion] = Config.String("Offensive"),
 			}),
 
 			Ability = Config.Table({
-				[db.WARRIOR.Ability.Avatar]        = "Offensive",
-				[db.WARRIOR.Ability.Bladestorm]    = "Offensive",
-				[db.WARRIOR.Ability.ColossusSmash] = "Offensive",
+				[db.WARRIOR.Ability.Avatar]        = Config.String("Offensive"),
+				[db.WARRIOR.Ability.Bladestorm]    = Config.String("Offensive"),
+				[db.WARRIOR.Ability.ColossusSmash] = Config.String("Offensive"),
 
-				[db.WARRIOR.Ability.DieByTheSword]   = "Defensive",
-				[db.WARRIOR.Ability.RallyingCry]     = "Defensive",
-				[db.WARRIOR.Ability.SpellReflection] = "Defensive",
-				[db.WARRIOR.Ability.DefensiveStance] = "Defensive",
+				[db.WARRIOR.Ability.DieByTheSword]   = Config.String("Defensive"),
+				[db.WARRIOR.Ability.RallyingCry]     = Config.String("Defensive"),
+				[db.WARRIOR.Ability.SpellReflection] = Config.String("Defensive"),
+				[db.WARRIOR.Ability.DefensiveStance] = Config.String("Defensive"),
 			}),
 		})
 
