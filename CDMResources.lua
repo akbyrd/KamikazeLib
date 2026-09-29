@@ -21,7 +21,7 @@ function CDM.Load()
 			borderColor     = Config.Color("FF000000"),
 			borderSize      = Config.Size("1ui"),
 
-			textEnabled = Config.Bool(false),
+			textEnabled = Config.Bool(true),
 			textColor   = Config.Color("FFFFFFFF"),
 			textSize    = Config.Size("78%"),
 			textYOffset = Config.Size("1px"),
@@ -52,6 +52,7 @@ function CDM.Load()
 			FURY           = Config.Color("FFC942FD"),
 			PAIN           = Config.Color("FFFF9C00"),
 			ESSENCE        = Config.Color("FF5AF3FC"),
+			SKYRIDING      = Config.Color("FF0EAAC2"),
 		})
 
 	Config.AddNode(CDM.cfgTree, "PowerColors", "ElvUIPowerColors",
@@ -114,6 +115,7 @@ function CDM.Init()
 	CDM.RegisterEvent("PLAYER_ENTERING_WORLD",     CDM.PLAYER_ENTERING_WORLD)
 	CDM.RegisterEvent("UI_SCALE_CHANGED",          CDM.OnScaleChanged)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",      CDM.OnScaleChanged)
+	CDM.RegisterEvent("PLAYER_CAN_GLIDE_CHANGED",  CDM.PLAYER_CAN_GLIDE_CHANGED)
 	CDM.RegisterUnitEvent("UNIT_DISPLAYPOWER",     CDM.UNIT_DISPLAYPOWER,     "player", "vehicle")
 	CDM.RegisterUnitEvent("UNIT_MAXPOWER",         CDM.UNIT_MAXPOWER,         "player", "vehicle")
 	CDM.RegisterUnitEvent("UNIT_POWER_FREQUENT",   CDM.UNIT_POWER_FREQUENT,   "player", "vehicle")
@@ -171,10 +173,16 @@ function CDM.Init()
 	CDM.Rebuild()
 end
 
+function CDM.Update()
+	-- NOTE: OInly enabled when skyriding
+	CDM.RefreshCurrentPower()
+end
+
 function CDM.Rebuild()
 	CDM.RefreshScale()
 	CDM.RefreshConfig()
 	CDM.RefreshLayout()
+	CDM.RefreshSkyriding()
 	CDM.RefreshPowerType()
 	CDM.RefreshMaxPower()
 	CDM.RefreshMarker()
@@ -234,13 +242,32 @@ function CDM.RefreshLayout()
 	CDM.Text:SetPoint("CENTER", 0.25, textYOffset + 0.25)
 end
 
+function CDM.RefreshSkyriding()
+	local isGliding, canGlide = C_PlayerInfo.GetGlidingInfo()
+	if canGlide then
+		CDM.GetPowerType    = CDM.GetPowerType_Skyriding
+		CDM.GetMaxPower     = CDM.GetMaxPower_Skyriding
+		CDM.GetCurrentPower = CDM.GetCurrentPower_Skyriding
+		CDM.eventFrame:SetScript("OnUpdate", CDM.Update)
+	else
+		CDM.GetPowerType    = UnitPowerType
+		CDM.GetMaxPower     = UnitPowerMax
+		CDM.GetCurrentPower = UnitPower
+		CDM.eventFrame:SetScript("OnUpdate", nil)
+	end
+end
+
 function CDM.RefreshMaxPower()
-	local maxPower = UnitPowerMax(CDM.unit, CDM.powerType)
+	local maxPower = CDM.GetMaxPower(CDM.unit, CDM.powerType)
+	CDM.maxPower = max(maxPower, 1)
 	CDM.Bar:SetMinMaxValues(0, maxPower)
 	CDM.Root:SetShown(maxPower > 0)
 
-	CDM.maxPower = max(maxPower, 1)
-	CDM.formatPower = maxPower >= 1000 and CDM.AbbreviatePower or C_StringUtil.TruncateWhenZero
+	if CDM.powerToken == "SKYRIDING" then
+		CDM.formatPower = CDM.FormatPower_Skyriding
+	else
+		CDM.formatPower = maxPower >= 1000 and CDM.AbbreviatePower or C_StringUtil.TruncateWhenZero
+	end
 end
 
 function CDM.RefreshMarker()
@@ -259,7 +286,7 @@ function CDM.RefreshPrediction()
 end
 
 function CDM.RefreshCurrentPower()
-	local power = UnitPower(CDM.unit, CDM.powerType)
+	local power = CDM.GetCurrentPower(CDM.unit, CDM.powerType)
 	CDM.Bar:SetValue(power)
 
 	local powerText = CDM.formatPower(power)
@@ -267,7 +294,7 @@ function CDM.RefreshCurrentPower()
 end
 
 function CDM.RefreshPowerType()
-	local type, token, r, g, b = UnitPowerType(CDM.unit)
+	local type, token, r, g, b = CDM.GetPowerType(CDM.unit)
 	CDM.powerType  = type
 	CDM.powerToken = token
 
@@ -278,6 +305,27 @@ end
 
 function CDM.AbbreviatePower(power)
 	return AbbreviateNumbers(power, CDM.textConfig)
+end
+
+function CDM.GetPowerType_Skyriding(unit)
+	local type  = nil
+	local token = "SKYRIDING"
+	return type, token
+end
+
+function CDM.GetMaxPower_Skyriding(unit, powerType)
+	return 100 -- yd/s
+end
+
+function CDM.GetCurrentPower_Skyriding(unit, powerType)
+	local isGliding, canGlide, forwardSpeed = C_PlayerInfo.GetGlidingInfo()
+	return forwardSpeed
+end
+
+function CDM.FormatPower_Skyriding(power)
+	local percent     = Round(power / BASE_MOVEMENT_SPEED * 100)
+	local percentText = C_StringUtil.TruncateWhenZero(percent)
+	return C_StringUtil.WrapString(percentText, nil, "%")
 end
 
 ----------------------------------------------------------------------------------------------------
@@ -306,6 +354,10 @@ function CDM.OnScaleChanged()
 end
 
 function CDM.PLAYER_ENTERING_WORLD()
+	CDM.Rebuild()
+end
+
+function CDM.PLAYER_CAN_GLIDE_CHANGED()
 	CDM.Rebuild()
 end
 
