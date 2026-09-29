@@ -53,6 +53,7 @@ function CDM.Load()
 			PAIN           = Config.Color("FFFF9C00"),
 			ESSENCE        = Config.Color("FF5AF3FC"),
 			SKYRIDING      = Config.Color("FF0EAAC2"),
+			THRILL         = Config.Color("FFE67E22"),
 		})
 
 	Config.AddNode(CDM.cfgTree, "PowerColors", "ElvUIPowerColors",
@@ -184,6 +185,7 @@ function CDM.Rebuild()
 	CDM.RefreshLayout()
 	CDM.RefreshSkyriding()
 	CDM.RefreshPowerType()
+	CDM.RefreshPowerColor()
 	CDM.RefreshMaxPower()
 	CDM.RefreshMarker()
 	CDM.RefreshPrediction()
@@ -249,11 +251,13 @@ function CDM.RefreshSkyriding()
 		CDM.GetMaxPower     = CDM.GetMaxPower_Skyriding
 		CDM.GetCurrentPower = CDM.GetCurrentPower_Skyriding
 		CDM.eventFrame:SetScript("OnUpdate", CDM.Update)
+		CDM.RegisterUnitEvent("UNIT_AURA", CDM.UNIT_AURA, "player")
 	else
 		CDM.GetPowerType    = UnitPowerType
 		CDM.GetMaxPower     = UnitPowerMax
 		CDM.GetCurrentPower = UnitPower
 		CDM.eventFrame:SetScript("OnUpdate", nil)
+		CDM.eventFrame:UnregisterEvent("UNIT_AURA")
 	end
 end
 
@@ -297,10 +301,19 @@ function CDM.RefreshPowerType()
 	local type, token, r, g, b = CDM.GetPowerType(CDM.unit)
 	CDM.powerType  = type
 	CDM.powerToken = token
+	CDM.powerColor = CDM.cfgPowerColors[token] or CreateColor(r, g, b)
+end
 
-	local powerColor = CDM.cfgPowerColors[token]
-	if powerColor then r, g, b = powerColor:GetRGBA() end
-	CDM.Bar:SetStatusBarColor(r, g, b)
+function CDM.RefreshPowerColor()
+	local db = Kami.CDM.db
+
+	local color = CDM.powerColor
+	if CDM.powerToken == "SKYRIDING" then
+		local thrill = C_UnitAuras.GetPlayerAuraBySpellID(db.Misc.ThrillOfTheSkies)
+		if thrill then color = CDM.cfgPowerColors.THRILL end
+	end
+
+	CDM.Bar:SetStatusBarColor(color:GetRGBA())
 end
 
 function CDM.AbbreviatePower(power)
@@ -359,6 +372,10 @@ end
 
 function CDM.PLAYER_CAN_GLIDE_CHANGED()
 	CDM.Rebuild()
+end
+
+function CDM.UNIT_AURA()
+	CDM.RefreshPowerColor()
 end
 
 function CDM.UNIT_DISPLAYPOWER(unit)

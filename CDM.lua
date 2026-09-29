@@ -16,6 +16,10 @@ function CDM.Load()
 			Healthstone  = Constants.SpellCooldownConsts.HEALTHSTONE_CATEGORY,
 		},
 
+		Misc = {
+			ThrillOfTheSkies = 377234,
+		},
+
 		WARRIOR = {
 			Ability = {
 				Avatar          = 107574,
