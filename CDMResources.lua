@@ -31,42 +31,44 @@ function CDM.Load()
 			markerSize  = Config.Size("1px"),
 
 			predictionColor = Config.Color("80000000"),
+		})
 
-			powerColors = Config.Table({
-				MANA           = Config.Color("FF0000FF"),
-				RAGE           = Config.Color("FFFF0000"),
-				FOCUS          = Config.Color("FFFF8040"),
-				ENERGY         = Config.Color("FFFFFF00"),
-				COMBO_POINTS   = Config.Color("FFFFF569"),
-				RUNES          = Config.Color("FF808080"),
-				RUNIC_POWER    = Config.Color("FF00D1FF"),
-				SOUL_SHARDS    = Config.Color("FF80528C"),
-				LUNAR_POWER    = Config.Color("FF4D85E6"),
-				HOLY_POWER     = Config.Color("FFF2E699"),
-				MAELSTROM      = Config.Color("FF0080FF"),
-				INSANITY       = Config.Color("FF6600CC"),
-				CHI            = Config.Color("FFB5FFEB"),
-				ARCANE_CHARGES = Config.Color("FF1A1AFA"),
-				FURY           = Config.Color("FFC942FD"),
-				PAIN           = Config.Color("FFFF9C00"),
-				ESSENCE        = Config.Color("FF5AF3FC"),
-			}),
+	Config.AddNode(CDM.cfgTree, nil, "PowerColors",
+		{
+			MANA           = Config.Color("FF0000FF"),
+			RAGE           = Config.Color("FFFF0000"),
+			FOCUS          = Config.Color("FFFF8040"),
+			ENERGY         = Config.Color("FFFFFF00"),
+			COMBO_POINTS   = Config.Color("FFFFF569"),
+			RUNES          = Config.Color("FF808080"),
+			RUNIC_POWER    = Config.Color("FF00D1FF"),
+			SOUL_SHARDS    = Config.Color("FF80528C"),
+			LUNAR_POWER    = Config.Color("FF4D85E6"),
+			HOLY_POWER     = Config.Color("FFF2E699"),
+			MAELSTROM      = Config.Color("FF0080FF"),
+			INSANITY       = Config.Color("FF6600CC"),
+			CHI            = Config.Color("FFB5FFEB"),
+			ARCANE_CHARGES = Config.Color("FF1A1AFA"),
+			FURY           = Config.Color("FFC942FD"),
+			PAIN           = Config.Color("FFFF9C00"),
+			ESSENCE        = Config.Color("FF5AF3FC"),
+		})
 
-			elvUIPowerColors = Config.Table({
-				MANA           = Config.Color("FF4F73A1"),
-				RAGE           = Config.Color("FFC74040"),
-				ENERGY         = Config.Color("FFFFF569"),
-				COMBO_POINTS   = Config.Color("FFCFCF4F"),
-				RUNES          = Config.Color("FFCC66FF"),
-				SOUL_SHARDS    = Config.Color("FF8040CC"),
-				HOLY_POWER     = Config.Color("FFE3E00F"),
-				CHI            = Config.Color("FF94BA5C"),
-				ARCANE_CHARGES = Config.Color("FF0066FF"),
-				ESSENCE        = Config.Color("FF2BF0D6"),
-				ALT_POWER      = Config.Color("FF3366CC"),
-			}),
+	Config.AddNode(CDM.cfgTree, "PowerColors", "ElvUIPowerColors",
+		{
+			MANA           = Config.Color("FF4F73A1"),
+			RAGE           = Config.Color("FFC74040"),
+			ENERGY         = Config.Color("FFFFF569"),
+			COMBO_POINTS   = Config.Color("FFCFCF4F"),
+			RUNES          = Config.Color("FFCC66FF"),
+			SOUL_SHARDS    = Config.Color("FF8040CC"),
+			HOLY_POWER     = Config.Color("FFE3E00F"),
+			CHI            = Config.Color("FF94BA5C"),
+			ARCANE_CHARGES = Config.Color("FF0066FF"),
+			ESSENCE        = Config.Color("FF2BF0D6"),
+			ALT_POWER      = Config.Color("FF3366CC"),
 
-			elvUIPointColors = Config.Table({
+			sequences = Config.Table({
 				COMBO_POINTS = Config.Table({
 					Config.Color("FFBF4F4F"),
 					Config.Color("FFC78F4F"),
@@ -122,10 +124,11 @@ function CDM.Init()
 	CDM.RegisterUnitEvent("UNIT_EXITED_VEHICLE",   CDM.UNIT_EXITED_VEHICLE,   "player")
 	hooksecurefunc(UIParent, "SetScale",           CDM.OnScaleChanged)
 
-	CDM.cfg           = Config.GetBranch(CDM.cfgTree, "Default")
-	CDM.unit          = "player"
-	CDM.predictedCost = 0
-	CDM.textConfig    = {
+	CDM.cfg            = Config.GetBranch(CDM.cfgTree, "Default")
+	CDM.cfgPowerColors = Config.GetBranch(CDM.cfgTree, "ElvUIPowerColors")
+	CDM.unit           = "player"
+	CDM.predictedCost  = 0
+	CDM.textConfig     = {
 		config = CreateAbbreviateConfig({
 			{ breakpoint = 1e9, abbreviation = "B", significandDivisor = 1e8, fractionDivisor = 10, abbreviationIsGlobal = false },
 			{ breakpoint = 1e6, abbreviation = "M", significandDivisor = 1e5, fractionDivisor = 10, abbreviationIsGlobal = false },
@@ -268,13 +271,9 @@ function CDM.RefreshPowerType()
 	CDM.powerType  = type
 	CDM.powerToken = token
 
-	-- TODO: Simplify this by having elvUIPowerColors inherit from powerColors
-	local powerColor = CDM.cfg.elvUIPowerColors[token] or CDM.cfg.powerColors[token]
-	if powerColor then
-		CDM.Bar:SetStatusBarColor(powerColor:GetRGBA())
-	else
-		CDM.Bar:SetStatusBarColor(r, g, b)
-	end
+	local powerColor = CDM.cfgPowerColors[token]
+	if powerColor then r, g, b = powerColor:GetRGBA() end
+	CDM.Bar:SetStatusBarColor(r, g, b)
 end
 
 function CDM.AbbreviatePower(power)

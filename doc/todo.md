@@ -1,11 +1,16 @@
 To Do
 -----
+Skyriding
+	Test on druid flight form
+	Test on flight path
+	Test on login
+	Test on dimensius
+
+Possess bar
+Power infusion
 Resources
 	Sweeping strikes bar
 	Whirlwind bar
-
-Skyriding
-Possess bar
 
 Generalize CDM infrastructure
 	Root frame and pixel perfect scaling
@@ -44,6 +49,7 @@ Alerts
 
 Other Ideas
 -----------
-Combat Text
 Reflect damage
+Combat Text
+Nameplates
 Out-of-game harness

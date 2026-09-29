@@ -326,6 +326,7 @@ Config.Impl.typeDefs = {
 	},
 }
 
+-- TODO: Add Config.Array
 -- TODO: Consider removing the format function
 -- TODO: How can we support ordering or grouping for a settings UI?
 -- TODO: Parse color tables without checking every individual key
