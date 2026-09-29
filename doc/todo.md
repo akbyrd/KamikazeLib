@@ -1,10 +1,8 @@
 To Do
 -----
 Skyriding
-	Test on druid flight form
-	Test on flight path
-	Test on login
-	Test on dimensius
+	Test on dimensius or chimaerus
+	Test cast prediction
 
 Possess bar
 Power infusion
@@ -22,8 +20,8 @@ Generalize CDM infrastructure
 Settings
 	Row highlights
 	Tooltips
-	Put file earlier in toc
-	Figure out how profiles should work
+		Put file earlier in toc
+		Figure out how profiles should work
 	Show in built-in Options > Addons?
 	Edit Mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
 	"show all" buff bars for edit mode

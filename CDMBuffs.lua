@@ -71,13 +71,14 @@ function CDM.Load()
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Buffs.Event")
-	CDM.eventFrame:SetScript("OnEvent",        CDM.DispatchEvent)
-	CDM.RegisterEvent("UI_SCALE_CHANGED",      CDM.OnScaleChanged)
-	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",  CDM.OnScaleChanged)
-	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",  CDM.PLAYER_REGEN_ENABLED)
-	CDM.RegisterEvent("PLAYER_TARGET_CHANGED", CDM.PLAYER_TARGET_CHANGED)
-	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN", CDM.SPELL_UPDATE_COOLDOWN)
-	hooksecurefunc(UIParent, "SetScale",       CDM.OnScaleChanged)
+	CDM.eventFrame:SetScript("OnEvent",           CDM.DispatchEvent)
+	CDM.RegisterEvent("UI_SCALE_CHANGED",         CDM.OnScaleChanged)
+	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",     CDM.OnScaleChanged)
+	CDM.RegisterEvent("PLAYER_CAN_GLIDE_CHANGED", CDM.PLAYER_CAN_GLIDE_CHANGED)
+	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",     CDM.PLAYER_REGEN_ENABLED)
+	CDM.RegisterEvent("PLAYER_TARGET_CHANGED",    CDM.PLAYER_TARGET_CHANGED)
+	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",    CDM.SPELL_UPDATE_COOLDOWN)
+	hooksecurefunc(UIParent, "SetScale",          CDM.OnScaleChanged)
 
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.OnCDMChanged)
@@ -128,6 +129,7 @@ function CDM.Rebuild()
 	CDM.AssignFrames()
 	CDM.RefreshAllConfig()
 	CDM.RefreshLayout()
+	CDM.RefreshSkyriding()
 	CDM.RefreshAllCategories()
 	CDM.RefreshAllAuras()
 end
@@ -336,6 +338,13 @@ function CDM.RefreshLayout()
 	end
 end
 
+function CDM.RefreshSkyriding()
+	local isGliding, canGlide = C_PlayerInfo.GetGlidingInfo()
+	for category, vState in pairs(CDM.viewers) do
+		vState.Root:SetShown(not canGlide)
+	end
+end
+
 function CDM.RefreshCategory(fState, spellID)
 	wipe(fState.spellIDs)
 	fState.auraSpellID = spellID
@@ -400,6 +409,10 @@ end
 function CDM.DispatchEvent(frame, event, ...)
 	local func = CDM.handlers[event]
 	func(...)
+end
+
+function CDM.PLAYER_CAN_GLIDE_CHANGED()
+	CDM.RefreshSkyriding()
 end
 
 function CDM.PLAYER_REGEN_ENABLED()
