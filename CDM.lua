@@ -14,6 +14,7 @@ function CDM.Load()
 			CombatPotion = Constants.SpellCooldownConsts.COMBAT_POTION_CATEGORY,
 			HealthPotion = Constants.SpellCooldownConsts.HEALTH_POTION_CATEGORY,
 			Healthstone  = Constants.SpellCooldownConsts.HEALTHSTONE_CATEGORY,
+			SkyridingGCD = 2316,
 		},
 
 		Misc = {

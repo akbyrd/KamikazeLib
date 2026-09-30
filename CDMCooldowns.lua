@@ -121,6 +121,7 @@ function CDM.Load()
 	CDM.RegisterEvent("UI_SCALE_CHANGED",                            CDM.OnScaleChanged)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                        CDM.OnScaleChanged)
 	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                         CDM.RefreshAllUsable)
+	CDM.RegisterEvent("PLAYER_CAN_GLIDE_CHANGED",                    CDM.PLAYER_CAN_GLIDE_CHANGED)
 	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                        CDM.PLAYER_REGEN_ENABLED)
 	CDM.RegisterEvent("BAG_UPDATE_COOLDOWN",                         CDM.BAG_UPDATE_COOLDOWN)
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                       CDM.SPELL_UPDATE_COOLDOWN)
@@ -236,7 +237,8 @@ function CDM.Rebuild()
 	-- NOTE: Keys (and certain other content) are restricted the whole time.
 	if C_Secrets.ShouldCooldownsBeSecret() then return end
 
-	Kami.CDM.GatherCDs(CDM.viewers)
+	CDM.RefreshSkyriding()
+	CDM.GatherCDs(CDM.viewers)
 
 	CDM.RefreshScale()
 	CDM.AssignFrames()
@@ -518,6 +520,17 @@ function CDM.AssignFrames()
 	end
 end
 
+function CDM.RefreshSkyriding()
+	local isGliding, canGlide = C_PlayerInfo.GetGlidingInfo()
+	if canGlide then
+		CDM.GatherCDs = CDM.GatherCDs_Skyriding
+		CDM.RegisterEvent("ACTIONBAR_SLOT_CHANGED", CDM.ACTIONBAR_SLOT_CHANGED)
+	else
+		CDM.GatherCDs = Kami.CDM.GatherCDs
+		CDM.eventFrame:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
+	end
+end
+
 function CDM.RefreshScale()
 	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
 	for category, vState in pairs(CDM.viewers) do
@@ -706,10 +719,17 @@ function CDM.RefreshAllOverrides()
 end
 
 function CDM.RefreshCooldown(fState)
-	local cdInfo   = C_Spell.GetSpellCooldown(fState.spellID) -- SpellCooldownInfo
-	local duration = C_Spell.GetSpellCooldownDuration(fState.spellID)
-	local onCD     = cdInfo.isActive and not cdInfo.isOnGCD
-	local onGCD    = cdInfo.isOnGCD
+	-- NOTE: The client doesn't flag the skyriding GCD as isOnGCD
+	-- NOTE: activeCategory is secret in combat
+
+	local db = Kami.CDM.db
+
+	local cdInfo         = C_Spell.GetSpellCooldown(fState.spellID) -- SpellCooldownInfo
+	local duration       = C_Spell.GetSpellCooldownDuration(fState.spellID)
+	local category       = cdInfo.activeCategory
+	local isSkyridingGCD = not issecretvalue(category) and category == db.Category.SkyridingGCD
+	local onCD           = cdInfo.isActive and not cdInfo.isOnGCD and not isSkyridingGCD
+	local onGCD          = cdInfo.isOnGCD or isSkyridingGCD
 
 	if fState.equipSlot then
 		-- NOTE: GetSpellCooldown[Duration] is the item burst category cooldown for items
@@ -914,6 +934,29 @@ function CDM.RefreshAssist()
 	end
 end
 
+function CDM.GatherCDs_Skyriding(viewers)
+	-- NOTE: Lookups assume a single instance of each spell, so skip duplicates.
+
+	local FIRST_SLOT = 121
+	local LAST_SLOT  = 132
+
+	for category, vState in pairs(viewers) do
+		wipe(vState.cdvInfos)
+	end
+
+	local vState = viewers[Enum.CooldownViewerCategory.Essential]
+	local added  = {}
+	for slot = FIRST_SLOT, LAST_SLOT do
+		local actionType, id, subType = GetActionInfo(slot)
+		if actionType == "spell" or (actionType == "macro" and subType == "spell") then
+			if not added[id] then
+				added[id] = true
+				table.insert(vState.cdvInfos, { spellID = id })
+			end
+		end
+	end
+end
+
 ----------------------------------------------------------------------------------------------------
 -- Event Handlers
 
@@ -931,6 +974,22 @@ function CDM.OnScaleChanged()
 	CDM.RefreshScale()
 	CDM.RefreshAllSizes()
 	CDM.RefreshAllPositions()
+end
+
+function CDM.ACTIONBAR_SLOT_CHANGED(slot)
+	-- NOTE: Only registered while skyriding
+	-- NOTE: Fires with no change when an ability with a cooldown of its own is used
+
+	local FIRST_SLOT = 121
+	local LAST_SLOT  = 132
+
+	if slot >= FIRST_SLOT and slot <= LAST_SLOT then
+		CDM.Rebuild()
+	end
+end
+
+function CDM.PLAYER_CAN_GLIDE_CHANGED()
+	CDM.Rebuild()
 end
 
 function CDM.PLAYER_REGEN_ENABLED()
@@ -963,6 +1022,8 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 	-- * Ignore the category parameter here, query each category's "last source", and do a refresh.
 	-- * Build up a mapping of these undocumented categories and register them in EnableFrame.
 
+	local db = Kami.CDM.db
+
 	local fState = CDM.categoryLookup[category]
 	if fState then
 		if fState.spellID ~= spellID then
@@ -974,8 +1035,9 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 		end
 	end
 
-	local startGCD = startRecoveryCategory == Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY
-	if startGCD or not spellID then
+	local startGCD          = startRecoveryCategory == Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY
+	local startSkyridingGCD = category == db.Category.SkyridingGCD
+	if startGCD or startSkyridingGCD or not spellID then
 		CDM.refreshAllCooldowns = true
 	else
 		-- NOTE: Supposedly this event can arrive before the override event, so we need to check base

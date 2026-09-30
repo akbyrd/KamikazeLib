@@ -22,7 +22,7 @@ function CDM.Load()
 
 			pandemicColor    = Config.Color("FFFF3030"),
 			pandemicInset    = Config.Size("0px"),
-			pandemicSize     = Config.Size("1px"),
+			pandemicSize     = Config.Size("2px"),
 			pandemicSpeed    = Config.Number(0.05),
 			pandemicSegments = Config.Number(8),
 			pandemicDuty     = Config.Number(0.6),

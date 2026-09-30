@@ -5,6 +5,8 @@ Skyriding
 	Test cast prediction
 
 Possess bar
+	Similar to skyriding - hide buffs, swap resource, show abilities
+
 Power infusion
 Resources
 	Sweeping strikes bar
