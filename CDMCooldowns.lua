@@ -719,15 +719,17 @@ function CDM.RefreshAllOverrides()
 end
 
 function CDM.RefreshCooldown(fState)
-	-- NOTE: The client doesn't flag the skyriding GCD as isOnGCD
-	-- NOTE: activeCategory is secret in combat
+	-- NOTE: The shared, GCD-like cooldown on several skyriding abilities is not actually the GCD.
+	-- It's a shared cooldown category (closer to the trinket / item burst category). So we go out of
+	-- our way to re-classify it as a GCD. activeCategory is secret in combat for most spells, but
+	-- luckily not skyriding abilities so we're able to read it when it matters. If it's secret, it's
+	-- definitely not the skyriding GCD anyway so we can ignore it.
 
 	local db = Kami.CDM.db
 
 	local cdInfo         = C_Spell.GetSpellCooldown(fState.spellID) -- SpellCooldownInfo
 	local duration       = C_Spell.GetSpellCooldownDuration(fState.spellID)
-	local category       = cdInfo.activeCategory
-	local isSkyridingGCD = not issecretvalue(category) and category == db.Category.SkyridingGCD
+	local isSkyridingGCD = Util.Sanitize(cdInfo.activeCategory) == db.Category.SkyridingGCD
 	local onCD           = cdInfo.isActive and not cdInfo.isOnGCD and not isSkyridingGCD
 	local onGCD          = cdInfo.isOnGCD or isSkyridingGCD
 

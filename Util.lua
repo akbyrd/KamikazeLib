@@ -159,3 +159,11 @@ end
 function Util.SpellToString(spellID)
 	return ("%s %s"):format(tostring(spellID), tostring(spellID and C_Spell.GetSpellName(spellID)))
 end
+
+function Util.Sanitize(value)
+	if issecretvalue(value) then
+		return nil
+	else
+		return value
+	end
+end
