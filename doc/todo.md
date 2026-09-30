@@ -1,8 +1,32 @@
+Skyriding
+---------
+* Don't like the empower stuff being moved to RefreshAllSizes
+* Not sure about GetActionSpell
+
+Should hidden frames remain in the lookups?
+	* Ideally, we don't update them while hidden
+	* Requires everything that isn't updated to be derivable on a rebuild
+	* Bling and Override are the hold outs
+	* Currently inconsistent: hidden frames are in lookups but not activeFramers and get mixed updates
+
+Are slots pulling their weight?
+All remaining known issues
+Remaining tests
+Full review
+Test conditional macro on skyriding while mounting
+Test dimensius
+Test cast prediction
+Test on evoker
+
+
+
 To Do
 -----
-Skyriding
-	Test on dimensius or chimaerus
-	Test cast prediction
+Add range check support for potions and trinkets
+Bladestorm buff bar doesn't show up
+Stance shared cooldown isn't shown
+Stance icon change doesn't work
+Consider tracking pressed state for things not on the CDM
 
 Possess bar
 	Similar to skyriding - hide buffs, swap resource, show abilities

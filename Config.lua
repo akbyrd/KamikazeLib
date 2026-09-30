@@ -9,6 +9,7 @@ function Config.Bool(value)                        return { type = "boolean", va
 function Config.Number(value)                      return { type = "number",  value = value                 } end
 function Config.String(value)                      return { type = "string",  value = value                 } end
 function Config.Table(value)                       return { type = "table",   value = value                 } end
+function Config.Raw(value)                         return { type = "raw",     value = value                 } end
 function Config.Size(value)                        return { type = "size",    value = value                 } end
 function Config.UISize(value, e)                   return { type = "size",    value = Util.UISize(value, e) } end
 function Config.Color(value)                       return { type = "color",   value = value                 } end
@@ -239,6 +240,17 @@ Config.Impl.typeDefs = {
 		end,
 		format = function(value)
 			return "table"
+		end,
+	},
+
+	raw = {
+		parse = function(key, decl)
+		end,
+		resolve = function(tree, derived, key, decl)
+			derived[key] = decl.value
+		end,
+		format = function(value)
+			return tostring(value)
 		end,
 	},
 
