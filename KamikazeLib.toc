@@ -24,3 +24,4 @@ CDMCooldowns.lua
 CDMBuffs.lua
 CDMResources.lua
 Settings.lua
+Test\RangeCheckTest.lua
