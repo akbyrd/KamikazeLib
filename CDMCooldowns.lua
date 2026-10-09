@@ -208,7 +208,6 @@ function CDM.Load()
 	CDM.classToken     = select(2, UnitClass("player"))
 	CDM.classColor     = C_ClassColor.GetClassColor(CDM.classToken)
 	CDM.spellLookup    = {}
-	CDM.categoryLookup = {}
 	CDM.categoryIcons  = {
 		[db.Category.GCD]          = "Interface/ICONS/INV_POTION_114",
 		[db.Category.CombatPotion] = "Interface/ICONS/INV_POTION_54",
@@ -218,6 +217,7 @@ function CDM.Load()
 	CDM.mousePresses        = {}
 	CDM.spellPresses        = {}
 	CDM.pressCounts         = {}
+	CDM.activeOverrides     = {}
 	CDM.refreshAllCooldowns = false
 	CDM.aurasSecret         = C_Secrets.ShouldAurasBeSecret()
 
@@ -230,37 +230,31 @@ function CDM.Update()
 		CDM.RefreshAllCooldowns()
 	end
 
-	CDM.RefreshAssist()
+	CDM.PollAssist()
 end
 
 function CDM.Rebuild(reason)
-	-- TODO: Fix these so they can be re-derived?
-
-	-- NOTE: Bling and OverrideTimer are the only things we aren't able to rebuild from scratch.
-	-- * Bling - There's a hasBling member so we know to bling when the cooldown ends. Cooldowns are
-	--   not updated when a frame is hidden, hasBling will stay set and we'll end up with a spurious
-	--   bling next time the frame is shown.
-	-- * OverrideTimer - We don't store the start time (but we could).
-
 	print("Rebuild", reason)
 
 	CDM.GatherCDs()
 	CDM.RefreshScale()
+	CDM.RefreshAllOverrideRecords()
 	CDM.RefreshAllBarSlots()
+	CDM.RefreshAllCategorySlots()
 	CDM.AssignFrames()
 	CDM.RefreshAllConfig()
-	CDM.RefreshAllSizes() -- TODO: Combine into RefreshLayout?
-	CDM.RefreshAllPositions()
-	CDM.RefreshAllCategories()
-	CDM.RefreshAllRangeChecks()
 	CDM.RefreshAllOverrides()
 	CDM.RefreshAllCooldowns()
+	CDM.RefreshAllQueued()
+	CDM.RefreshAllProcs()
+	CDM.RefreshAllAssist()
+	CDM.RefreshAllEmpower()
+	CDM.RefreshAllSizes()
+	CDM.RefreshAllPositions()
+	CDM.RefreshAllRangeChecks()
 	CDM.RefreshAllIcons()
 	CDM.RefreshAllUsable()
 	CDM.RefreshAllPress()
-	CDM.RefreshAllQueued()
-	CDM.RefreshAllProcs()
-	CDM.RefreshAssist()
 	CDM.RefreshSkyriding()
 end
 
@@ -276,27 +270,20 @@ function CDM.ConstructFrame(vState, slot)
 	--   Outline    | Assist                 | Draw Order
 
 	local fState = {}
-	fState.cfg           = vState.cfg
-	fState.baseSpellID   = slot.spellID
-	fState.spellID       = slot.spellID
-	fState.categoryID    = slot.categoryID
-	fState.equipSlot     = slot.equipSlot
-	fState.barSlot       = slot.barSlot
-	fState.itemDuration  = C_DurationUtil.CreateDuration()
-	fState.itemID        = nil
-	fState.empowerBuff   = nil
-	fState.hasBling      = nil
-	fState.overrideTimer = nil
-	fState.rangeSpellID  = nil
-
-	if fState.spellID then
-		CDM.spellLookup[fState.spellID] = CDM.spellLookup[fState.spellID] or {}
-		CDM.spellLookup[fState.spellID][fState] = true
-	end
-	if fState.categoryID then
-		CDM.categoryLookup[fState.categoryID] = CDM.categoryLookup[fState.categoryID] or {}
-		CDM.categoryLookup[fState.categoryID][fState] = true
-	end
+	fState.cfg              = vState.cfg
+	fState.slot             = nil
+	fState.baseSpellID      = nil
+	fState.spellID          = nil
+	fState.categoryID       = slot.categoryID
+	fState.equipSlot        = slot.equipSlot
+	fState.barSlot          = slot.barSlot
+	fState.itemDuration     = C_DurationUtil.CreateDuration()
+	fState.empowerMaxStacks = 1
+	fState.itemID           = nil
+	fState.empowerBuff      = nil
+	fState.hasBling         = nil
+	fState.overrideTimer    = nil
+	fState.rangeSpellID     = nil
 
 	fState.Root = CreateFrame("Frame", nil, vState.Root)
 	fState.Root:SetParentKey("Root")
@@ -354,6 +341,7 @@ function CDM.ConstructFrame(vState, slot)
 				fState.EmpowerBar:SetStatusBarTexture(fState.EmpowerFill)
 			end,
 		})
+	fState.Empower:Hide()
 
 	fState.Recharge = CreateFrame("Cooldown", nil, fState.Content)
 	fState.Recharge:SetParentKey("Recharge")
@@ -383,13 +371,11 @@ function CDM.ConstructFrame(vState, slot)
 	fState.Press:SetParentKey("Press")
 	fState.Press:SetAllPoints()
 	fState.Press:SetBlendMode("ADD")
-	fState.Press:Hide()
 
 	fState.Queued = fState.Overlay:CreateTexture(nil, "OVERLAY", nil, 0)
 	fState.Queued:SetParentKey("Queued")
 	fState.Queued:SetAllPoints()
 	fState.Queued:SetBlendMode("ADD")
-	fState.Queued:Hide()
 
 	fState.Charges = fState.Overlay:CreateFontString(nil, "OVERLAY")
 	fState.Charges:SetParentKey("Charges")
@@ -418,11 +404,9 @@ function CDM.ConstructFrame(vState, slot)
 	fState.Assist:SetAllPoints()
 	fState.Assist:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
 	fState.Assist:SetTextureSliceMargins(1, 1, 1, 1)
-	fState.Assist:Hide()
 
 	-- TODO: Does PixelAnts actually need to create a frame?
 	fState.Proc = PixelAnts.Create(fState.Outline)
-	fState.Proc:Hide()
 
 	fState.Override = CreateFrame("StatusBar", nil, fState.Outline)
 	fState.Override:SetParentKey("Override")
@@ -430,7 +414,6 @@ function CDM.ConstructFrame(vState, slot)
 	fState.Override:SetPoint("BOTTOMLEFT")
 	fState.Override:SetPoint("BOTTOMRIGHT")
 	fState.Override:SetTimerDuration(C_DurationUtil.CreateDuration(), nil, Enum.StatusBarTimerDirection.RemainingTime)
-	fState.Override:Hide()
 
 	fState.OverrideBG = fState.Override:CreateTexture(nil, "BACKGROUND")
 	fState.OverrideBG:SetParentKey("Background")
@@ -439,17 +422,28 @@ function CDM.ConstructFrame(vState, slot)
 	return fState
 end
 
-function CDM.EnableFrame(fState)
+function CDM.EnableFrame(fState, slot)
+	fState.slot        = slot
+	fState.baseSpellID = slot.spellID
+	fState.spellID     = slot.spellID
+	fState.itemID      = slot.itemID
+
+	if fState.spellID then
+		CDM.spellLookup[fState.spellID] = CDM.spellLookup[fState.spellID] or {}
+		CDM.spellLookup[fState.spellID][fState] = true
+	end
+
+	CDM.ClearBling(fState)
 	fState.Root:Show()
 end
 
 function CDM.DisableFrame(fState)
-	fState.Root:Hide()
+	if fState.spellID then
+		CDM.spellLookup[fState.spellID][fState] = nil
+		CDM.spellLookup[fState.baseSpellID][fState] = nil
+	end
 
-	-- TODO: Remove this (then maybe remove EnableFrame/DisableFrame entirely)
-	fState.Bling:Clear()
-	fState.Override:Hide()
-	fState.hasBling = nil
+	fState.Root:Hide()
 end
 
 function CDM.AssignFrames()
@@ -477,7 +471,7 @@ function CDM.AssignFrames()
 					vState.allFrames[slot.key] = fState
 				end
 
-				CDM.EnableFrame(fState)
+				CDM.EnableFrame(fState, slot)
 				table.insert(vState.activeFrames, fState)
 			end
 		end
@@ -497,6 +491,27 @@ function CDM.AssignFrames()
 	end
 end
 
+function CDM.ReassignFrame(fState, slot)
+	CDM.DisableFrame(fState)
+	CDM.EnableFrame(fState, slot)
+
+	CDM.RefreshConfig(fState)
+	CDM.RefreshOverride(fState)
+	CDM.RefreshCooldown(fState)
+	CDM.RefreshQueued(fState)
+	CDM.RefreshProc(fState)
+	CDM.RefreshAssist(fState)
+	CDM.RefreshEmpower(fState)
+	CDM.RefreshRangeCheck(fState)
+	CDM.RefreshIcon(fState)
+	CDM.RefreshUsable(fState)
+	CDM.RefreshPress(fState)
+
+	if fState.empowerBuff then
+		CDM.RefreshAllSizes()
+	end
+end
+
 function CDM.RefreshScale()
 	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
 	for category, vState in pairs(CDM.viewers) do
@@ -506,13 +521,50 @@ function CDM.RefreshScale()
 	Config.RefreshValues(CDM.cfgTree, pixelsToUI)
 end
 
+function CDM.RefreshEmpower(fState)
+	local empowerBuff = fState.cfg.empowerBuffs[CDM.classToken][fState.baseSpellID]
+
+	if empowerBuff and not C_Secrets.ShouldAurasBeSecret() then
+		fState.empowerMaxStacks = max(1, C_Spell.GetSpellMaxCumulativeAuraApplications(empowerBuff))
+		fState.EmpowerButton:SetApplicationBar(fState.EmpowerBar, { maxApplications = fState.empowerMaxStacks })
+	end
+
+	if fState.empowerBuff ~= empowerBuff then
+		if empowerBuff and not C_Secrets.ShouldAurasBeSecret() then
+			fState.empowerBuff = empowerBuff
+			fState.Empower:SetAuraSlotCandidateFilters(tostring(fState), { includeSpellIDs = { [fState.empowerBuff] = true } })
+			fState.Empower:Show()
+		else
+			fState.empowerBuff = nil
+			fState.empowerMaxStacks = 1
+			fState.Empower:SetAuraSlotCandidateFilters(tostring(fState), { includeSpellIDs = {} })
+			fState.Empower:Hide()
+		end
+	end
+end
+
+function CDM.RefreshAllEmpower()
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.activeFrames) do
+			CDM.RefreshEmpower(fState)
+		end
+	end
+end
+
 function CDM.RefreshConfig(fState)
+	fState.overrideTimer = fState.cfg.overrideTimers[CDM.classToken][fState.baseSpellID]
+
 	fState.Border:SetVertexColor(fState.cfg.borderColor:GetRGBA())
 	fState.Press:SetColorTexture(fState.cfg.pressColor:GetRGBA())
 	fState.Queued:SetColorTexture(fState.cfg.queuedColor:GetRGBA())
 	fState.Assist:SetVertexColor(fState.cfg.assistColor:GetRGBA())
 	fState.Override:SetColorFill(fState.cfg.procColor:GetRGBA())
 	fState.OverrideBG:SetColorTexture(fState.cfg.borderColor:GetRGBA())
+
+	if not C_Secrets.ShouldAurasBeSecret() then
+		fState.EmpowerBorder:SetVertexColor(fState.cfg.borderColor:GetRGBA())
+		fState.EmpowerFill:SetVertexColor(CDM.classColor:GetRGBA())
+	end
 
 	fState.Proc:SetConfig(
 		nil,
@@ -521,12 +573,6 @@ function CDM.RefreshConfig(fState)
 		fState.cfg.procSpeed,
 		fState.cfg.procSegments,
 		fState.cfg.procDuty)
-
-	fState.overrideTimer = fState.cfg.overrideTimers[CDM.classToken][fState.baseSpellID]
-	fState.empowerBuff   = fState.cfg.empowerBuffs[CDM.classToken][fState.baseSpellID]
-
-	local includeSpellIDs = fState.empowerBuff and { [fState.empowerBuff] = true } or {}
-	fState.Empower:SetAuraSlotCandidateFilters(tostring(fState), { includeSpellIDs = includeSpellIDs })
 end
 
 function CDM.RefreshAllConfig()
@@ -537,8 +583,6 @@ function CDM.RefreshAllConfig()
 	end
 end
 
--- TODO: Size the empower bar even if it's not used. This means we don't have to run a resize pass
--- when a bar slot changes into a spell with an empower buff.
 function CDM.RefreshAllSizes()
 	local pxSize, pySize = GetPhysicalScreenSize()
 
@@ -587,10 +631,9 @@ function CDM.RefreshAllSizes()
 			Util.SetSliceScale(fState.Assist, assistSize)
 
 			if fState.empowerBuff and not C_Secrets.ShouldAurasBeSecret() then
-				local maxStacks = max(1, C_Spell.GetSpellMaxCumulativeAuraApplications(fState.empowerBuff))
-
 				-- TODO: This is no longer pixel perfect if tiles are wider than 64, which happens with
 				-- a 1 stack buff. Consider increasing the texture size to 128 or 256.
+				local maxStacks     = fState.empowerMaxStacks
 				local xTileSize     = floor((cxSize + empowerGapSize - 6) / maxStacks)
 				local xBorderSize   = xTileSize - empowerGapSize
 				local xFillSize     = xBorderSize - 2*empowerBorderSize
@@ -604,9 +647,6 @@ function CDM.RefreshAllSizes()
 				local vFill         = (Round(xFillSize   / barScale) - 0.5) / 64
 				local vBorder       = (Round(xBorderSize / barScale) - 0.5) / 64
 
-				fState.EmpowerButton:SetApplicationBar(fState.EmpowerBar, { maxApplications = maxStacks })
-				fState.EmpowerBorder:SetVertexColor(fState.cfg.borderColor:GetRGBA())
-				fState.EmpowerFill:SetVertexColor(CDM.classColor:GetRGBA())
 				fState.Empower:SetPoint("TOPLEFT", fState.Content, "BOTTOMLEFT", 0, empowerSize)
 				fState.EmpowerBar:SetScale(barScale)
 				fState.EmpowerBar:SetPoint("TOPLEFT", borderSize + xCenterOffset, -borderSize + yOffset)
@@ -658,6 +698,25 @@ function CDM.RefreshAllPositions()
 	end
 end
 
+function CDM.RefreshOverrideRecord(spellID)
+	if not CDM.activeOverrides[spellID] then
+		local overrideSpellID = C_Spell.GetOverrideSpell(spellID)
+		if overrideSpellID ~= spellID then
+			CDM.activeOverrides[spellID] = { overrideSpellID = overrideSpellID, time = nil }
+		end
+	end
+end
+
+function CDM.RefreshAllOverrideRecords()
+	for category, vState in pairs(CDM.viewers) do
+		for iSlot, slot in ipairs(vState.slots) do
+			if slot.spellID then
+				CDM.RefreshOverrideRecord(slot.spellID)
+			end
+		end
+	end
+end
+
 function CDM.SetOverride(fState, spellID)
 	-- Remove the current override
 	if fState.spellID ~= fState.baseSpellID then
@@ -674,33 +733,28 @@ function CDM.SetOverride(fState, spellID)
 end
 
 function CDM.RefreshOverride(fState)
-	local spellID = C_Spell.GetOverrideSpell(fState.baseSpellID)
+	local override = CDM.activeOverrides[fState.baseSpellID]
+	local spellID  = override and override.overrideSpellID
 	CDM.SetOverride(fState, spellID)
+
+	local timer = fState.overrideTimer
+	if timer and override and override.time and override.overrideSpellID == timer.overrideSpellID then
+		local duration = fState.Override:GetTimerDuration()
+		duration:SetTimeFromStart(override.time, timer.duration)
+		fState.Override:Show()
+	else
+		fState.Override:Hide()
+	end
 end
 
 function CDM.RefreshAllOverrides()
 	for category, vState in pairs(CDM.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			if fState.spellID then
-				CDM.RefreshOverride(fState)
-			end
+			CDM.RefreshOverride(fState)
 		end
 	end
 end
 
-function CDM.SetOverrideTimer(fState, overrideSpellID)
-	if fState.overrideTimer then
-		if fState.overrideTimer.overrideSpellID == overrideSpellID then
-			local duration = fState.Override:GetTimerDuration()
-			duration:SetTimeFromStart(GetTime(), fState.overrideTimer.duration)
-			fState.Override:Show()
-		else
-			fState.Override:Hide()
-		end
-	end
-end
-
--- TODO: This needs to use the itemID instead of equipSlot
 function CDM.RefreshCooldown(fState)
 	-- NOTE: The shared, GCD-like cooldown on several skyriding abilities is not actually the GCD.
 	-- It's a shared cooldown category (closer to the trinket / item burst category). So we go out of
@@ -708,23 +762,67 @@ function CDM.RefreshCooldown(fState)
 	-- luckily not skyriding abilities so we're able to read it when it matters. If it's secret, it's
 	-- definitely not the skyriding GCD and we can ignore it.
 
+	-- NOTE: isOnGCD is always false for an item's bar action.
+
+	-- NOTE: At first glance it seems like we could drop the action bar path below and treat
+	-- everything as either an item or a spell. But, there are in fact things with cooldowns that are
+	-- neither: e.g. companion pets (on the GCD) and transmog outfits (3s CD).
+
+	-- NOTE: Other fun edge cases to know about:
+	-- * C_ActionBar APIs follow #showtooltip when it differs from what will actually be cast/used.
+	-- * [btn:2] casts a different spell from what is visible (noteworthy for the press overlay).
+	-- * There can be multiple spells/uses in a single macro when they aren't on the GCD.
+	-- * /castsequence exists.
+	-- * Many complex conditionals (stance, exists, harm, etc). Must rely on ACTIONBAR_SLOT_CHANGED.
+
+	-- NOTE: API behavior for items
+	-- API                                   | Secret | GCD | isOnGCD | CD  | Shared | ignoreGCD |
+	--
+	-- C_Item.GetItemCooldown                | No     | Yes | No      | Yes | Yes    | N/A       |
+	-- C_ActionBar.GetActionCooldown         | Yes    | Yes | No      | Yes | Yes    | N/A       |
+	-- C_Spell.GetSpellCooldown              | Yes    | Yes | Yes     | No  | Yes    | N/A       |
+	--
+	-- C_Item.GetItemCooldownDuration        | doesn't exist                                     |
+	-- C_ActionBar.GetActionCooldownDuration | Yes    | Yes | N/A     | Yes | Yes    | Broken    |
+	-- C_Spell.GetSpellCooldownDuration      | Yes    | Yes | N/A     | No  | Yes    | Works     |
+
 	local db = Kami.CDM.db
 
-	local cdInfo   = C_Spell.GetSpellCooldown(fState.spellID) -- SpellCooldownInfo
-	local duration = C_Spell.GetSpellCooldownDuration(fState.spellID)
-	local onGCD    = cdInfo.isOnGCD or Util.Sanitize(cdInfo.activeCategory) == db.Category.SkyridingGCD
-	local onCD     = cdInfo.isActive and not onGCD
+	local isItem, onCD, onGCD, duration, rechargeDuration, chargeCount
 
-	if fState.equipSlot then
+	if fState.itemID then
 		-- NOTE: GetSpellCooldown[Duration] is the item burst category cooldown for items
-		local start, duration2, enable = GetInventoryItemCooldown("player", fState.equipSlot)
-		if enable == 1 and duration2 > 0 then
-			local BASE_GCD = 1.5
-			fState.itemDuration:SetTimeFromStart(start, duration2)
-			duration = fState.itemDuration
-			onCD     = duration2 > BASE_GCD
-			onGCD    = not onCD
-		end
+		local BASE_GCD = 1.5
+		local start, itemDuration, enable = C_Item.GetItemCooldown(fState.itemID)
+		fState.itemDuration:SetTimeFromStart(start, itemDuration)
+
+		isItem      = true
+		onCD        = enable and itemDuration > BASE_GCD
+		onGCD       = enable and itemDuration > 0 and not onCD
+		duration    = fState.itemDuration
+		chargeCount = C_Item.GetItemCount(fState.itemID)
+
+	elseif fState.barSlot then
+		local cdInfo     = C_ActionBar.GetActionCooldown(fState.barSlot) -- SpellCooldownInfo
+		local chargeInfo = C_ActionBar.GetActionCharges(fState.barSlot) -- SpellChargeInfo
+
+		isItem           = C_ActionBar.IsItemAction(fState.barSlot)
+		onGCD            = cdInfo.isOnGCD or Util.Sanitize(cdInfo.activeCategory) == db.Category.SkyridingGCD
+		onCD             = cdInfo.isActive and not onGCD
+		duration         = C_ActionBar.GetActionCooldownDuration(fState.barSlot)
+		rechargeDuration = C_ActionBar.GetActionChargeDuration(fState.barSlot)
+		chargeCount      = chargeInfo.maxCharges > 1 and chargeInfo.currentCharges or C_ActionBar.GetActionUseCount(fState.barSlot)
+
+	elseif fState.spellID then
+		local cdInfo     = C_Spell.GetSpellCooldown(fState.spellID) -- SpellCooldownInfo
+		local chargeInfo = C_Spell.GetSpellCharges(fState.spellID) -- SpellChargeInfo
+
+		isItem           = false
+		onGCD            = cdInfo.isOnGCD or Util.Sanitize(cdInfo.activeCategory) == db.Category.SkyridingGCD
+		onCD             = cdInfo.isActive and not onGCD
+		duration         = C_Spell.GetSpellCooldownDuration(fState.spellID)
+		rechargeDuration = C_Spell.GetSpellChargeDuration(fState.spellID)
+		chargeCount      = chargeInfo and chargeInfo.maxCharges > 1 and chargeInfo.currentCharges or C_Spell.GetSpellCastCount(fState.spellID)
 	end
 
 	if onCD then
@@ -742,63 +840,40 @@ function CDM.RefreshCooldown(fState)
 
 	if onCD then
 		fState.hasBling = true
-		fState.Bling:SetCooldownFromDurationObject(duration, true)
+		fState.Bling:SetCooldownFromDurationObject(duration)
 	elseif fState.hasBling then
 		fState.hasBling = nil
 		fState.Bling:SetCooldownDuration(1e-3)
 	end
 
-	local chargeInfo = C_Spell.GetSpellCharges(fState.spellID) -- SpellChargeInfo
-	local recharging = chargeInfo and chargeInfo.isActive and not onCD
-	if recharging then
-		local duration = C_Spell.GetSpellChargeDuration(fState.spellID)
-		fState.Recharge:SetCooldownFromDurationObject(duration)
+	if rechargeDuration and not onCD then
+		fState.Recharge:SetCooldownFromDurationObject(rechargeDuration)
 	else
 		fState.Recharge:Clear()
 	end
 
-	local count
-	if chargeInfo and chargeInfo.maxCharges > 1 then
-		count = chargeInfo.currentCharges
-	else
-		count = C_Spell.GetSpellCastCount(fState.spellID)
-	end
-	count = C_StringUtil.TruncateWhenZero(count)
-	fState.Charges:SetText(count)
+	chargeCount = not isItem and chargeCount or 0
+	chargeCount = C_StringUtil.TruncateWhenZero(chargeCount)
+	fState.Charges:SetText(chargeCount)
 end
 
 function CDM.RefreshAllCooldowns()
 	for category, vState in pairs(CDM.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			if fState.spellID then
-				CDM.RefreshCooldown(fState)
-			end
+			CDM.RefreshCooldown(fState)
 		end
 	end
 end
 
-function CDM.SetCategory(fState, spellID, itemID)
-	if fState.spellID then
-		CDM.spellLookup[fState.spellID][fState] = nil
-	end
-
-	fState.baseSpellID = spellID
-	fState.spellID     = spellID
-	fState.itemID      = itemID
-
-	CDM.spellLookup[spellID] = CDM.spellLookup[spellID] or {}
-	CDM.spellLookup[spellID][fState] = true
+function CDM.ClearBling(fState)
+	fState.hasBling = nil
+	fState.Bling:Clear()
 end
 
-function CDM.RefreshAllCategories()
+function CDM.ClearAllBlings()
 	for category, vState in pairs(CDM.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			if fState.categoryID then
-				local lastSource = CDM.charVars.lastCategorySource[fState.categoryID]
-				if lastSource then
-					CDM.SetCategory(fState, lastSource.spellID, lastSource.itemID)
-				end
-			end
+			CDM.ClearBling(fState)
 		end
 	end
 end
@@ -826,10 +901,10 @@ end
 function CDM.RefreshIcon(fState)
 	local texture = nil
 
-	if     fState.itemID     then texture = C_Item.GetItemIconByID(fState.itemID)
-	elseif fState.barSlot    then texture = GetActionTexture(fState.barSlot)
-	elseif fState.spellID    then texture = C_Spell.GetSpellTexture(fState.spellID)
+	if     fState.barSlot    then texture = C_ActionBar.GetActionTexture(fState.barSlot)
+	elseif fState.itemID     then texture = C_Item.GetItemIconByID(fState.itemID)
 	elseif fState.equipSlot  then texture = GetInventoryItemTexture("player", fState.equipSlot)
+	elseif fState.spellID    then texture = C_Spell.GetSpellTexture(fState.spellID)
 	elseif fState.categoryID then texture = CDM.categoryIcons[fState.categoryID]
 	end
 
@@ -845,21 +920,28 @@ function CDM.RefreshAllIcons()
 end
 
 function CDM.RefreshUsable(fState)
-	if fState.spellID then
-		local usable, noMana = C_Spell.IsSpellUsable(fState.spellID)
-		local noRange = C_Spell.IsSpellInRange(fState.spellID) == false -- nil is "no target" etc
-
-		local color
-		if     noRange then color = fState.cfg.noRangeColor
-		elseif usable  then color = fState.cfg.usableColor
-		elseif noMana  then color = fState.cfg.noManaColor
-		else                color = fState.cfg.noUsableColor
-		end
-		fState.Icon:SetVertexColor(color:GetRGBA())
+	-- NOTE: Each of the "in range" functions return nil for "no target", etc
+	local usable, noMana, noRange
+	if fState.barSlot then
+		usable, noMana = C_ActionBar.IsUsableAction(fState.barSlot)
+		noRange        = C_ActionBar.IsActionInRange(fState.barSlot, "target") == false
+	elseif fState.itemID then
+		usable, noMana = C_Item.IsUsableItem(fState.itemID)
+		noRange        = C_Item.IsItemInRange(fState.itemID, "target") == false
+	elseif fState.spellID then
+		usable, noMana = C_Spell.IsSpellUsable(fState.spellID)
+		noRange        = C_Spell.IsSpellInRange(fState.spellID, "target") == false
 	else
-		local color = fState.cfg.usableColor
-		fState.Icon:SetVertexColor(color:GetRGBA())
+		usable = true
 	end
+
+	local color
+	if     noRange then color = fState.cfg.noRangeColor
+	elseif usable  then color = fState.cfg.usableColor
+	elseif noMana  then color = fState.cfg.noManaColor
+	else                color = fState.cfg.noUsableColor
+	end
+	fState.Icon:SetVertexColor(color:GetRGBA())
 end
 
 function CDM.RefreshAllUsable()
@@ -870,95 +952,139 @@ function CDM.RefreshAllUsable()
 	end
 end
 
-function CDM.SetPress(spellID, pressed)
-	for fState in pairs(CDM.spellLookup[spellID] or {}) do
-		fState.Press:SetShown(pressed)
-	end
+function CDM.RefreshPress(fState)
+	local pressCount = CDM.pressCounts[fState.baseSpellID] or 0
+	fState.Press:SetShown(pressCount > 0)
 end
 
-function CDM.RefreshPress(fState)
-	for spellID, pressCount in pairs(CDM.pressCounts) do
-		if spellID == fState.spellID then
-			CDM.SetPress(fState, pressCount > 0)
+function CDM.RefreshAllPress()
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.activeFrames) do
+			CDM.RefreshPress(fState)
 		end
 	end
 end
 
-function CDM.RefreshAllPress()
-	for spellID, pressCount in pairs(CDM.pressCounts) do
-		CDM.SetPress(spellID, pressCount > 0)
-	end
-end
-
 function CDM.RefreshQueued(fState)
-	local isCurrent = C_Spell.IsCurrentSpell(fState.spellID)
+	local isCurrent = false
+	if fState.barSlot then
+		isCurrent = C_ActionBar.IsCurrentAction(fState.barSlot)
+	elseif fState.itemID then
+		isCurrent = C_Item.IsCurrentItem(fState.itemID)
+	elseif fState.spellID then
+		isCurrent = C_Spell.IsCurrentSpell(fState.spellID)
+	end
 	fState.Queued:SetShown(isCurrent)
 end
 
 function CDM.RefreshAllQueued()
 	for category, vState in pairs(CDM.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			if fState.spellID then
-				CDM.RefreshQueued(fState)
-			end
+			CDM.RefreshQueued(fState)
 		end
 	end
 end
 
 function CDM.RefreshProc(fState)
-	local show = C_SpellActivationOverlay.IsSpellOverlayed(fState.spellID)
+	local show = fState.spellID and C_SpellActivationOverlay.IsSpellOverlayed(fState.spellID)
 	fState.Proc:SetShown(show)
 end
 
 function CDM.RefreshAllProcs()
 	for category, vState in pairs(CDM.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			if fState.spellID then
-				CDM.RefreshProc(fState)
-			end
+			CDM.RefreshProc(fState)
 		end
 	end
 end
 
--- TODO: Handle spell ID change on override
--- TODO: Handle spell ID change on category
-function CDM.RefreshAssist()
-	local assistSpellID = nil
-
-	if CDM.showAssist then
-		local spellID = C_AssistedCombat.GetNextCastSpell(false)
-		for fState in pairs(CDM.spellLookup[spellID] or {}) do
-			assistSpellID = fState.baseSpellID
-		end
-	end
-
+function CDM.PollAssist()
+	local assistSpellID = CDM.showAssist and C_AssistedCombat.GetNextCastSpell(false) or nil
 	if CDM.assistSpellID ~= assistSpellID then
-		for fState in pairs(CDM.spellLookup[CDM.assistSpellID] or {}) do
-			fState.Assist:Hide()
-		end
+		local prevAssistSpellID = CDM.assistSpellID
 		CDM.assistSpellID = assistSpellID
+		for fState in pairs(CDM.spellLookup[prevAssistSpellID] or {}) do
+			CDM.RefreshAssist(fState)
+		end
 		for fState in pairs(CDM.spellLookup[CDM.assistSpellID] or {}) do
-			fState.Assist:Show()
+			CDM.RefreshAssist(fState)
 		end
 	end
 end
 
-function CDM.GetActionSpell(slot)
-	local actionType, id, subType = GetActionInfo(slot)
+function CDM.RefreshAssist(fState)
+	local shown = fState.spellID and (fState.spellID == CDM.assistSpellID or fState.baseSpellID == CDM.assistSpellID)
+	fState.Assist:SetShown(shown)
+end
+
+function CDM.RefreshAllAssist()
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.activeFrames) do
+			CDM.RefreshAssist(fState)
+		end
+	end
+end
+
+function CDM.GetBarSpell(barSlot)
+	local actionType, id, subType = GetActionInfo(barSlot)
+	local spellID
 
 	-- plain spell or /cast macro
 	if actionType == "spell" or (actionType == "macro" and subType == "spell") then
-		return id, nil
+		spellID = id
 
 	-- plain item or /use macro
 	elseif actionType == "item" or (actionType == "macro" and subType == "item") then
 		-- NOTE: spellID can be 0 while logging in
 		-- BUG: https://github.com/Stanzilla/WoWUIBugs/issues/495
-		local spellID = C_ActionBar.GetSpell(slot)
-		local itemID  = actionType == "item" and id or nil
+		spellID = C_ActionBar.GetSpell(barSlot)
 		spellID = spellID ~= 0 and spellID or nil
-		return spellID, itemID
 	end
+
+	for baseSpellID, override in pairs(CDM.activeOverrides) do
+		if override.overrideSpellID == spellID then
+			spellID = baseSpellID
+		end
+	end
+	return spellID
+end
+
+function CDM.GetBarItem(barSlot)
+	local actionType, id, subType = GetActionInfo(barSlot)
+	local itemID
+
+	-- plain item
+	if actionType == "item" then
+		itemID = id
+
+	-- /use macro
+	elseif actionType == "macro" and subType == "item" then
+		-- BUG: https://github.com/Stanzilla/WoWUIBugs/issues/495
+		--
+		-- Getting the item id is important for cooldowns to work properly. The spell cooldown shows
+		-- the GCD and the shared cooldown, but not the actual idem cooldown. A few options for
+		-- getting the item id:
+		-- 1. Map the macro name to the macro index, then query the macro. This mapping is ambiguous
+		--    because macro names are not required to be unique. We can mostly disambiguate by
+		--    confirming the spell id matches, but that can fail too when multiple items have the same
+		--    spell, like ranks of the Algari Healing Potion.
+		-- 2. Get the item id from the tooltip. This can fail if the macro doesn't use #showtooltip.
+		--    The line index is undocumented so it's unclear if it will always be in the first slot.
+		-- 3. Learn items from SPELL_UPDATE_COOLDOWN. This can fail if the cast wasn't seen, e.g. when
+		--    first installing the addon, when saved vars where reset, or when the spell was cast
+		--    while logged in on a different PC.
+		--
+		-- Since all of these options kind of suck, we go with the tooltip approach. This is the only
+		-- one that requires no additional state. If they're all sort-of-broken we might as well take
+		-- the simplest one.
+		local tooltipData = C_TooltipInfo.GetAction(barSlot)
+		local line        = tooltipData.lines[1]
+		if line.tooltipType == Enum.TooltipDataType.Item then
+			itemID = line.tooltipID
+		end
+	end
+
+	return itemID
 end
 
 function CDM.GatherCDs()
@@ -969,6 +1095,7 @@ function CDM.GatherCDs()
 			local slot = {
 				key        = cdvInfo.cooldownID,
 				spellID    = cdvInfo.spellID,
+				itemID     = cdvInfo.equipSlot and GetInventoryItemID("player", cdvInfo.equipSlot) or nil,
 				categoryID = cdvInfo.spellCategoryID,
 				equipSlot  = cdvInfo.equipSlot,
 				barSlot    = nil,
@@ -986,6 +1113,7 @@ function CDM.GatherCDs()
 		local slot = {
 			key        = barSlot,
 			spellID    = nil,
+			itemID     = nil,
 			categoryID = nil,
 			equipSlot  = nil,
 			barSlot    = barSlot,
@@ -1006,13 +1134,11 @@ function CDM.RefreshSkyriding()
 end
 
 function CDM.RefreshBarSlot(slot)
-	local spellID, itemID = CDM.GetActionSpell(slot.barSlot)
-	slot.spellID   = spellID
-	slot.hasAction = HasAction(slot.barSlot)
-	--slot.itemID = itemID -- TODO: Why do we set this but not fState.spellID?
+	slot.spellID   = CDM.GetBarSpell(slot.barSlot)
+	slot.itemID    = CDM.GetBarItem(slot.barSlot)
+	slot.hasAction = C_ActionBar.HasAction(slot.barSlot)
 end
 
--- TODO: Should this be merged into GatherCDs?
 function CDM.RefreshAllBarSlots()
 	for category, vState in pairs(CDM.viewers) do
 		for iSlot, slot in ipairs(vState.slots) do
@@ -1023,21 +1149,21 @@ function CDM.RefreshAllBarSlots()
 	end
 end
 
--- TODO: Move
--- TODO: Merge with SetCategory?
--- TODO: Why doesn't this set item id?
-function CDM.ReassignFrame(fState, spellID)
-	if fState.spellID then
-		CDM.spellLookup[fState.spellID][fState] = nil
-		CDM.spellLookup[fState.baseSpellID][fState] = nil
+function CDM.RefreshCategorySlot(slot)
+	local source = CDM.charVars.lastCategorySource[slot.categoryID]
+	if source then
+		slot.spellID = source.spellID
+		slot.itemID  = source.itemID
 	end
+end
 
-	fState.baseSpellID = spellID
-	fState.spellID     = spellID
-
-	if spellID then
-		CDM.spellLookup[spellID] = CDM.spellLookup[spellID] or {}
-		CDM.spellLookup[spellID][fState] = true
+function CDM.RefreshAllCategorySlots()
+	for category, vState in pairs(CDM.viewers) do
+		for iSlot, slot in ipairs(vState.slots) do
+			if slot.categoryID then
+				CDM.RefreshCategorySlot(slot)
+			end
+		end
 	end
 end
 
@@ -1062,10 +1188,9 @@ end
 
 function CDM.OnAssistChange()
 	CDM.showAssist = GetCVarBool("assistedCombatHighlight")
-	CDM.RefreshAssist()
 end
 
-function CDM.ACTIONBAR_SLOT_CHANGED(changedBarSlot)
+function CDM.ACTIONBAR_SLOT_CHANGED(barSlot)
 	-- NOTE: Any spell with a cooldown causes this event (e.g. Whirling Surge and Aerial Halt)
 	-- NOTE: Fires when a conditional macro changes state
 
@@ -1080,10 +1205,10 @@ function CDM.ACTIONBAR_SLOT_CHANGED(changedBarSlot)
 	local FIRST_SLOT = 121
 	local LAST_SLOT  = 132
 
-	if changedBarSlot >= FIRST_SLOT and changedBarSlot <= LAST_SLOT then
+	if barSlot >= FIRST_SLOT and barSlot <= LAST_SLOT then
 		for category, vState in pairs(CDM.viewers) do
-			local slot = vState.slots[changedBarSlot - FIRST_SLOT + 1]
-			if slot and slot.barSlot == changedBarSlot then
+			local slot = vState.slots[barSlot - FIRST_SLOT + 1]
+			if slot and slot.barSlot == barSlot then
 				local hadAction = slot.hasAction
 				CDM.RefreshBarSlot(slot)
 
@@ -1091,55 +1216,41 @@ function CDM.ACTIONBAR_SLOT_CHANGED(changedBarSlot)
 				local removed =     hadAction and not slot.hasAction
 				local changed =     hadAction and     slot.hasAction
 
-				local fState = vState.allFrames[slot.key]
-				changed = changed and slot.spellID ~= fState.baseSpellID
-
-				if fState and (added or removed or changed) then
-					CDM.DisableFrame(fState)
-					CDM.ReassignFrame(fState, slot.spellID)
-					CDM.EnableFrame(fState)
-				end
-
-				-- TODO: Need to update empower sizing
 				if changed then
-					CDM.RefreshRangeCheck(fState)
-					CDM.RefreshOverride(fState)
-					CDM.RefreshCooldown(fState)
-					CDM.RefreshIcon(fState)
-					CDM.RefreshUsable(fState)
-					CDM.RefreshPress(fState)
-					CDM.RefreshQueued(fState)
-					CDM.RefreshProc(fState)
-					CDM.RefreshAssist()
+					local fState = vState.allFrames[slot.key]
+					local spellChanged = slot.spellID ~= fState.baseSpellID
+					local itemChanged  = slot.itemID  ~= fState.itemID
+					if spellChanged or itemChanged then
+						CDM.ReassignFrame(fState, slot)
+					else
+						-- NOTE: There are cases where we need to refresh things even when the spell hasn't changed:
+						-- * Macros can have custom icons and need to be updated when swapped with the same spell.
+						-- * Different items can have the same spell (e.g. Algari Healing Potion).
+						CDM.RefreshIcon(fState)
+						CDM.RefreshCooldown(fState)
+						CDM.RefreshQueued(fState)
+						CDM.RefreshUsable(fState)
+					end
+
 				elseif added or removed then
 					CDM.Rebuild("ACTIONBAR_SLOT_CHANGED")
 				end
 			end
 		end
 
-	elseif changedBarSlot == 0 then
-		CDM.RefreshAllBarSlots()
-
-		for category, vState in pairs(CDM.viewers) do
-			for iSlot, slot in ipairs(vState.slots) do
-				local fState = vState.allFrames[slot.key]
-				if slot.barSlot and fState then
-					if slot.spellID ~= fState.baseSpellID then
-						CDM.ReassignFrame(fState, slot.spellID)
-					end
-				end
-			end
-		end
+	elseif barSlot == 0 then
 		CDM.Rebuild("ACTIONBAR_SLOT_CHANGED")
 	end
 end
 
 function CDM.PLAYER_CAN_GLIDE_CHANGED()
+	CDM.ClearAllBlings()
 	CDM.RefreshSkyriding()
+	CDM.RefreshAllCooldowns()
 end
 
--- TODO: Test this. Why can't we use Enum.AddOnRestrictionState.Active/Inactive?
 function CDM.ADDON_RESTRICTION_STATE_CHANGED(type, state)
+	-- NOTE: Only states Activating and Inactive are sent, not Active.
 	local aurasSecret = state == Enum.AddOnRestrictionState.Activating or C_Secrets.ShouldAurasBeSecret()
 	if CDM.aurasSecret and not aurasSecret then
 		CDM.Rebuild("ADDON_RESTRICTION_STATE_CHANGED")
@@ -1156,7 +1267,7 @@ end
 function CDM.BAG_UPDATE_COOLDOWN()
 	for category, vState in pairs(CDM.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			if fState.equipSlot then
+			if fState.itemID or fState.barSlot then
 				CDM.RefreshCooldown(fState)
 			end
 		end
@@ -1177,13 +1288,20 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 	if category and itemID then
 		-- TODO: Do we need to save this to an account saved vars too?
 		-- TODO: Move the saved var update to CDM.lua
-		CDM.charVars.lastCategorySource[category] = { spellID = spellID, itemID = itemID }
+		CDM.charVars.lastCategorySource[category] = { spellID = baseSpellID or spellID, itemID = itemID }
 
-		for fState in pairs(CDM.categoryLookup[category] or {}) do
-			if fState.spellID ~= spellID then
-				CDM.SetCategory(fState, spellID, itemID)
-				CDM.RefreshRangeCheck(fState)
-				CDM.RefreshIcon(fState)
+		for vCategory, vState in pairs(CDM.viewers) do
+			for iFrame, fState in ipairs(vState.activeFrames) do
+				if fState.categoryID == category then
+					local slot = fState.slot
+					CDM.RefreshCategorySlot(slot)
+
+					local spellChanged = slot.spellID ~= fState.baseSpellID
+					local itemChanged  = slot.itemID  ~= fState.itemID
+					if spellChanged or itemChanged then
+						CDM.ReassignFrame(fState, slot)
+					end
+				end
 			end
 		end
 	end
@@ -1194,14 +1312,14 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 		CDM.refreshAllCooldowns = true
 	else
 		-- NOTE: Supposedly this event can arrive before the override event, so we need to check base
-		for fState in pairs(CDM.spellLookup[spellID] or CDM.spellLookup[baseSpellID] or {}) do
+		for fState in pairs(CDM.spellLookup[baseSpellID or spellID] or {}) do
 			CDM.RefreshCooldown(fState)
 		end
 	end
 end
 
 function CDM.SPELL_UPDATE_USES(spellID, baseSpellID)
-	for fState in pairs(CDM.spellLookup[spellID] or CDM.spellLookup[baseSpellID] or {}) do
+	for fState in pairs(CDM.spellLookup[baseSpellID or spellID] or {}) do
 		CDM.RefreshCooldown(fState)
 	end
 end
@@ -1239,9 +1357,15 @@ function CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE(spellID)
 end
 
 function CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID)
+	if overrideSpellID then
+		CDM.activeOverrides[baseSpellID] = { overrideSpellID = overrideSpellID, time = GetTime() }
+	else
+		CDM.activeOverrides[baseSpellID] = nil
+	end
+
 	for fState in pairs(CDM.spellLookup[baseSpellID] or {}) do
-		CDM.SetOverride(fState, overrideSpellID)
-		CDM.SetOverrideTimer(fState, overrideSpellID)
+		CDM.RefreshOverride(fState)
+		CDM.RefreshAssist(fState)
 	end
 end
 
@@ -1280,8 +1404,8 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 	if down then
 		local buttonType = SecureButton_GetModifiedAttribute(button, "type", mouseButton)
 		if buttonType == "action" then
-			local slot = button:CalculateAction(mouseButton)
-			spellID = CDM.GetActionSpell(slot)
+			local barSlot = button:CalculateAction(mouseButton)
+			spellID = CDM.GetBarSpell(barSlot)
 		end
 
 		if not isKeyPress then
@@ -1292,28 +1416,29 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 		end
 	end
 
-	local currSpellID = nil
-	for fState in pairs(CDM.spellLookup[spellID] or {}) do
-		currSpellID = fState.baseSpellID
-	end
-
+	local currSpellID = spellID
 	local prevSpellID = CDM.spellPresses[button]
 
 	if prevSpellID ~= currSpellID then
 		CDM.spellPresses[button] = currSpellID
 
 		if prevSpellID then
-			local pressCount = Util.TableRefAdd(CDM.pressCounts, prevSpellID, -1)
-			CDM.SetPress(prevSpellID, pressCount > 0)
+			Util.TableRefAdd(CDM.pressCounts, prevSpellID, -1)
+			for fState in pairs(CDM.spellLookup[prevSpellID] or {}) do
+				CDM.RefreshPress(fState)
+			end
 		end
 
 		if currSpellID then
-			local pressCount = Util.TableRefAdd(CDM.pressCounts, currSpellID, 1)
-			CDM.SetPress(currSpellID, pressCount > 0)
+			Util.TableRefAdd(CDM.pressCounts, currSpellID, 1)
+			for fState in pairs(CDM.spellLookup[currSpellID] or {}) do
+				CDM.RefreshPress(fState)
+			end
 		end
 	end
 end
 
+-- TODO: We want to rebuild in combat when a spell is added or removed
 function CDM.OnCDMChanged()
 	-- NOTE: Hook fires when events are being throttled. Wait for the unlock.
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
@@ -1323,7 +1448,7 @@ function CDM.OnCDMChanged()
 	-- would cause rebuilds in combat. I wish we could be more selective about when we get this
 	-- event. Really, we only want it for non-combat related events like hotfixes, talent changes,
 	-- and CDM settings changes.
-	if C_Secrets.ShouldAurasBeSecret() then return end
+	if InCombatLockdown() then return end
 
 	CDM.Rebuild("OnCDMChanged")
 end

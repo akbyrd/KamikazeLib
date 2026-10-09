@@ -1,37 +1,57 @@
 Skyriding
 ---------
-* Don't like the empower stuff being moved to RefreshAllSizes
-* Not sure about GetActionSpell
+Not spell/item with cooldown
+	Pet journal
+	Pet macro
+	Spell assistant
 
-Should hidden frames remain in the lookups?
-	* Ideally, we don't update them while hidden
-	* Requires everything that isn't updated to be derivable on a rebuild
-	* Bling and Override are the hold outs
-	* Currently inconsistent: hidden frames are in lookups but not activeFramers and get mixed updates
+Missing press
+	Mount journal, random, macro
+	Pet journal, random, macro
+	Equipment set
+	Transmog
+	Flyout
+	Macro
 
-Are slots pulling their weight?
-All remaining known issues
-Remaining tests
-Full review
-Test conditional macro on skyriding while mounting
-Test dimensius
-Test cast prediction
-Test on evoker
+Missing darken
+	Equipment set
+
+Assistant - doesn't reassign consistently
+
+Architecture review - compare with d81b8aab46c65f01180cb7b3344e8eabc7bcc9db
+Split unrelated changes
 
 
 
 To Do
 -----
-Add range check support for potions and trinkets
+Charge flicker when clearing target
+Passenger mount - confirm resource bar behaves
 Bladestorm buff bar doesn't show up
+Imminent Demise empower doesn't show up
 Stance shared cooldown isn't shown
-Stance icon change doesn't work
-Consider tracking pressed state for things not on the CDM
+	Icons also won't be right if added to non-action bar viewers
+Keep empower max stacks across e.g. conditional macro changes
+	Central lookup?
+	Or pool frame by identity and reuse (complicated with duplicates)
+Add range check support for potions and trinkets
+	Partially works with the new RefreshUsable
+	Slow to update when moving in/out of range
+	Updates immediately on a target change
 
-Possess bar
+Show ground movement speed when skyriding but grounded
+Handle press highlight for `[btn:2]` macros
+Test /castsequence (should update as the sequence progresses)
+
+Possess / vehicle cooldowns
+	Test vehicle power prediction
+	Test vehicle with no power - resource bar hides
 	Similar to skyriding - hide buffs, swap resource, show abilities
 
-Power infusion
+Track any spell
+	Power infusion
+Track any item
+
 Resources
 	Sweeping strikes bar
 	Whirlwind bar
@@ -59,15 +79,12 @@ Anchoring
 Custom glow when ready
 Disable ability highlight on specific spells
 Per-talent layout
-Track any item
-Track any spell
 Find a suitable spell category database (Danders if loaded?)
 Profile performance
-Empower flickers when rebuilding
-	Consider minimizing unnecessary rebuilds?
-	Only if CD data changes?
 Test vehicle power prediction
 Alerts
+Attempt to remove OnCDMChanged
+Store empower max stacks - better conditional macro support in combat
 
 
 
@@ -77,3 +94,4 @@ Reflect damage
 Combat Text
 Nameplates
 Out-of-game harness
+Debug tooling - repl and log window
