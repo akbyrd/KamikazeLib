@@ -120,7 +120,6 @@ function CDM.Load()
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Cooldowns.Event")
 	CDM.eventFrame:SetScript("OnEvent",                              CDM.DispatchEvent)
-	CDM.eventFrame:SetScript("OnUpdate",                             CDM.Update)
 	CDM.RegisterEvent("UI_SCALE_CHANGED",                            CDM.OnScaleChanged)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                        CDM.OnScaleChanged)
 	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                         CDM.RefreshAllUsable) -- TODO: Wrap with an event handler
@@ -130,8 +129,6 @@ function CDM.Load()
 	CDM.RegisterEvent("BAG_UPDATE_COOLDOWN",                         CDM.BAG_UPDATE_COOLDOWN)
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                       CDM.SPELL_UPDATE_COOLDOWN)
 	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",                    CDM.SPELL_RANGE_CHECK_UPDATE)
-	CDM.RegisterEvent("GLOBAL_MOUSE_DOWN",                           CDM.GLOBAL_MOUSE_DOWN)
-	CDM.RegisterEvent("GLOBAL_MOUSE_UP",                             CDM.GLOBAL_MOUSE_UP)
 	CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",                  CDM.CURRENT_SPELL_CAST_CHANGED)
 	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",          CDM.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
 	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",          CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
@@ -140,6 +137,8 @@ function CDM.Load()
 	CDM.RegisterEvent("SPELL_UPDATE_USES",                           CDM.SPELL_UPDATE_USES)
 	hooksecurefunc(UIParent, "SetScale",                             CDM.OnScaleChanged)
 	hooksecurefunc("SecureActionButton_OnClick",                     CDM.OnClick)
+	SecureStateDriverManager:HookScript("OnUpdate",                  CDM.Update)
+	RegisterStateDriver(CDM.eventFrame, "poll", "1")
 	CVarCallbackRegistry:RegisterCallback("assistedCombatHighlight", CDM.OnAssistChange, CDM)
 
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
@@ -214,7 +213,6 @@ function CDM.Load()
 		[db.Category.HealthPotion] = "Interface/ICONS/Warlock_ Healthstone",
 		[db.Category.Healthstone]  = "Interface/ICONS/Warlock_ Bloodstone",
 	}
-	CDM.mousePresses        = {}
 	CDM.spellPresses        = {}
 	CDM.pressCounts         = {}
 	CDM.activeOverrides     = {}
@@ -231,6 +229,7 @@ function CDM.Update()
 	end
 
 	CDM.PollAssist()
+	CDM.PollPresses()
 end
 
 function CDM.Rebuild(reason)
@@ -1025,6 +1024,13 @@ function CDM.RefreshAllAssist()
 	end
 end
 
+function CDM.PollPresses()
+	for button, spellID in pairs(CDM.spellPresses) do
+		local down = button:GetButtonState() == "PUSHED"
+		CDM.OnClick(button, "LeftButton", down, nil, nil)
+	end
+end
+
 function CDM.GetBarSpell(barSlot)
 	local actionType, id, subType = GetActionInfo(barSlot)
 	local spellID
@@ -1324,22 +1330,6 @@ function CDM.SPELL_UPDATE_USES(spellID, baseSpellID)
 	end
 end
 
-function CDM.GLOBAL_MOUSE_DOWN(mouseButton)
-	CDM.mousePresses[mouseButton] = {
-		time   = GetTime(),
-		button = nil,
-	}
-end
-
-function CDM.GLOBAL_MOUSE_UP(mouseButton)
-	local press = CDM.mousePresses[mouseButton]
-	CDM.mousePresses[mouseButton] = nil
-
-	if press and press.button then
-		CDM.OnClick(press.button, mouseButton, false, nil, nil)
-	end
-end
-
 function CDM.CURRENT_SPELL_CAST_CHANGED(cancelledCast)
 	CDM.RefreshAllQueued()
 end
@@ -1385,7 +1375,7 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 	-- Mouse down, drag off (far), drag on, mouse release - no event, was turned into a drag
 	-- Mouse down, drag spell off bar, mouse release      - no event
 	-- Key down, mouse down, mouse up, key up             - no event, any up cancels other events
-	-- Key down, disable action bar, key up               - no event
+	-- Key down, disable action bar, key up               - no event, includes action bar hiding
 	-- Maybe if keybinding is programmatically changed while held?
 
 	-- NOTE: Macros can cast/use multiple spells/items but there doesn't appear to be a way to get
@@ -1405,14 +1395,7 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 		local buttonType = SecureButton_GetModifiedAttribute(button, "type", mouseButton)
 		if buttonType == "action" then
 			local barSlot = button:CalculateAction(mouseButton)
-			spellID = CDM.GetBarSpell(barSlot)
-		end
-
-		if not isKeyPress then
-			local press = CDM.mousePresses[mouseButton]
-			if press and press.time == GetTime() and button:IsMouseMotionFocus() then
-				press.button = button
-			end
+			spellID = CDM.GetBarSpell(barSlot) or false
 		end
 	end
 
