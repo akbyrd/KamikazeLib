@@ -188,6 +188,7 @@ function CDM.Rebuild()
 	CDM.RefreshPowerColor()
 	CDM.RefreshMaxPower()
 	CDM.RefreshMarker()
+	CDM.RefreshPredictionCost()
 	CDM.RefreshPrediction()
 	CDM.RefreshCurrentPower()
 end
@@ -281,6 +282,15 @@ function CDM.RefreshMarker()
 	local xPos        = Round((markerValue or 0) / CDM.maxPower * xSize)
 	CDM.Marker:SetPoint("TOPLEFT", xPos, 0)
 	CDM.Marker:SetShown(markerValue ~= nil)
+end
+
+function CDM.RefreshPredictionCost()
+	CDM.predictedCost = 0
+
+	local spellID = select(9, UnitCastingInfo(CDM.unit))
+	if spellID then
+		CDM.UNIT_SPELLCAST_START(CDM.unit, nil, spellID)
+	end
 end
 
 function CDM.RefreshPrediction()
