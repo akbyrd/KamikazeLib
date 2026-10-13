@@ -1,22 +1,7 @@
 Skyriding
 ---------
-Not spell/item with cooldown
-	Pet journal
-	Pet macro
-	Spell assistant
-
-Missing press
-	Mount journal, random, macro
-	Pet journal, random, macro
-	Equipment set
-	Transmog
-	Flyout
-	Macro
-
-Missing darken
-	Equipment set
-
-Assistant - doesn't reassign consistently
+Equipment set doesn't darken consistently
+Spell assistant doesn't reassign consistently
 
 Architecture review - compare with d81b8aab46c65f01180cb7b3344e8eabc7bcc9db
 Split unrelated changes

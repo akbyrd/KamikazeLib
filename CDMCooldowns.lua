@@ -213,8 +213,8 @@ function CDM.Load()
 		[db.Category.Healthstone]  = "Interface/ICONS/Warlock_ Healthstone",
 		[db.Category.Bloodstone]   = "Interface/ICONS/Warlock_ Bloodstone",
 	}
-	CDM.spellPresses        = {}
-	CDM.pressCounts         = {}
+	CDM.activePresses       = {}
+	CDM.pressKeyIDLookup    = {}
 	CDM.activeOverrides     = {}
 	CDM.refreshAllCooldowns = false
 	CDM.aurasSecret         = C_Secrets.ShouldAurasBeSecret()
@@ -280,6 +280,8 @@ function CDM.ConstructFrame(vState, slot)
 	fState.itemDuration     = C_DurationUtil.CreateDuration()
 	fState.empowerMaxStacks = 1
 	fState.itemID           = nil
+	fState.pressKeyType     = nil
+	fState.pressKeyID       = nil
 	fState.empowerBuff      = nil
 	fState.hasBling         = nil
 	fState.overrideTimer    = nil
@@ -423,14 +425,21 @@ function CDM.ConstructFrame(vState, slot)
 end
 
 function CDM.EnableFrame(fState, slot)
-	fState.slot        = slot
-	fState.baseSpellID = slot.spellID
-	fState.spellID     = slot.spellID
-	fState.itemID      = slot.itemID
+	fState.slot         = slot
+	fState.baseSpellID  = slot.spellID
+	fState.spellID      = slot.spellID
+	fState.itemID       = slot.itemID
+	fState.pressKeyType = slot.pressKeyType
+	fState.pressKeyID   = slot.pressKeyID
 
 	if fState.spellID then
 		CDM.spellLookup[fState.spellID] = CDM.spellLookup[fState.spellID] or {}
 		CDM.spellLookup[fState.spellID][fState] = true
+	end
+
+	if fState.pressKeyID then
+		CDM.pressKeyIDLookup[fState.pressKeyID] = CDM.pressKeyIDLookup[fState.pressKeyID] or {}
+		CDM.pressKeyIDLookup[fState.pressKeyID][fState] = true
 	end
 
 	CDM.ClearBling(fState)
@@ -441,6 +450,10 @@ function CDM.DisableFrame(fState)
 	if fState.spellID then
 		CDM.spellLookup[fState.spellID][fState] = nil
 		CDM.spellLookup[fState.baseSpellID][fState] = nil
+	end
+
+	if fState.pressKeyID then
+		CDM.pressKeyIDLookup[fState.pressKeyID][fState] = nil
 	end
 
 	fState.Root:Hide()
@@ -953,8 +966,16 @@ function CDM.RefreshAllUsable()
 end
 
 function CDM.RefreshPress(fState)
-	local pressCount = CDM.pressCounts[fState.baseSpellID] or 0
-	fState.Press:SetShown(pressCount > 0)
+	-- BUG: Flyouts on ElvUI action bars do not have a press highlight
+	local pressed = false
+	if fState.pressKeyType then
+		for button, held in pairs(CDM.activePresses) do
+			if button.klPressKeyType == fState.pressKeyType and button.klPressKeyID == fState.pressKeyID then
+				pressed = true
+			end
+		end
+	end
+	fState.Press:SetShown(pressed)
 end
 
 function CDM.RefreshAllPress()
@@ -1026,72 +1047,76 @@ function CDM.RefreshAllAssist()
 end
 
 function CDM.PollPresses()
-	for button, spellID in pairs(CDM.spellPresses) do
+	for button, prevDown in pairs(CDM.activePresses) do
 		local down = button:GetButtonState() == "PUSHED"
 		CDM.OnClick(button, "LeftButton", down, nil, nil)
 	end
 end
 
-function CDM.GetBarSpell(barSlot)
+function CDM.GetBarAction(barSlot, needItemID)
+	-- BUG: https://github.com/Stanzilla/WoWUIBugs/issues/495
+	--
+	-- Getting the item id is important for cooldowns to work properly. The spell cooldown shows the
+	-- GCD and the shared cooldown, but not the actual idem cooldown. A few options for getting the
+	-- item id:
+	-- 1. Map the macro name to the macro index, then query the macro. This mapping is ambiguous
+	--    because macro names are not required to be unique. We can mostly disambiguate by confirming
+	--    the spell id matches, but that can fail too when multiple items have the same spell, like
+	--    ranks of the Algari Healing Potion.
+	-- 2. Get the item id from the tooltip. This can fail if the macro doesn't use #showtooltip. The
+	--    line index is undocumented so it's unclear if it will always be in the first slot.
+	-- 3. Learn items from SPELL_UPDATE_COOLDOWN. This can fail if the cast wasn't seen, e.g. when
+	--    first installing the addon, when saved vars where reset, or when the spell was cast while
+	--    logged in on a different PC.
+	--
+	-- Since all of these options kind of suck, we go with the tooltip approach. This is the only one
+	-- that requires no additional state. If they're all sort-of-broken we might as well take the
+	-- simplest one.
+
+	-- NOTE: Every transmog outfit has the same spell, so they are keyed by actionType instead of "spell"
+
+	local spellID, itemID, pressKeyType, pressKeyID
 	local actionType, id, subType = GetActionInfo(barSlot)
-	local spellID
 
-	-- plain spell or /cast macro
-	if actionType == "spell" or (actionType == "macro" and subType == "spell") then
-		spellID = id
-
-	-- plain item or /use macro
-	elseif actionType == "item" or (actionType == "macro" and subType == "item") then
+	-- spell
+	do
 		-- NOTE: spellID can be 0 while logging in
-		-- BUG: https://github.com/Stanzilla/WoWUIBugs/issues/495
 		spellID = C_ActionBar.GetSpell(barSlot)
 		spellID = spellID ~= 0 and spellID or nil
-	end
 
-	for baseSpellID, override in pairs(CDM.activeOverrides) do
-		if override.overrideSpellID == spellID then
-			spellID = baseSpellID
-		end
-	end
-	return spellID
-end
-
-function CDM.GetBarItem(barSlot)
-	local actionType, id, subType = GetActionInfo(barSlot)
-	local itemID
-
-	-- plain item
-	if actionType == "item" then
-		itemID = id
-
-	-- /use macro
-	elseif actionType == "macro" and subType == "item" then
-		-- BUG: https://github.com/Stanzilla/WoWUIBugs/issues/495
-		--
-		-- Getting the item id is important for cooldowns to work properly. The spell cooldown shows
-		-- the GCD and the shared cooldown, but not the actual idem cooldown. A few options for
-		-- getting the item id:
-		-- 1. Map the macro name to the macro index, then query the macro. This mapping is ambiguous
-		--    because macro names are not required to be unique. We can mostly disambiguate by
-		--    confirming the spell id matches, but that can fail too when multiple items have the same
-		--    spell, like ranks of the Algari Healing Potion.
-		-- 2. Get the item id from the tooltip. This can fail if the macro doesn't use #showtooltip.
-		--    The line index is undocumented so it's unclear if it will always be in the first slot.
-		-- 3. Learn items from SPELL_UPDATE_COOLDOWN. This can fail if the cast wasn't seen, e.g. when
-		--    first installing the addon, when saved vars where reset, or when the spell was cast
-		--    while logged in on a different PC.
-		--
-		-- Since all of these options kind of suck, we go with the tooltip approach. This is the only
-		-- one that requires no additional state. If they're all sort-of-broken we might as well take
-		-- the simplest one.
-		local tooltipData = C_TooltipInfo.GetAction(barSlot)
-		local line        = tooltipData.lines[1]
-		if line.tooltipType == Enum.TooltipDataType.Item then
-			itemID = line.tooltipID
+		for baseSpellID, override in pairs(CDM.activeOverrides) do
+			if override.overrideSpellID == spellID then
+				spellID = baseSpellID
+			end
 		end
 	end
 
-	return itemID
+	-- item
+	if needItemID then
+		if actionType == "item" then
+			itemID = id
+
+		elseif actionType == "macro" and subType == "item" then
+			local tooltipData = C_TooltipInfo.GetAction(barSlot)
+			local line        = tooltipData.lines[1]
+			if line.tooltipType == Enum.TooltipDataType.Item then
+				itemID = line.tooltipID
+			end
+		end
+	end
+
+	-- press key
+	do
+		if spellID and actionType ~= "outfit" then
+			pressKeyType = "spell"
+			pressKeyID   = spellID
+		elseif actionType ~= "macro" or subType == "" then
+			pressKeyType = actionType
+			pressKeyID   = id
+		end
+	end
+
+	return spellID, itemID, pressKeyType, pressKeyID
 end
 
 function CDM.GatherCDs()
@@ -1100,13 +1125,15 @@ function CDM.GatherCDs()
 		wipe(vState.slots)
 		for iInfo, cdvInfo in ipairs(vState.cdvInfos) do
 			local slot = {
-				key        = cdvInfo.cooldownID,
-				spellID    = cdvInfo.spellID,
-				itemID     = cdvInfo.equipSlot and GetInventoryItemID("player", cdvInfo.equipSlot) or nil,
-				categoryID = cdvInfo.spellCategoryID,
-				equipSlot  = cdvInfo.equipSlot,
-				barSlot    = nil,
-				hasAction  = true,
+				key          = cdvInfo.cooldownID,
+				spellID      = cdvInfo.spellID,
+				itemID       = cdvInfo.equipSlot and GetInventoryItemID("player", cdvInfo.equipSlot) or nil,
+				categoryID   = cdvInfo.spellCategoryID,
+				equipSlot    = cdvInfo.equipSlot,
+				barSlot      = nil,
+				pressKeyType = cdvInfo.spellID and "spell",
+				pressKeyID   = cdvInfo.spellID,
+				hasAction    = true,
 			}
 			table.insert(vState.slots, slot)
 		end
@@ -1118,13 +1145,15 @@ function CDM.GatherCDs()
 	wipe(vState.slots)
 	for barSlot = FIRST_SLOT, LAST_SLOT do
 		local slot = {
-			key        = barSlot,
-			spellID    = nil,
-			itemID     = nil,
-			categoryID = nil,
-			equipSlot  = nil,
-			barSlot    = barSlot,
-			hasAction  = false,
+			key          = barSlot,
+			spellID      = nil,
+			itemID       = nil,
+			categoryID   = nil,
+			equipSlot    = nil,
+			barSlot      = barSlot,
+			pressKeyType = nil,
+			pressKeyID   = nil,
+			hasAction    = false,
 		}
 		table.insert(vState.slots, slot)
 	end
@@ -1141,8 +1170,7 @@ function CDM.RefreshSkyriding()
 end
 
 function CDM.RefreshBarSlot(slot)
-	slot.spellID   = CDM.GetBarSpell(slot.barSlot)
-	slot.itemID    = CDM.GetBarItem(slot.barSlot)
+	slot.spellID, slot.itemID, slot.pressKeyType, slot.pressKeyID = CDM.GetBarAction(slot.barSlot, true)
 	slot.hasAction = C_ActionBar.HasAction(slot.barSlot)
 end
 
@@ -1159,8 +1187,10 @@ end
 function CDM.RefreshCategorySlot(slot)
 	local source = CDM.charVars.lastCategorySource[slot.categoryID]
 	if source then
-		slot.spellID = source.spellID
-		slot.itemID  = source.itemID
+		slot.spellID      = source.spellID
+		slot.itemID       = source.itemID
+		slot.pressKeyType = source.spellID and "spell"
+		slot.pressKeyID   = source.spellID
 	end
 end
 
@@ -1225,9 +1255,10 @@ function CDM.ACTIONBAR_SLOT_CHANGED(barSlot)
 
 				if changed then
 					local fState = vState.allFrames[slot.key]
-					local spellChanged = slot.spellID ~= fState.baseSpellID
-					local itemChanged  = slot.itemID  ~= fState.itemID
-					if spellChanged or itemChanged then
+					local spellChanged    = slot.spellID ~= fState.baseSpellID
+					local itemChanged     = slot.itemID  ~= fState.itemID
+					local pressKeyChanged = slot.pressKeyType ~= fState.pressKeyType or slot.pressKeyID ~= fState.pressKeyID
+					if spellChanged or itemChanged or pressKeyChanged then
 						CDM.ReassignFrame(fState, slot)
 					else
 						-- NOTE: There are cases where we need to refresh things even when the spell hasn't changed:
@@ -1390,34 +1421,29 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 	-- NOTE: When dragging a spell off a button it will no longer have an action.
 	-- NOTE: We choose not to handle the action bar disable and binding change edge cases.
 
-	local spellID = nil
+	local pressKeyType = nil
+	local pressKeyID   = nil
 
 	if down then
 		local buttonType = SecureButton_GetModifiedAttribute(button, "type", mouseButton)
 		if buttonType == "action" then
 			local barSlot = button:CalculateAction(mouseButton)
-			spellID = CDM.GetBarSpell(barSlot) or false
+			pressKeyType, pressKeyID = select(3, CDM.GetBarAction(barSlot, false))
 		end
 	end
 
-	local currSpellID = spellID
-	local prevSpellID = CDM.spellPresses[button]
+	CDM.activePresses[button] = down or nil
 
-	if prevSpellID ~= currSpellID then
-		CDM.spellPresses[button] = currSpellID
+	if button.klPressKeyType ~= pressKeyType or button.klPressKeyID ~= pressKeyID then
+		local prevKeyID = button.klPressKeyID
+		button.klPressKeyType = pressKeyType
+		button.klPressKeyID   = pressKeyID
 
-		if prevSpellID then
-			Util.TableRefAdd(CDM.pressCounts, prevSpellID, -1)
-			for fState in pairs(CDM.spellLookup[prevSpellID] or {}) do
-				CDM.RefreshPress(fState)
-			end
+		for fState in pairs(CDM.pressKeyIDLookup[prevKeyID] or {}) do
+			CDM.RefreshPress(fState)
 		end
-
-		if currSpellID then
-			Util.TableRefAdd(CDM.pressCounts, currSpellID, 1)
-			for fState in pairs(CDM.spellLookup[currSpellID] or {}) do
-				CDM.RefreshPress(fState)
-			end
+		for fState in pairs(CDM.pressKeyIDLookup[button.klPressKeyID] or {}) do
+			CDM.RefreshPress(fState)
 		end
 	end
 end
