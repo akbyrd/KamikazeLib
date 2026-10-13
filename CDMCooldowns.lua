@@ -208,10 +208,10 @@ function CDM.Load()
 	CDM.classColor     = C_ClassColor.GetClassColor(CDM.classToken)
 	CDM.spellLookup    = {}
 	CDM.categoryIcons  = {
-		[db.Category.GCD]          = "Interface/ICONS/INV_POTION_114",
-		[db.Category.CombatPotion] = "Interface/ICONS/INV_POTION_54",
-		[db.Category.HealthPotion] = "Interface/ICONS/Warlock_ Healthstone",
-		[db.Category.Healthstone]  = "Interface/ICONS/Warlock_ Bloodstone",
+		[db.Category.CombatPotion] = "Interface/ICONS/INV_POTION_114",
+		[db.Category.HealthPotion] = "Interface/ICONS/INV_POTION_54",
+		[db.Category.Healthstone]  = "Interface/ICONS/Warlock_ Healthstone",
+		[db.Category.Bloodstone]   = "Interface/ICONS/Warlock_ Bloodstone",
 	}
 	CDM.spellPresses        = {}
 	CDM.pressCounts         = {}

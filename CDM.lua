@@ -10,10 +10,11 @@ function CDM.Load()
 
 	CDM.db = {
 		Category = {
-			GCD          = Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY,
-			CombatPotion = Constants.SpellCooldownConsts.COMBAT_POTION_CATEGORY,
-			HealthPotion = Constants.SpellCooldownConsts.HEALTH_POTION_CATEGORY,
-			Healthstone  = Constants.SpellCooldownConsts.HEALTHSTONE_CATEGORY,
+			GCD          = Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY, -- 133
+			CombatPotion = Constants.SpellCooldownConsts.COMBAT_POTION_CATEGORY,   -- 4
+			HealthPotion = Constants.SpellCooldownConsts.HEALTH_POTION_CATEGORY,   -- 30
+			Healthstone  = Constants.SpellCooldownConsts.HEALTHSTONE_CATEGORY,     -- 1711
+			Bloodstone   = 2566,
 			SkyridingGCD = 2316,
 		},
 
