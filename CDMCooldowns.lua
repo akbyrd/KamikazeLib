@@ -219,6 +219,7 @@ function CDM.Load()
 	CDM.refreshAllCooldowns = false
 	CDM.aurasSecret         = C_Secrets.ShouldAurasBeSecret()
 
+	CDM.OnAssistChange()
 	CDM.Rebuild("Load")
 end
 
