@@ -71,14 +71,15 @@ function CDM.Load()
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Buffs.Event")
-	CDM.eventFrame:SetScript("OnEvent",           CDM.DispatchEvent)
-	CDM.RegisterEvent("UI_SCALE_CHANGED",         CDM.OnScaleChanged)
-	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",     CDM.OnScaleChanged)
-	CDM.RegisterEvent("PLAYER_CAN_GLIDE_CHANGED", CDM.PLAYER_CAN_GLIDE_CHANGED)
-	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",     CDM.PLAYER_REGEN_ENABLED)
-	CDM.RegisterEvent("PLAYER_TARGET_CHANGED",    CDM.PLAYER_TARGET_CHANGED)
-	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",    CDM.SPELL_UPDATE_COOLDOWN)
-	hooksecurefunc(UIParent, "SetScale",          CDM.OnScaleChanged)
+	CDM.eventFrame:SetScript("OnEvent",                         CDM.DispatchEvent)
+	CDM.RegisterEvent("UI_SCALE_CHANGED",                       CDM.OnScaleChanged)
+	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                   CDM.OnScaleChanged)
+	CDM.RegisterEvent("PLAYER_CAN_GLIDE_CHANGED",               CDM.PLAYER_CAN_GLIDE_CHANGED)
+	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                   CDM.PLAYER_REGEN_ENABLED)
+	CDM.RegisterEvent("PLAYER_TARGET_CHANGED",                  CDM.PLAYER_TARGET_CHANGED)
+	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                  CDM.SPELL_UPDATE_COOLDOWN)
+	CDM.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED", CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
+	hooksecurefunc(UIParent, "SetScale",                        CDM.OnScaleChanged)
 
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.OnCDMChanged)
@@ -188,9 +189,13 @@ function CDM.EnableFrame(fState, cdvInfo, vState)
 		CDM.categoryLookup[fState.spellCategory] = fState
 	end
 
+	fState.baseSpellID = cdvInfo.spellID
+	fState.spellID     = cdvInfo.spellID
+
 	-- NOTE: Category slots (e.g. Combat Potion) don't have a spell id
 	if cdvInfo.spellID then
 		fState.spellIDs[cdvInfo.spellID] = true
+		CDM.SetOverride(fState, C_Spell.GetOverrideSpell(cdvInfo.spellID))
 	end
 	for iLinked, linkedSpellID in ipairs(cdvInfo.linkedSpellIDs) do
 		fState.spellIDs[linkedSpellID] = true
@@ -207,6 +212,8 @@ end
 
 function CDM.DisableFrame(fState)
 	wipe(fState.spellIDs)
+	fState.baseSpellID = nil
+	fState.spellID = nil
 	fState.cfg = nil
 	fState.auraSpellID = nil
 	fState.spellCategory = nil
@@ -345,6 +352,20 @@ function CDM.RefreshSkyriding()
 	end
 end
 
+function CDM.SetOverride(fState, spellID)
+	-- Remove the current override
+	if fState.spellID ~= fState.baseSpellID then
+		fState.spellIDs[fState.spellID] = nil
+		fState.spellID = fState.baseSpellID
+	end
+
+	-- Apply the new override (or revert back to base)
+	if spellID and spellID ~= fState.spellID then
+		fState.spellIDs[spellID] = true
+		fState.spellID = spellID
+	end
+end
+
 function CDM.RefreshCategory(fState, spellID)
 	wipe(fState.spellIDs)
 	fState.auraSpellID = spellID
@@ -431,6 +452,17 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 		if not fState.spellIDs[spellID] then
 			CDM.RefreshCategory(fState, spellID)
 			CDM.RefreshAuras(fState)
+		end
+	end
+end
+
+function CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID)
+	for category, vState in pairs(CDM.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			if fState.baseSpellID == baseSpellID then
+				CDM.SetOverride(fState, overrideSpellID)
+				CDM.RefreshAuras(fState)
+			end
 		end
 	end
 end

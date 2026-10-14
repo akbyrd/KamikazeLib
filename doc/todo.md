@@ -1,33 +1,23 @@
-Skyriding
----------
-Equipment set doesn't darken consistently
-Spell assistant doesn't reassign consistently
-
-Architecture review - compare with d81b8aab46c65f01180cb7b3344e8eabc7bcc9db
-Split unrelated changes
-
-
-
 To Do
 -----
-Charge text is hidden at zero
-Charge flicker when clearing target
-Passenger mount - confirm resource bar behaves
-Bladestorm buff bar doesn't show up
-Imminent Demise empower doesn't show up
-Stance shared cooldown isn't shown
-	Icons also won't be right if added to non-action bar viewers
-Keep empower max stacks across e.g. conditional macro changes
-	Central lookup?
-	Or pool frame by identity and reuse (complicated with duplicates)
 Add range check support for potions and trinkets
 	Partially works with the new RefreshUsable
 	Slow to update when moving in/out of range
 	Updates immediately on a target change
-
+Spell assistant doesn't reassign consistently
+Equipment set doesn't darken consistently
+Stance shared cooldown isn't shown
+	Icons also won't be right if added to non-action bar viewers
 Show ground movement speed when skyriding but grounded
-Handle press highlight for `[btn:2]` macros
-Test /castsequence (should update as the sequence progresses)
+
+Known issues
+	Charge flicker when clearing target
+	Passenger mount - confirm resource bar behaves
+	Keep empower max stacks across e.g. conditional macro changes
+		Central lookup?
+		Or pool frame by identity and reuse (complicated with duplicates)
+	Handle press highlight for `[btn:2]` macros
+	Test /castsequence (should update as the sequence progresses)
 
 Possess / vehicle cooldowns
 	Test vehicle power prediction
@@ -48,6 +38,7 @@ Generalize CDM infrastructure
 	Rebuild events
 	Share more config by default?
 	Maybe event handling?
+	Override tracking
 
 Settings
 	Row highlights
@@ -71,6 +62,7 @@ Test vehicle power prediction
 Alerts
 Attempt to remove OnCDMChanged
 Store empower max stacks - better conditional macro support in combat
+Enable pandemic per-spell (disable on Bladestorm)
 
 
 

@@ -82,7 +82,7 @@ function CDM.Load()
 				WARRIOR     = Config.Table({
 					[db.WARRIOR.Ability.Overpower]    = Config.Number(db.WARRIOR.Aura.Opportunist),
 					[db.WARRIOR.Ability.Cleave]       = Config.Number(db.WARRIOR.Aura.CollateralDamage),
-					[db.WARRIOR.Ability.Bladestorm]   = Config.Number(db.WARRIOR.Aura.ImminentDemise),
+					[db.WARRIOR.Talent.Bladestorm]    = Config.Number(db.WARRIOR.Aura.ImminentDemise),
 					[db.WARRIOR.Ability.Slam]         = Config.Number(db.WARRIOR.Aura.WindingUp),
 					[db.WARRIOR.Ability.Execute]      = Config.Number(db.WARRIOR.Aura.Executioner),
 					[db.WARRIOR.Ability.MortalStrike] = Config.Number(db.WARRIOR.Aura.ExecutionersPrecision),
