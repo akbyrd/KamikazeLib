@@ -10,6 +10,7 @@ Split unrelated changes
 
 To Do
 -----
+Charge text is hidden at zero
 Charge flicker when clearing target
 Passenger mount - confirm resource bar behaves
 Bladestorm buff bar doesn't show up

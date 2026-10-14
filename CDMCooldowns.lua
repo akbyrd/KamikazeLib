@@ -969,7 +969,7 @@ function CDM.RefreshPress(fState)
 	-- BUG: Flyouts on ElvUI action bars do not have a press highlight
 	local pressed = false
 	if fState.pressKeyType then
-		for button, held in pairs(CDM.activePresses) do
+		for button, mouseButton in pairs(CDM.activePresses) do
 			if button.klPressKeyType == fState.pressKeyType and button.klPressKeyID == fState.pressKeyID then
 				pressed = true
 			end
@@ -1047,9 +1047,9 @@ function CDM.RefreshAllAssist()
 end
 
 function CDM.PollPresses()
-	for button, prevDown in pairs(CDM.activePresses) do
+	for button, mouseButton in pairs(CDM.activePresses) do
 		local down = button:GetButtonState() == "PUSHED"
-		CDM.OnClick(button, "LeftButton", down, nil, nil)
+		CDM.OnClick(button, mouseButton, down, nil, nil)
 	end
 end
 
@@ -1432,7 +1432,7 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 		end
 	end
 
-	CDM.activePresses[button] = down or nil
+	CDM.activePresses[button] = down and mouseButton or nil
 
 	if button.klPressKeyType ~= pressKeyType or button.klPressKeyID ~= pressKeyID then
 		local prevKeyID = button.klPressKeyID
