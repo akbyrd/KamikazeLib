@@ -127,15 +127,20 @@ function CDM.Init()
 	CDM.RegisterUnitEvent("UNIT_EXITED_VEHICLE",   CDM.UNIT_EXITED_VEHICLE,   "player")
 	hooksecurefunc(UIParent, "SetScale",           CDM.OnScaleChanged)
 
-	CDM.cfg            = Config.GetBranch(CDM.cfgTree, "Default")
-	CDM.cfgPowerColors = Config.GetBranch(CDM.cfgTree, "ElvUIPowerColors")
-	CDM.unit           = "player"
-	CDM.predictedCost  = 0
-	CDM.textConfig     = {
+	CDM.cfg             = Config.GetBranch(CDM.cfgTree, "Default")
+	CDM.cfgPowerColors  = Config.GetBranch(CDM.cfgTree, "ElvUIPowerColors")
+	CDM.unit            = "player"
+	CDM.predictedCost   = 0
+	CDM.textConfig      = {
 		config = CreateAbbreviateConfig({
 			{ breakpoint = 1e9, abbreviation = "B", significandDivisor = 1e8, fractionDivisor = 10, abbreviationIsGlobal = false },
 			{ breakpoint = 1e6, abbreviation = "M", significandDivisor = 1e5, fractionDivisor = 10, abbreviationIsGlobal = false },
 			{ breakpoint = 1e3, abbreviation = "K", significandDivisor = 1e2, fractionDivisor = 10, abbreviationIsGlobal = false },
+		})
+	}
+	CDM.speedTextConfig = {
+		config = CreateAbbreviateConfig({
+			{ breakpoint = 1e-6, abbreviation = "", significandDivisor = BASE_MOVEMENT_SPEED / 1000 * (1 - 1e-6), fractionDivisor = 10, abbreviationIsGlobal = false },
 		})
 	}
 
@@ -342,13 +347,28 @@ end
 
 function CDM.GetCurrentPower_Skyriding(unit, powerType)
 	local isGliding, canGlide, forwardSpeed = C_PlayerInfo.GetGlidingInfo()
+	if not isGliding then
+		local currentSpeed, runSpeed, flightSpeed, swimSpeed = GetUnitSpeed("player")
+		if IsPlayerMoving() then
+			forwardSpeed = currentSpeed
+		elseif IsSwimming("player") then
+			forwardSpeed = swimSpeed
+		elseif IsFlying("player") then
+			forwardSpeed = flightSpeed
+		else
+			forwardSpeed = runSpeed
+		end
+	end
 	return forwardSpeed
 end
 
 function CDM.FormatPower_Skyriding(power)
-	local percent     = Round(power / BASE_MOVEMENT_SPEED * 100)
-	local percentText = C_StringUtil.TruncateWhenZero(percent)
-	return C_StringUtil.WrapString(percentText, nil, "%")
+	local text
+	text = AbbreviateNumbers(power, CDM.speedTextConfig)
+	text = C_StringUtil.RoundToNearestString(text)
+	text = C_StringUtil.TruncateWhenZero(text)
+	text = C_StringUtil.WrapString(text, nil, "%")
+	return text
 end
 
 ----------------------------------------------------------------------------------------------------

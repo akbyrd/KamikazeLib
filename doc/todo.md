@@ -8,7 +8,6 @@ Spell assistant doesn't reassign consistently
 Equipment set doesn't darken consistently
 Stance shared cooldown isn't shown
 	Icons also won't be right if added to non-action bar viewers
-Show ground movement speed when skyriding but grounded
 
 Known issues
 	Charge flicker when clearing target
