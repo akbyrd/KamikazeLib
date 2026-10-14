@@ -347,26 +347,18 @@ end
 
 function CDM.GetCurrentPower_Skyriding(unit, powerType)
 	local isGliding, canGlide, forwardSpeed = C_PlayerInfo.GetGlidingInfo()
-	if not isGliding then
-		local currentSpeed, runSpeed, flightSpeed, swimSpeed = GetUnitSpeed("player")
-		if IsPlayerMoving() then
-			forwardSpeed = currentSpeed
-		elseif IsSwimming("player") then
-			forwardSpeed = swimSpeed
-		elseif IsFlying("player") then
-			forwardSpeed = flightSpeed
-		else
-			forwardSpeed = runSpeed
-		end
+	if isGliding then
+		return forwardSpeed
+	else
+		local currentSpeed = GetUnitSpeed("player")
+		return currentSpeed
 	end
-	return forwardSpeed
 end
 
 function CDM.FormatPower_Skyriding(power)
 	local text
 	text = AbbreviateNumbers(power, CDM.speedTextConfig)
 	text = C_StringUtil.RoundToNearestString(text)
-	text = C_StringUtil.TruncateWhenZero(text)
 	text = C_StringUtil.WrapString(text, nil, "%")
 	return text
 end
