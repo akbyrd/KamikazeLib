@@ -1333,8 +1333,6 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 	-- * Ignore the category parameter here, query each category's "last source", and do a refresh.
 	-- * Build up a mapping of these undocumented categories and register them in EnableFrame.
 
-	local db = Kami.CDM.db
-
 	-- NOTE: Sometimes the item id isn't set
 	if category and itemID then
 		-- TODO: Do we need to save this to an account saved vars too?
@@ -1357,9 +1355,9 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 		end
 	end
 
-	local startGCD          = startRecoveryCategory == Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY
-	local startSkyridingGCD = category == db.Category.SkyridingGCD
-	if startGCD or startSkyridingGCD or not spellID then
+	local hasCategory         = category and category ~= 0
+	local hasRecoveryCategory = startRecoveryCategory and startRecoveryCategory ~= 0
+	if hasCategory or hasRecoveryCategory or not spellID then
 		CDM.refreshAllCooldowns = true
 	else
 		-- NOTE: Supposedly this event can arrive before the override event, so we need to check base

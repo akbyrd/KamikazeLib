@@ -1,10 +1,5 @@
 To Do
 -----
-Stance icons on Essential
-	Shared cooldown isn't shown
-	Icons are wrong when in a stance
-	There are examples that aren't on the shapeshift bar (e.g. Ghost Wolf)
-
 Add range check support for potions and trinkets
 	Partially works with the new RefreshUsable
 	Slow to update when moving in/out of range
