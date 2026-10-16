@@ -5,7 +5,6 @@ Add range check support for potions and trinkets
 	Slow to update when moving in/out of range
 	Updates immediately on a target change
 Spell assistant doesn't reassign consistently
-Equipment set doesn't darken consistently
 Custom glow when ready (replace bling animation)
 
 Known issues

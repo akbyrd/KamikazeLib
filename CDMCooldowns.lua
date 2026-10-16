@@ -122,7 +122,8 @@ function CDM.Load()
 	CDM.eventFrame:SetScript("OnEvent",                              CDM.DispatchEvent)
 	CDM.RegisterEvent("UI_SCALE_CHANGED",                            CDM.OnScaleChanged)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                        CDM.OnScaleChanged)
-	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                         CDM.RefreshAllUsable) -- TODO: Wrap with an event handler
+	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                         CDM.SPELL_UPDATE_USABLE)
+	CDM.RegisterEvent("ACTIONBAR_UPDATE_USABLE",                     CDM.ACTIONBAR_UPDATE_USABLE)
 	CDM.RegisterEvent("PLAYER_CAN_GLIDE_CHANGED",                    CDM.PLAYER_CAN_GLIDE_CHANGED)
 	CDM.RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED",             CDM.ADDON_RESTRICTION_STATE_CHANGED)
 	CDM.RegisterEvent("ACTIONBAR_SLOT_CHANGED",                      CDM.ACTIONBAR_SLOT_CHANGED)
@@ -219,6 +220,7 @@ function CDM.Load()
 	CDM.pressKeyIDLookup    = {}
 	CDM.activeOverrides     = {}
 	CDM.refreshAllCooldowns = false
+	CDM.refreshAllUsable    = false
 	CDM.aurasSecret         = C_Secrets.ShouldAurasBeSecret()
 
 	CDM.OnAssistChange()
@@ -229,6 +231,11 @@ function CDM.Update()
 	if CDM.refreshAllCooldowns then
 		CDM.refreshAllCooldowns = false
 		CDM.RefreshAllCooldowns()
+	end
+
+	if CDM.refreshAllUsable then
+		CDM.refreshAllUsable = false
+		CDM.RefreshAllUsable()
 	end
 
 	CDM.PollAssist()
@@ -1292,6 +1299,19 @@ function CDM.ACTIONBAR_SLOT_CHANGED(barSlot)
 	elseif barSlot == 0 then
 		CDM.Rebuild("ACTIONBAR_SLOT_CHANGED")
 	end
+end
+
+function CDM.SPELL_UPDATE_USABLE()
+	CDM.refreshAllUsable = true
+end
+
+function CDM.ACTIONBAR_UPDATE_USABLE()
+	-- NOTE: We could use ACTION_USABLE_UPDATE which carries an array of changes as payload, but
+	-- SPELL_UPDATE_USABLE already forces us to run the full RefreshAllUsable so we know it has to be
+	-- fast enough to be acceptable.
+
+	-- NOTE: Runs on the same frame as SPELL_UPDATE_USABLE about a third of the time, so deferred.
+	CDM.refreshAllUsable = true
 end
 
 function CDM.PLAYER_CAN_GLIDE_CHANGED()
