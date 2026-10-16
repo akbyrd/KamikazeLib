@@ -947,13 +947,16 @@ end
 
 function CDM.RefreshUsable(fState)
 	-- NOTE: Each of the "in range" functions return nil for "no target", etc
+	-- NOTE: C_Item.IsItemInRange is blocked in combat for friendly, self, and nil targets.
+
 	local usable, noMana, noRange
 	if fState.barSlot then
 		usable, noMana = C_ActionBar.IsUsableAction(fState.barSlot)
 		noRange        = C_ActionBar.IsActionInRange(fState.barSlot, "target") == false
 	elseif fState.itemID then
+		local canCheck = not InCombatLockdown() or UnitCanAttack("player", "target")
 		usable, noMana = C_Item.IsUsableItem(fState.itemID)
-		noRange        = C_Item.IsItemInRange(fState.itemID, "target") == false
+		noRange        = canCheck and C_Item.IsItemInRange(fState.itemID, "target") == false
 	elseif fState.spellID then
 		usable, noMana = C_Spell.IsSpellUsable(fState.spellID)
 		noRange        = C_Spell.IsSpellInRange(fState.spellID, "target") == false
