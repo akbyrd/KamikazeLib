@@ -1,17 +1,20 @@
 To Do
 -----
+Stance icons on Essential
+	Shared cooldown isn't shown
+	Icons are wrong when in a stance
+	There are examples that aren't on the shapeshift bar (e.g. Ghost Wolf)
+
 Add range check support for potions and trinkets
 	Partially works with the new RefreshUsable
 	Slow to update when moving in/out of range
 	Updates immediately on a target change
 Spell assistant doesn't reassign consistently
 Equipment set doesn't darken consistently
-Stance shared cooldown isn't shown
-	Icons also won't be right if added to non-action bar viewers
+Custom glow when ready (replace bling animation)
 
 Known issues
 	Charge flicker when clearing target
-	Passenger mount - confirm resource bar behaves
 	Keep empower max stacks across e.g. conditional macro changes
 		Central lookup?
 		Or pool frame by identity and reuse (complicated with duplicates)
@@ -49,15 +52,19 @@ Settings
 	"show all" buff bars for edit mode
 	Implement search
 	Versioning
+
+Testing
+	Passenger mount - confirm resource bar behaves
+	Vehicle power prediction
+	Shared charges on Essential
+
 Auto-hide
 Track active duration
 Anchoring
-Custom glow when ready
 Disable ability highlight on specific spells
 Per-talent layout
 Find a suitable spell category database (Danders if loaded?)
 Profile performance
-Test vehicle power prediction
 Alerts
 Attempt to remove OnCDMChanged
 Store empower max stacks - better conditional macro support in combat

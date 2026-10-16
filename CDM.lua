@@ -9,6 +9,7 @@ function CDM.Load()
 	KLCharVars.CDM.lastCategorySource = KLCharVars.CDM.lastCategorySource or {}
 
 	CDM.db = {
+		-- https://wago.tools/db2/SpellCategory
 		Category = {
 			GCD          = Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY, -- 133
 			CombatPotion = Constants.SpellCooldownConsts.COMBAT_POTION_CATEGORY,   -- 4

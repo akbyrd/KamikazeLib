@@ -134,6 +134,7 @@ function CDM.Load()
 	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",          CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
 	CDM.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED",      CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
 	CDM.RegisterEvent("SPELL_UPDATE_ICON",                           CDM.SPELL_UPDATE_ICON)
+	CDM.RegisterEvent("UPDATE_SHAPESHIFT_FORM",                      CDM.UPDATE_SHAPESHIFT_FORM)
 	CDM.RegisterEvent("SPELL_UPDATE_USES",                           CDM.SPELL_UPDATE_USES)
 	hooksecurefunc(UIParent, "SetScale",                             CDM.OnScaleChanged)
 	hooksecurefunc("SecureActionButton_OnClick",                     CDM.OnClick)
@@ -207,6 +208,7 @@ function CDM.Load()
 	CDM.classToken     = select(2, UnitClass("player"))
 	CDM.classColor     = C_ClassColor.GetClassColor(CDM.classToken)
 	CDM.spellLookup    = {}
+	CDM.formLookup     = {}
 	CDM.categoryIcons  = {
 		[db.Category.CombatPotion] = "Interface/ICONS/INV_POTION_114",
 		[db.Category.HealthPotion] = "Interface/ICONS/INV_POTION_54",
@@ -237,6 +239,7 @@ function CDM.Rebuild(reason)
 	print("Rebuild", reason)
 
 	CDM.GatherCDs()
+	CDM.RefreshFormLookup()
 	CDM.RefreshScale()
 	CDM.RefreshAllOverrideRecords()
 	CDM.RefreshAllBarSlots()
@@ -913,10 +916,12 @@ end
 
 function CDM.RefreshIcon(fState)
 	local texture = nil
+	local formIndex = CDM.formLookup[fState.baseSpellID]
 
 	if     fState.barSlot    then texture = C_ActionBar.GetActionTexture(fState.barSlot)
 	elseif fState.itemID     then texture = C_Item.GetItemIconByID(fState.itemID)
 	elseif fState.equipSlot  then texture = GetInventoryItemTexture("player", fState.equipSlot)
+	elseif formIndex         then texture = GetShapeshiftFormInfo(formIndex)
 	elseif fState.spellID    then texture = C_Spell.GetSpellTexture(fState.spellID)
 	elseif fState.categoryID then texture = CDM.categoryIcons[fState.categoryID]
 	end
@@ -1159,6 +1164,14 @@ function CDM.GatherCDs()
 	end
 end
 
+function CDM.RefreshFormLookup()
+	wipe(CDM.formLookup)
+	for iForm = 1, GetNumShapeshiftForms() do
+		local spellID = select(4, GetShapeshiftFormInfo(iForm))
+		CDM.formLookup[spellID] = iForm
+	end
+end
+
 function CDM.RefreshSkyriding()
 	local isGliding, canGlide = C_PlayerInfo.GetGlidingInfo()
 	for category, vState in pairs(CDM.viewers) do
@@ -1398,6 +1411,14 @@ function CDM.SPELL_UPDATE_ICON(spellID)
 		end
 	else
 		CDM.RefreshAllIcons()
+	end
+end
+
+function CDM.UPDATE_SHAPESHIFT_FORM()
+	for spellID in pairs(CDM.formLookup) do
+		for fState in pairs(CDM.spellLookup[spellID] or {}) do
+			CDM.RefreshIcon(fState)
+		end
 	end
 end
 
