@@ -4,7 +4,6 @@ Add range check support for potions and trinkets
 	Partially works with the new RefreshUsable
 	Slow to update when moving in/out of range
 	Updates immediately on a target change
-Spell assistant doesn't reassign consistently
 Custom glow when ready (replace bling animation)
 
 Known issues

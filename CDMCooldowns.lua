@@ -218,6 +218,7 @@ function CDM.Load()
 	}
 	CDM.activePresses       = {}
 	CDM.pressKeyIDLookup    = {}
+	CDM.assistSlots         = {}
 	CDM.activeOverrides     = {}
 	CDM.refreshAllCooldowns = false
 	CDM.refreshAllUsable    = false
@@ -1032,22 +1033,32 @@ function CDM.RefreshAllProcs()
 end
 
 function CDM.PollAssist()
-	local assistSpellID = CDM.showAssist and C_AssistedCombat.GetNextCastSpell(false) or nil
+	local assistSpellID = C_AssistedCombat.GetNextCastSpell(false)
 	if CDM.assistSpellID ~= assistSpellID then
-		local prevAssistSpellID = CDM.assistSpellID
-		CDM.assistSpellID = assistSpellID
-		for fState in pairs(CDM.spellLookup[prevAssistSpellID] or {}) do
-			CDM.RefreshAssist(fState)
-		end
 		for fState in pairs(CDM.spellLookup[CDM.assistSpellID] or {}) do
-			CDM.RefreshAssist(fState)
+			CDM.SetAssist(fState, false)
+		end
+
+		CDM.assistSpellID = assistSpellID
+
+		-- NOTE: Fix stale charge counts on assistant slots
+		for barSlot in pairs(CDM.assistSlots) do
+			C_ActionBar.ForceUpdateAction(barSlot, false)
+		end
+
+		for fState in pairs(CDM.spellLookup[CDM.assistSpellID] or {}) do
+			CDM.SetAssist(fState, true)
 		end
 	end
 end
 
+function CDM.SetAssist(fState, isAssist)
+	fState.Assist:SetShown(CDM.showAssist and isAssist)
+end
+
 function CDM.RefreshAssist(fState)
-	local shown = fState.spellID and (fState.spellID == CDM.assistSpellID or fState.baseSpellID == CDM.assistSpellID)
-	fState.Assist:SetShown(shown)
+	local isAssist = fState.spellID and (fState.spellID == CDM.assistSpellID or fState.baseSpellID == CDM.assistSpellID)
+	CDM.SetAssist(fState, isAssist)
 end
 
 function CDM.RefreshAllAssist()
@@ -1128,7 +1139,7 @@ function CDM.GetBarAction(barSlot, needItemID)
 		end
 	end
 
-	return spellID, itemID, pressKeyType, pressKeyID
+	return spellID, itemID, pressKeyType, pressKeyID, actionType, subType
 end
 
 function CDM.GatherCDs()
@@ -1145,6 +1156,8 @@ function CDM.GatherCDs()
 				barSlot      = nil,
 				pressKeyType = cdvInfo.spellID and "spell",
 				pressKeyID   = cdvInfo.spellID,
+				actionType   = nil,
+				subType      = nil,
 				hasAction    = true,
 			}
 			table.insert(vState.slots, slot)
@@ -1165,6 +1178,8 @@ function CDM.GatherCDs()
 			barSlot      = barSlot,
 			pressKeyType = nil,
 			pressKeyID   = nil,
+			actionType   = nil,
+			subType      = nil,
 			hasAction    = false,
 		}
 		table.insert(vState.slots, slot)
@@ -1190,8 +1205,11 @@ function CDM.RefreshSkyriding()
 end
 
 function CDM.RefreshBarSlot(slot)
-	slot.spellID, slot.itemID, slot.pressKeyType, slot.pressKeyID = CDM.GetBarAction(slot.barSlot, true)
+	slot.spellID, slot.itemID, slot.pressKeyType, slot.pressKeyID, slot.actionType, slot.subType = CDM.GetBarAction(slot.barSlot, true)
 	slot.hasAction = C_ActionBar.HasAction(slot.barSlot)
+
+	local isAssist = slot.actionType == "spell" and slot.subType == "assistedcombat"
+	CDM.assistSlots[slot.barSlot] = isAssist or nil
 end
 
 function CDM.RefreshAllBarSlots()
@@ -1245,6 +1263,7 @@ end
 
 function CDM.OnAssistChange()
 	CDM.showAssist = GetCVarBool("assistedCombatHighlight")
+	CDM.RefreshAllAssist()
 end
 
 function CDM.ACTIONBAR_SLOT_CHANGED(barSlot)
