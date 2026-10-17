@@ -1,10 +1,14 @@
 To Do
 -----
-Add range check support for potions and trinkets
-	Partially works with the new RefreshUsable
-	Slow to update when moving in/out of range
-	Updates immediately on a target change
+Probably just update cooldown and usability on everything every frame
 Custom glow when ready (replace bling animation)
+Consider C_ActionBar.FindAssistedCombatActionButtons()
+
+Formalize the set of types
+	Probably 2 concepts: source type (or slot type?) and content type (or frame type?)
+	Source type: cdm, action bar
+	Content type: item, spell
+	What about these: macro, action
 
 Known issues
 	Charge flicker when clearing target

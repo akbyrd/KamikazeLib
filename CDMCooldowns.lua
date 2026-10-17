@@ -130,6 +130,7 @@ function CDM.Load()
 	CDM.RegisterEvent("BAG_UPDATE_COOLDOWN",                         CDM.BAG_UPDATE_COOLDOWN)
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                       CDM.SPELL_UPDATE_COOLDOWN)
 	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",                    CDM.SPELL_RANGE_CHECK_UPDATE)
+	CDM.RegisterEvent("ACTION_RANGE_CHECK_UPDATE",                   CDM.ACTION_RANGE_CHECK_UPDATE)
 	CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",                  CDM.CURRENT_SPELL_CAST_CHANGED)
 	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",          CDM.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
 	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",          CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
@@ -219,6 +220,7 @@ function CDM.Load()
 	CDM.activePresses       = {}
 	CDM.pressKeyIDLookup    = {}
 	CDM.assistSlots         = {}
+	CDM.itemRangeFrames     = {}
 	CDM.activeOverrides     = {}
 	CDM.refreshAllCooldowns = false
 	CDM.refreshAllUsable    = false
@@ -241,6 +243,7 @@ function CDM.Update()
 
 	CDM.PollAssist()
 	CDM.PollPresses()
+	CDM.PollItemRange()
 end
 
 function CDM.Rebuild(reason)
@@ -296,7 +299,8 @@ function CDM.ConstructFrame(vState, slot)
 	fState.empowerBuff      = nil
 	fState.hasBling         = nil
 	fState.overrideTimer    = nil
-	fState.rangeSpellID     = nil
+	fState.rangeCheckKey    = nil
+	fState.itemInRange      = nil
 
 	fState.Root = CreateFrame("Frame", nil, vState.Root)
 	fState.Root:SetParentKey("Root")
@@ -453,6 +457,10 @@ function CDM.EnableFrame(fState, slot)
 		CDM.pressKeyIDLookup[fState.pressKeyID][fState] = true
 	end
 
+	if fState.itemID and not fState.barSlot then
+		CDM.itemRangeFrames[fState] = true
+	end
+
 	CDM.ClearBling(fState)
 	fState.Root:Show()
 end
@@ -465,6 +473,10 @@ function CDM.DisableFrame(fState)
 
 	if fState.pressKeyID then
 		CDM.pressKeyIDLookup[fState.pressKeyID][fState] = nil
+	end
+
+	if fState.itemID and not fState.barSlot then
+		CDM.itemRangeFrames[fState] = nil
 	end
 
 	fState.Root:Hide()
@@ -903,13 +915,21 @@ function CDM.ClearAllBlings()
 end
 
 function CDM.RefreshRangeCheck(fState)
-	if fState.rangeSpellID ~= fState.baseSpellID then
-		if fState.rangeSpellID then
-			C_Spell.EnableSpellRangeCheck(fState.rangeSpellID, false)
+	if fState.barSlot then
+		if fState.rangeCheckKey ~= fState.barSlot then
+			fState.rangeCheckKey = fState.barSlot
+			C_ActionBar.EnableActionRangeCheck(fState.rangeCheckKey, true)
 		end
-		fState.rangeSpellID = fState.baseSpellID
-		if fState.rangeSpellID then
-			C_Spell.EnableSpellRangeCheck(fState.rangeSpellID, true)
+
+	else
+		if fState.rangeCheckKey ~= fState.baseSpellID then
+			if fState.rangeCheckKey then
+				C_Spell.EnableSpellRangeCheck(fState.rangeCheckKey, false)
+			end
+			fState.rangeCheckKey = fState.baseSpellID
+			if fState.rangeCheckKey then
+				C_Spell.EnableSpellRangeCheck(fState.rangeCheckKey, true)
+			end
 		end
 	end
 end
@@ -1076,6 +1096,17 @@ function CDM.PollPresses()
 	for button, mouseButton in pairs(CDM.activePresses) do
 		local down = button:GetButtonState() == "PUSHED"
 		CDM.OnClick(button, mouseButton, down, nil, nil)
+	end
+end
+
+function CDM.PollItemRange()
+	local canCheck = not InCombatLockdown() or UnitCanAttack("player", "target")
+	for fState in pairs(CDM.itemRangeFrames) do
+		local inRange = canCheck and C_Item.IsItemInRange(fState.itemID, "target")
+		if fState.itemInRange ~= inRange then
+			fState.itemInRange = inRange
+			CDM.RefreshUsable(fState)
+		end
 	end
 end
 
@@ -1353,7 +1384,24 @@ end
 
 function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
 	for fState in pairs(CDM.spellLookup[spellID] or {}) do
-		CDM.RefreshUsable(fState)
+		if not fState.barSlot then
+			CDM.RefreshUsable(fState)
+		end
+	end
+end
+
+function CDM.ACTION_RANGE_CHECK_UPDATE(barSlot, isInRange, checksRange)
+	local FIRST_SLOT = 121
+	local LAST_SLOT  = 132
+
+	if barSlot >= FIRST_SLOT and barSlot <= LAST_SLOT then
+		for category, vState in pairs(CDM.viewers) do
+			local slot = vState.slots[barSlot - FIRST_SLOT + 1]
+			if slot and slot.barSlot == barSlot and slot.hasAction then
+				local fState = vState.allFrames[slot.key]
+				CDM.RefreshUsable(fState)
+			end
+		end
 	end
 end
 
