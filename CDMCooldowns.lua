@@ -800,6 +800,15 @@ function CDM.RefreshCooldown(fState)
 
 	-- NOTE: isOnGCD is always false for an item's bar action.
 
+	-- NOTE: isOnGCD is only trustworthy inside SPELL_UPDATE_COOLDOWN. In practice it looks like:
+	-- * Reads on the same frame as the events are correct
+	-- * It's false one frame early at the end of the GCD
+	--
+	-- The only place we can run into a problem is if we refresh on the one wrong frame and no
+	-- cooldown event happened the frame. We'll turn the GCD into a real cooldown and get a spurious
+	-- bling. I haven't ever noticed it happen. But it does imply that we can't blindly update all
+	-- cooldowns every frame.
+
 	-- NOTE: At first glance it seems like we could drop the action bar path below and treat
 	-- everything as either an item or a spell. But, there are in fact things with cooldowns that are
 	-- neither: e.g. companion pets (on the GCD) and transmog outfits (3s CD).

@@ -1,8 +1,11 @@
 To Do
 -----
-Probably just update cooldown and usability on everything every frame
 Custom glow when ready (replace bling animation)
-Consider C_ActionBar.FindAssistedCombatActionButtons()
+
+Possess / vehicle cooldowns
+	Test vehicle power prediction
+	Test vehicle with no power - resource bar hides
+	Similar to skyriding - hide buffs, swap resource, show abilities
 
 Formalize the set of types
 	Probably 2 concepts: source type (or slot type?) and content type (or frame type?)
@@ -17,11 +20,6 @@ Known issues
 		Or pool frame by identity and reuse (complicated with duplicates)
 	Handle press highlight for `[btn:2]` macros
 	Test /castsequence (should update as the sequence progresses)
-
-Possess / vehicle cooldowns
-	Test vehicle power prediction
-	Test vehicle with no power - resource bar hides
-	Similar to skyriding - hide buffs, swap resource, show abilities
 
 Track any spell
 	Power infusion
@@ -66,6 +64,7 @@ Alerts
 Attempt to remove OnCDMChanged
 Store empower max stacks - better conditional macro support in combat
 Enable pandemic per-spell (disable on Bladestorm)
+Consider C_ActionBar.FindAssistedCombatActionButtons()
 
 
 
