@@ -311,7 +311,7 @@ function CDM.ConstructFrame(vState, slot)
 	fState.Border:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
 	fState.Border:SetTextureSliceMargins(1, 1, 1, 1)
 
-	-- BUG: Edge and bling are broken in 12.1 They aren't scaled properly and they don't
+	-- BUG: Cooldown edge and bling are broken in 12.1 They aren't scaled properly and they don't
 	-- clip. They show up as a rotating rectangle. So we manually rescale and clip them.
 	fState.Content = CreateFrame("Frame", nil, fState.Root)
 	fState.Content:SetParentKey("Content")
@@ -398,20 +398,6 @@ function CDM.ConstructFrame(vState, slot)
 	fState.Charges:SetParentKey("Charges")
 	fState.Charges:SetFontObject(vState.chargeFont)
 
-	-- BUG: Bling is broken in 12.1. It occasionally flickers at the end of its duration.
-	-- Ideally it would be above the Outline / Assist, but it needs to be clipped by Content
-
-	fState.Bling = CreateFrame("Cooldown", nil, fState.Content, "CooldownFrameTemplate")
-	fState.Bling:SetParentKey("Bling")
-	fState.Bling:ClearAllPoints() -- Template sets points
-	fState.Bling:SetPoint("CENTER")
-	fState.Bling:SetDrawSwipe(false)
-	fState.Bling:SetDrawEdge(false)
-	fState.Bling:SetDrawBling(true)
-	fState.Bling:SetBlingTexture("Interface\\Cooldown\\star4", 0.3, 0.6, 1, 0.64)
-	fState.Bling:SetHideCountdownNumbers(true)
-	fState.Bling:SetScript("OnCooldownDone", function() fState.hasBling = nil end)
-
 	fState.Outline = CreateFrame("Frame", nil, fState.Root)
 	fState.Outline:SetParentKey("Outline")
 	fState.Outline:SetAllPoints()
@@ -424,6 +410,51 @@ function CDM.ConstructFrame(vState, slot)
 
 	-- TODO: Does PixelAnts actually need to create a frame?
 	fState.Proc = PixelAnts.Create(fState.Outline)
+
+	-- BUG: Built-in bling animations flicker on their last frame, so we make our own.
+	fState.BlingTimer = CreateFrame("Cooldown", nil, fState.Root, "CooldownFrameTemplate")
+	fState.BlingTimer:SetParentKey("BlingTimer")
+	fState.BlingTimer:ClearAllPoints() -- Template sets points
+	fState.BlingTimer:SetPoint("CENTER")
+	fState.BlingTimer:SetDrawSwipe(false)
+	fState.BlingTimer:SetDrawEdge(false)
+	fState.BlingTimer:SetDrawBling(false)
+	fState.BlingTimer:SetHideCountdownNumbers(true)
+	fState.BlingTimer:SetScript("OnCooldownDone", function() CDM.PlayBling(fState) end)
+
+	fState.Bling = CreateFrame("Frame", nil, fState.Root)
+	fState.Bling:SetParentKey("Bling")
+	fState.Bling:SetAllPoints()
+	fState.Bling:SetPoint("CENTER")
+	fState.Bling:SetAlpha(0)
+
+	fState.BlingTex = fState.Bling:CreateTexture(nil, "OVERLAY")
+	fState.BlingTex:SetParentKey("Star")
+	fState.BlingTex:SetAllPoints()
+	fState.BlingTex:SetTexture("Interface\\Cooldown\\star4")
+	fState.BlingTex:SetBlendMode("ADD")
+	fState.BlingTex:SetVertexColor(0.3, 0.6, 1, 0.64)
+
+	fState.BlingAnimGroup = fState.Bling:CreateAnimationGroup()
+	fState.BlingAlpha = fState.BlingAnimGroup:CreateAnimation("Alpha")
+	fState.BlingAlpha:SetFromAlpha(1)
+	fState.BlingAlpha:SetToAlpha(0)
+	fState.BlingAlpha:SetDuration(0.5)
+	fState.BlingAlpha:SetSmoothing("IN")
+
+	--fState.BlingScale = fState.BlingAnimGroup:CreateAnimation("Scale")
+	--fState.BlingScale:SetTarget(fState.BlingTex)
+	--fState.BlingScale:SetOrigin("CENTER", 0, 0)
+	--fState.BlingScale:SetScaleFrom(0.25, 0.25)
+	--fState.BlingScale:SetScaleTo(1, 1)
+	--fState.BlingScale:SetDuration(0.5)
+	--fState.BlingScale:SetSmoothing("OUT")
+
+	fState.BlingRotation = fState.BlingAnimGroup:CreateAnimation("Rotation")
+	fState.BlingRotation:SetTarget(fState.BlingTex)
+	fState.BlingRotation:SetOrigin("CENTER", 0, 0)
+	fState.BlingRotation:SetDegrees(-90)
+	fState.BlingRotation:SetDuration(0.5)
 
 	fState.Override = CreateFrame("StatusBar", nil, fState.Outline)
 	fState.Override:SetParentKey("Override")
@@ -885,10 +916,10 @@ function CDM.RefreshCooldown(fState)
 
 	if onCD then
 		fState.hasBling = true
-		fState.Bling:SetCooldownFromDurationObject(duration)
-	elseif fState.hasBling then
-		fState.hasBling = nil
-		fState.Bling:SetCooldownDuration(1e-3)
+		fState.BlingTimer:SetCooldownFromDurationObject(duration)
+		fState.BlingAnimGroup:Stop()
+	else
+		CDM.PlayBling(fState)
 	end
 
 	if rechargeDuration and not onCD then
@@ -910,9 +941,18 @@ function CDM.RefreshAllCooldowns()
 	end
 end
 
+function CDM.PlayBling(fState)
+	if fState.hasBling then
+		fState.hasBling = nil
+		fState.BlingTimer:Clear()
+		fState.BlingAnimGroup:Restart()
+	end
+end
+
 function CDM.ClearBling(fState)
 	fState.hasBling = nil
-	fState.Bling:Clear()
+	fState.BlingTimer:Clear()
+	fState.BlingAnimGroup:Stop()
 end
 
 function CDM.ClearAllBlings()
