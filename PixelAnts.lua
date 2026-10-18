@@ -2,6 +2,8 @@ local Kami = select(2, ...)
 local PixelAnts = {}
 Kami.PixelAnts = PixelAnts
 
+local Media = Kami.Media
+
 local edgeWalk = {
 	{ x = 1, y = 0, u = { 0, 0, 1, 1 }, points = { "TOPLEFT",    "TOPRIGHT"    } },
 	{ x = 0, y = 1, u = { 0, 1, 0, 1 }, points = { "TOPRIGHT",   "BOTTOMRIGHT" } },
@@ -15,7 +17,7 @@ function PixelAnts.Create(parent)
 	f.edges = {}
 	for iEdge, w in ipairs(edgeWalk) do
 		local tex = f:CreateTexture(nil, "OVERLAY")
-		tex:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\PixelAnts.tga", "REPEAT", "REPEAT", "NEAREST")
+		tex:SetTexture(Media.Staircase.texture, "REPEAT", "REPEAT", "NEAREST")
 
 		local group = tex:CreateAnimationGroup()
 		group:SetLooping("REPEAT")
@@ -34,7 +36,7 @@ end
 -- color     - ColorMixin
 -- speed     - revolutions per second, positive is clockwise
 -- segments  - segment count along the top edge, approximate
--- duty      - lit fraction of each segment cycle, in 1/64 steps
+-- duty      - lit fraction of each segment cycle, in 1/Media.Staircase.size steps
 function PixelAnts.SetConfig(f, thickness, inset, color, speed, segments, duty)
 	-- NOTE: This pattern needs to change if we ever accept booleans
 	f.thickness = thickness or f.thickness
@@ -42,7 +44,9 @@ function PixelAnts.SetConfig(f, thickness, inset, color, speed, segments, duty)
 	f.speed     = speed     or f.speed
 	f.segments  = segments  or f.segments
 	f.duty      = duty      or f.duty
-	f.v         = (Clamp(Round(f.duty * 64), 1, 64) - 0.5) / 64
+
+	local size = Media.Staircase.size
+	f.v = (Clamp(Round(f.duty * size), 1, size) - 0.5) / size
 
 	if color then
 		for iEdge, tex in ipairs(f.edges) do

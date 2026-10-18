@@ -2,6 +2,8 @@ local Kami = select(2, ...)
 local BorderTrace = {}
 Kami.BorderTrace = BorderTrace
 
+local Media = Kami.Media
+
 local edgeWalk = {
 	{ x =  1, y =  0, u = { 0, 0, 1, 1 }, points = { "TOPLEFT",     "TOPRIGHT"    } },
 	{ x =  0, y = -1, u = { 0, 1, 0, 1 }, points = { "TOPRIGHT",    "BOTTOMRIGHT" } },
@@ -18,7 +20,7 @@ function BorderTrace.Create(parent)
 	f.edges = {}
 	for iEdge, w in ipairs(edgeWalk) do
 		local tex = f:CreateTexture(nil, "OVERLAY")
-		tex:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\PixelAnts.tga", "REPEAT", "CLAMP", "TRILINEAR")
+		tex:SetTexture(Media.Staircase.texture, "REPEAT", "CLAMP", "TRILINEAR")
 		tex:SetTexCoord(w.u[1], 0, w.u[2], 0, w.u[3], 0, w.u[4], 0)
 		tex:SetSnapToPixelGrid(false)
 		tex:SetTexelSnappingBias(0)

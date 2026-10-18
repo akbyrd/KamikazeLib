@@ -320,7 +320,7 @@ Config.Impl.typeDefs = {
 			local color = CreateColorFromHexString(value.color)
 			local font  = CreateFont(tostring(value))
 			local size  = value.size or value.info.size
-			font:SetFont(value.info.path, size, value.flags or "")
+			font:SetFont(value.info.font, size, value.flags or "")
 			font:SetTextColor(color:GetRGBA())
 			if value.shadow then
 				font:SetShadowColor(0, 0, 0, 1)

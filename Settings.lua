@@ -3,6 +3,7 @@ local Settings = {}
 Kami.Settings = Settings
 
 local Config = Kami.Config
+local Media  = Kami.Media
 local UI     = Kami.UI
 local LSM    = LibStub("LibSharedMedia-3.0")
 
@@ -18,14 +19,7 @@ function Settings.Load()
 	-- TODO: Any good patterns for "stronger types" in lua?
 	local rootSize = 500
 	local textFont = {
-		path = LSM:Fetch("font", "PT Sans Narrow", true) or "Fonts\\ARIALN.TTF",
-	}
-	local iconFont = {
-		path    = "Interface\\AddOns\\KamikazeLib\\Media\\MaterialSymbolsSharp-Regular.ttf",
-		ascent  = 1056,
-		descent = 96,
-		grid    = 24,
-		size    = 24,
+		font = LSM:Fetch("font", "PT Sans Narrow", true) or "Fonts\\ARIALN.TTF",
 	}
 
 	Settings.cfgTree = Config.Create()
@@ -87,19 +81,19 @@ function Settings.Load()
 	Config.AddNode(Settings.cfgTree, "Button", "IconButton",
 		{
 			font = Config.Font({
-				info   = iconFont,
+				info   = Media.MaterialSymbols,
 				color  = "A6FFFFFF",
 				shadow = true,
 				size   = 24,
 			}),
 			hoverFont = Config.Font({
-				info   = iconFont,
+				info   = Media.MaterialSymbols,
 				color  = "FFFFFFFF",
 				shadow = true,
 				size   = 24,
 			}),
 			disabledFont = Config.Font({
-				info   = iconFont,
+				info   = Media.MaterialSymbols,
 				color  = "59FFFFFF",
 				shadow = true,
 				size   = 24,

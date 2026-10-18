@@ -12,10 +12,12 @@ Lib\CallbackHandler-1.0\CallbackHandler-1.0.lua
 Lib\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
 
 KamikazeLib.lua
+Media.lua
 Util.lua
 Config.lua
 UI.lua
 PixelAnts.lua
+BorderTrace.lua
 WorldMarkers.lua
 MouseCursor.lua
 CombatText.lua

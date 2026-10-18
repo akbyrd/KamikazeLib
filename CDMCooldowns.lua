@@ -4,6 +4,7 @@ Kami.CDM.Cooldowns = CDM
 
 local BorderTrace = Kami.BorderTrace
 local Config      = Kami.Config
+local Media       = Kami.Media
 local PixelAnts   = Kami.PixelAnts
 local Util        = Kami.Util
 local LSM         = LibStub("LibSharedMedia-3.0")
@@ -306,7 +307,7 @@ function CDM.ConstructFrame(vState, slot)
 	fState.Border = fState.Root:CreateTexture(nil, "OVERLAY")
 	fState.Border:SetParentKey("Border")
 	fState.Border:SetAllPoints()
-	fState.Border:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
+	fState.Border:SetTexture(Media.Border.texture, "CLAMP", "CLAMP", "NEAREST")
 	fState.Border:SetTextureSliceMargins(1, 1, 1, 1)
 
 	-- BUG: Cooldown edge and bling are broken in 12.1 They aren't scaled properly and they don't
@@ -337,11 +338,11 @@ function CDM.ConstructFrame(vState, slot)
 				fState.EmpowerBar = CreateFrame("StatusBar", nil, fState.EmpowerButton)
 
 				fState.EmpowerBorder = fState.EmpowerBar:CreateTexture(nil, "BORDER")
-				fState.EmpowerBorder:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\PixelAnts.tga", "REPEAT", "REPEAT", "NEAREST")
+				fState.EmpowerBorder:SetTexture(Media.Staircase.texture, "REPEAT", "REPEAT", "NEAREST")
 				fState.EmpowerBorder:SetHorizTile(true)
 
 				fState.EmpowerFill = fState.EmpowerBar:CreateTexture(nil, "ARTWORK")
-				fState.EmpowerFill:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\PixelAnts.tga", "REPEAT", "REPEAT", "NEAREST")
+				fState.EmpowerFill:SetTexture(Media.Staircase.texture, "REPEAT", "REPEAT", "NEAREST")
 				fState.EmpowerFill:SetHorizTile(true)
 
 				-- BUG: This works around a 1 frame flicker. The bar is shown in OnUpdate, but the
@@ -365,7 +366,7 @@ function CDM.ConstructFrame(vState, slot)
 	fState.Recharge:SetPoint("CENTER")
 	fState.Recharge:SetDrawSwipe(false)
 	fState.Recharge:SetDrawEdge(true)
-	fState.Recharge:SetEdgeTexture("Interface\\AddOns\\KamikazeLib\\Media\\CD-Swipe-Edge.tga")
+	fState.Recharge:SetEdgeTexture(Media.CooldownEdge.texture)
 	fState.Recharge:SetEdgeColor(0.6, 1, 0, 1)
 	fState.Recharge:SetHideCountdownNumbers(true)
 
@@ -405,7 +406,7 @@ function CDM.ConstructFrame(vState, slot)
 	fState.Assist = fState.Outline:CreateTexture(nil, "OVERLAY", nil, 1)
 	fState.Assist:SetParentKey("Assist")
 	fState.Assist:SetAllPoints()
-	fState.Assist:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
+	fState.Assist:SetTexture(Media.Border.texture, "CLAMP", "CLAMP", "NEAREST")
 	fState.Assist:SetTextureSliceMargins(1, 1, 1, 1)
 
 	fState.Proc = PixelAnts.Create(fState.Outline)
@@ -677,21 +678,20 @@ function CDM.RefreshAllSizes()
 			Util.SetSliceScale(fState.Assist, assistSize)
 
 			if fState.empowerBuff and not C_Secrets.ShouldAurasBeSecret() then
-				-- TODO: This is no longer pixel perfect if tiles are wider than 64, which happens with
-				-- a 1 stack buff. Consider increasing the texture size to 128 or 256.
+				local texSize       = Media.Staircase.size
 				local maxStacks     = fState.empowerMaxStacks
 				local xTileSize     = floor((cxSize + empowerGapSize - 6) / maxStacks)
 				local xBorderSize   = xTileSize - empowerGapSize
 				local xFillSize     = xBorderSize - 2*empowerBorderSize
 				local xTotalSize    = xTileSize * maxStacks - empowerGapSize
-				local barScale      = xTileSize / 64
+				local barScale      = xTileSize / texSize
 				local borderSize    = empowerBorderSize / barScale
 				local xCenterOffset = floor((cxSize - xTotalSize) / 2) / barScale
 				local yOffset       = 1 / barScale
-				local xBarSize      = maxStacks * 64
+				local xBarSize      = maxStacks * texSize
 				local yBarSize      = (empowerSize - 2*empowerBorderSize) / barScale
-				local vFill         = (Round(xFillSize   / barScale) - 0.5) / 64
-				local vBorder       = (Round(xBorderSize / barScale) - 0.5) / 64
+				local vFill         = (Round(xFillSize   / barScale) - 0.5) / texSize
+				local vBorder       = (Round(xBorderSize / barScale) - 0.5) / texSize
 
 				fState.Empower:SetPoint("TOPLEFT", fState.Content, "BOTTOMLEFT", 0, empowerSize)
 				fState.EmpowerBar:SetScale(barScale)

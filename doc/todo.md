@@ -1,8 +1,5 @@
 To Do
 -----
-Is PixelAnts frame rate dependent?
-Bigger PixelAnts texture
-
 Possess / vehicle cooldowns
 	Test vehicle power prediction
 	Test vehicle with no power - resource bar hides

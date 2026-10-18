@@ -3,6 +3,7 @@ local CDM = {}
 Kami.CDM.Buffs = CDM
 
 local Config    = Kami.Config
+local Media     = Kami.Media
 local PixelAnts = Kami.PixelAnts
 local Util      = Kami.Util
 
@@ -158,7 +159,7 @@ function CDM.ConstructFrame(vState)
 				fState.IconBorder = fState.Button:CreateTexture(nil, "OVERLAY")
 				fState.IconBorder:SetParentKey("IconBorder")
 				fState.IconBorder:SetPoint("BOTTOMLEFT")
-				fState.IconBorder:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
+				fState.IconBorder:SetTexture(Media.Border.texture, "CLAMP", "CLAMP", "NEAREST")
 				fState.IconBorder:SetTextureSliceMargins(1, 1, 1, 1)
 
 				fState.Bar = CreateFrame("StatusBar", nil, fState.Button)
@@ -171,7 +172,7 @@ function CDM.ConstructFrame(vState)
 				fState.BarBorder = fState.Button:CreateTexture(nil, "OVERLAY")
 				fState.BarBorder:SetParentKey("BarBorder")
 				fState.BarBorder:SetPoint("BOTTOMLEFT")
-				fState.BarBorder:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
+				fState.BarBorder:SetTexture(Media.Border.texture, "CLAMP", "CLAMP", "NEAREST")
 				fState.BarBorder:SetTextureSliceMargins(1, 1, 1, 1)
 
 				fState.Pandemic = PixelAnts.Create(fState.Button)

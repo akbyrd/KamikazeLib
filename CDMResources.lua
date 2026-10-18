@@ -3,6 +3,7 @@ local CDM = {}
 Kami.CDM.Resources = CDM
 
 local Config = Kami.Config
+local Media  = Kami.Media
 local Util   = Kami.Util
 local LSM    = LibStub("LibSharedMedia-3.0")
 
@@ -173,7 +174,7 @@ function CDM.Init()
 	CDM.Border = CDM.Root:CreateTexture(nil, "OVERLAY")
 	CDM.Border:SetParentKey("Border")
 	CDM.Border:SetAllPoints()
-	CDM.Border:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
+	CDM.Border:SetTexture(Media.Border.texture, "CLAMP", "CLAMP", "NEAREST")
 	CDM.Border:SetTextureSliceMargins(1, 1, 1, 1)
 
 	CDM.Rebuild()
