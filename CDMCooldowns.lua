@@ -2,10 +2,11 @@ local Kami = select(2, ...)
 local CDM = {}
 Kami.CDM.Cooldowns = CDM
 
-local Config    = Kami.Config
-local PixelAnts = Kami.PixelAnts
-local Util      = Kami.Util
-local LSM       = LibStub("LibSharedMedia-3.0")
+local BorderTrace = Kami.BorderTrace
+local Config      = Kami.Config
+local PixelAnts   = Kami.PixelAnts
+local Util        = Kami.Util
+local LSM         = LibStub("LibSharedMedia-3.0")
 
 function CDM.Load()
 	CDM.savedVars = KLSavedVars.CDM
@@ -51,6 +52,13 @@ function CDM.Load()
 			procSpeed    = Config.Number(0.30),
 			procSegments = Config.Number(2),
 			procDuty     = Config.Number(0.6),
+
+			blingSize     = Config.Size("1px"),
+			blingInset    = Config.Size("0ui"),
+			blingColor    = Config.Color("FFFFFFFF"),
+			blingDuration = Config.Number(0.8),
+			blingDistance = Config.Number(2.5),
+			blingFill     = Config.Number(0.5),
 
 			rowLimit  = Config.Number(6),
 			rowLimits = Config.Table({}),
@@ -273,16 +281,6 @@ function CDM.Rebuild(reason)
 end
 
 function CDM.ConstructFrame(vState, slot)
-	-- Frame        | Textures/Text          | Purpose
-	-- -------------|------------------------|--------
-	-- Root         | Border                 | Size, Position
-	--   Content    | Icon                   | Inset
-	--     Recharge |                        | Cooldown
-	--     Cooldown |                        | Cooldown
-	--     Overlay  | Press, Queued, Charges | Draw Order
-	--     Bling    |                        | Cooldown
-	--   Outline    | Assist                 | Draw Order
-
 	local fState = {}
 	fState.cfg              = vState.cfg
 	fState.slot             = nil
@@ -312,7 +310,9 @@ function CDM.ConstructFrame(vState, slot)
 	fState.Border:SetTextureSliceMargins(1, 1, 1, 1)
 
 	-- BUG: Cooldown edge and bling are broken in 12.1 They aren't scaled properly and they don't
-	-- clip. They show up as a rotating rectangle. So we manually rescale and clip them.
+	-- clip. They show up as a rotating rectangle. So we manually rescale and clip them. Bling also
+	-- has a 1 frame flicker at the end.
+
 	fState.Content = CreateFrame("Frame", nil, fState.Root)
 	fState.Content:SetParentKey("Content")
 	fState.Content:SetPoint("CENTER")
@@ -344,7 +344,7 @@ function CDM.ConstructFrame(vState, slot)
 				fState.EmpowerFill:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\PixelAnts.tga", "REPEAT", "REPEAT", "NEAREST")
 				fState.EmpowerFill:SetHorizTile(true)
 
-				-- BUG: This works around a 1-frame flicker. The bar is shown in OnUpdate, but the
+				-- BUG: This works around a 1 frame flicker. The bar is shown in OnUpdate, but the
 				-- layout happens before and is skipped for hidden frames. The first time the bar is
 				-- shown it has its default, full width. Next frame it gets resized to the proper width.
 				-- So we force a texture to be created and manually position it outside the clipping
@@ -408,10 +408,9 @@ function CDM.ConstructFrame(vState, slot)
 	fState.Assist:SetTexture("Interface\\AddOns\\KamikazeLib\\Media\\Border.tga", "CLAMP", "CLAMP", "NEAREST")
 	fState.Assist:SetTextureSliceMargins(1, 1, 1, 1)
 
-	-- TODO: Does PixelAnts actually need to create a frame?
 	fState.Proc = PixelAnts.Create(fState.Outline)
+	fState.Proc:SetParentKey("Proc")
 
-	-- BUG: Built-in bling animations flicker on their last frame, so we make our own.
 	fState.BlingTimer = CreateFrame("Cooldown", nil, fState.Root, "CooldownFrameTemplate")
 	fState.BlingTimer:SetParentKey("BlingTimer")
 	fState.BlingTimer:ClearAllPoints() -- Template sets points
@@ -422,39 +421,8 @@ function CDM.ConstructFrame(vState, slot)
 	fState.BlingTimer:SetHideCountdownNumbers(true)
 	fState.BlingTimer:SetScript("OnCooldownDone", function() CDM.PlayBling(fState) end)
 
-	fState.Bling = CreateFrame("Frame", nil, fState.Root)
+	fState.Bling = BorderTrace.Create(fState.Outline)
 	fState.Bling:SetParentKey("Bling")
-	fState.Bling:SetAllPoints()
-	fState.Bling:SetPoint("CENTER")
-	fState.Bling:SetAlpha(0)
-
-	fState.BlingTex = fState.Bling:CreateTexture(nil, "OVERLAY")
-	fState.BlingTex:SetParentKey("Star")
-	fState.BlingTex:SetAllPoints()
-	fState.BlingTex:SetTexture("Interface\\Cooldown\\star4")
-	fState.BlingTex:SetBlendMode("ADD")
-	fState.BlingTex:SetVertexColor(0.3, 0.6, 1, 0.64)
-
-	fState.BlingAnimGroup = fState.Bling:CreateAnimationGroup()
-	fState.BlingAlpha = fState.BlingAnimGroup:CreateAnimation("Alpha")
-	fState.BlingAlpha:SetFromAlpha(1)
-	fState.BlingAlpha:SetToAlpha(0)
-	fState.BlingAlpha:SetDuration(0.5)
-	fState.BlingAlpha:SetSmoothing("IN")
-
-	--fState.BlingScale = fState.BlingAnimGroup:CreateAnimation("Scale")
-	--fState.BlingScale:SetTarget(fState.BlingTex)
-	--fState.BlingScale:SetOrigin("CENTER", 0, 0)
-	--fState.BlingScale:SetScaleFrom(0.25, 0.25)
-	--fState.BlingScale:SetScaleTo(1, 1)
-	--fState.BlingScale:SetDuration(0.5)
-	--fState.BlingScale:SetSmoothing("OUT")
-
-	fState.BlingRotation = fState.BlingAnimGroup:CreateAnimation("Rotation")
-	fState.BlingRotation:SetTarget(fState.BlingTex)
-	fState.BlingRotation:SetOrigin("CENTER", 0, 0)
-	fState.BlingRotation:SetDegrees(-90)
-	fState.BlingRotation:SetDuration(0.5)
 
 	fState.Override = CreateFrame("StatusBar", nil, fState.Outline)
 	fState.Override:SetParentKey("Override")
@@ -640,6 +608,14 @@ function CDM.RefreshConfig(fState)
 		fState.cfg.procSpeed,
 		fState.cfg.procSegments,
 		fState.cfg.procDuty)
+
+	fState.Bling:SetConfig(
+		nil,
+		nil,
+		fState.cfg.blingColor,
+		fState.cfg.blingDuration,
+		fState.cfg.blingDistance,
+		fState.cfg.blingFill)
 end
 
 function CDM.RefreshAllConfig()
@@ -662,6 +638,8 @@ function CDM.RefreshAllSizes()
 		local assistSize        = Round(cfg.assistSize        + cfg.assistSizeRel        * iconSize)
 		local procSize          = Round(cfg.procSize          + cfg.procSizeRel          * iconSize)
 		local procInset         = Round(cfg.procInset         + cfg.procInsetRel         * iconSize)
+		local blingSize         = Round(cfg.blingSize         + cfg.blingSizeRel         * iconSize)
+		local blingInset        = Round(cfg.blingInset        + cfg.blingInsetRel        * iconSize)
 		local overrideSize      = Round(cfg.overrideSize      + cfg.overrideSizeRel      * iconSize)
 		local empowerSize       = Round(cfg.empowerSize       + cfg.empowerSizeRel       * iconSize)
 		local empowerGapSize    = Round(cfg.empowerGapSize    + cfg.empowerGapSizeRel    * iconSize)
@@ -688,9 +666,10 @@ function CDM.RefreshAllSizes()
 			fState.Content:SetSize(cxSize, cySize)
 			fState.Recharge:SetSize(diagSize, diagSize)
 			fState.Charges:SetPoint("BOTTOMRIGHT", fState.Content, "BOTTOMRIGHT", chargeXOffset, chargeYOffset)
-			fState.Bling:SetSize(diagSize, diagSize)
 			fState.Proc:SetConfig(procSize, procInset, nil, nil, nil, nil)
 			fState.Proc:RefreshSize() -- TODO: Pass the size in
+			fState.Bling:SetConfig(blingSize, blingInset, nil, nil, nil, nil)
+			fState.Bling:RefreshSize()
 			fState.Override:SetHeight(overrideSize)
 
 			Util.ZoomIcon(fState.Icon, iconZoom, cxSize, cySize)
@@ -917,7 +896,7 @@ function CDM.RefreshCooldown(fState)
 	if onCD then
 		fState.hasBling = true
 		fState.BlingTimer:SetCooldownFromDurationObject(duration)
-		fState.BlingAnimGroup:Stop()
+		fState.Bling:Stop()
 	else
 		CDM.PlayBling(fState)
 	end
@@ -945,14 +924,14 @@ function CDM.PlayBling(fState)
 	if fState.hasBling then
 		fState.hasBling = nil
 		fState.BlingTimer:Clear()
-		fState.BlingAnimGroup:Restart()
+		fState.Bling:Play()
 	end
 end
 
 function CDM.ClearBling(fState)
 	fState.hasBling = nil
 	fState.BlingTimer:Clear()
-	fState.BlingAnimGroup:Stop()
+	fState.Bling:Stop()
 end
 
 function CDM.ClearAllBlings()

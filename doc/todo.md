@@ -1,6 +1,7 @@
 To Do
 -----
-Custom glow when ready (replace bling animation)
+Is PixelAnts frame rate dependent?
+Bigger PixelAnts texture
 
 Possess / vehicle cooldowns
 	Test vehicle power prediction
