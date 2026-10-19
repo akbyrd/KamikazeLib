@@ -123,7 +123,7 @@ function CDM.Load()
 			rowLimits = Config.Table({ Config.Number(4) }),
 		})
 
-	Config.AddNode(CDM.cfgTree, "Essential", "Skyriding", {})
+	Config.AddNode(CDM.cfgTree, "Essential", "ActionBar", {})
 
 	CDM.handlers = {}
 	CDM.eventFrame = CreateFrame("Frame")
@@ -133,7 +133,9 @@ function CDM.Load()
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                        CDM.OnScaleChanged)
 	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                         CDM.SPELL_UPDATE_USABLE)
 	CDM.RegisterEvent("ACTIONBAR_UPDATE_USABLE",                     CDM.ACTIONBAR_UPDATE_USABLE)
-	CDM.RegisterEvent("PLAYER_CAN_GLIDE_CHANGED",                    CDM.PLAYER_CAN_GLIDE_CHANGED)
+	CDM.RegisterEvent("UPDATE_VEHICLE_ACTIONBAR",                    CDM.OnActionBarChanged)
+	CDM.RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR",                   CDM.OnActionBarChanged)
+	CDM.RegisterEvent("UPDATE_BONUS_ACTIONBAR",                      CDM.OnActionBarChanged)
 	CDM.RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED",             CDM.ADDON_RESTRICTION_STATE_CHANGED)
 	CDM.RegisterEvent("ACTIONBAR_SLOT_CHANGED",                      CDM.ACTIONBAR_SLOT_CHANGED)
 	CDM.RegisterEvent("BAG_UPDATE_COOLDOWN",                         CDM.BAG_UPDATE_COOLDOWN)
@@ -162,7 +164,7 @@ function CDM.Load()
 	local categories = {
 		[Enum.CooldownViewerCategory.Essential] = "Essential",
 		[Enum.CooldownViewerCategory.Utility]   = "Utility",
-		Skyriding                               = "Skyriding",
+		ActionBar                               = "ActionBar",
 	}
 
 	CDM.viewers = {}
@@ -185,6 +187,8 @@ function CDM.Load()
 			cdFontName   = cdFontName,
 			cdFont       = cdFont,
 			chargeFont   = chargeFont,
+			barIndex     = nil,
+			barLocked    = nil,
 			cdvInfos     = {},
 			slots        = {},
 			allFrames    = {},
@@ -258,6 +262,7 @@ end
 function CDM.Rebuild(reason)
 	print("Rebuild", reason)
 
+	CDM.RefreshActionBarOverride()
 	CDM.GatherCDs()
 	CDM.RefreshFormLookup()
 	CDM.RefreshScale()
@@ -278,7 +283,7 @@ function CDM.Rebuild(reason)
 	CDM.RefreshAllIcons()
 	CDM.RefreshAllUsable()
 	CDM.RefreshAllPress()
-	CDM.RefreshSkyriding()
+	CDM.RefreshVisible()
 end
 
 function CDM.ConstructFrame(vState, slot)
@@ -934,14 +939,6 @@ function CDM.ClearBling(fState)
 	fState.Bling:Stop()
 end
 
-function CDM.ClearAllBlings()
-	for category, vState in pairs(CDM.viewers) do
-		for iFrame, fState in ipairs(vState.activeFrames) do
-			CDM.ClearBling(fState)
-		end
-	end
-end
-
 function CDM.RefreshRangeCheck(fState)
 	if fState.barSlot then
 		if fState.rangeCheckKey ~= fState.barSlot then
@@ -1226,25 +1223,27 @@ function CDM.GatherCDs()
 		end
 	end
 
-	local FIRST_SLOT = 121
-	local LAST_SLOT  = 132
-	local vState = CDM.viewers.Skyriding
+	local vState = CDM.viewers.ActionBar
 	wipe(vState.slots)
-	for barSlot = FIRST_SLOT, LAST_SLOT do
-		local slot = {
-			key          = barSlot,
-			spellID      = nil,
-			itemID       = nil,
-			categoryID   = nil,
-			equipSlot    = nil,
-			barSlot      = barSlot,
-			pressKeyType = nil,
-			pressKeyID   = nil,
-			actionType   = nil,
-			subType      = nil,
-			hasAction    = false,
-		}
-		table.insert(vState.slots, slot)
+	if vState.barIndex then
+		local firstSlot = (vState.barIndex - 1) * NUM_ACTIONBAR_BUTTONS + 1
+		local lastSlot  = vState.barIndex * NUM_ACTIONBAR_BUTTONS
+		for barSlot = firstSlot, lastSlot do
+			local slot = {
+				key          = barSlot,
+				spellID      = nil,
+				itemID       = nil,
+				categoryID   = nil,
+				equipSlot    = nil,
+				barSlot      = barSlot,
+				pressKeyType = nil,
+				pressKeyID   = nil,
+				actionType   = nil,
+				subType      = nil,
+				hasAction    = false,
+			}
+			table.insert(vState.slots, slot)
+		end
 	end
 end
 
@@ -1256,19 +1255,32 @@ function CDM.RefreshFormLookup()
 	end
 end
 
-function CDM.RefreshSkyriding()
-	local isGliding, canGlide = C_PlayerInfo.GetGlidingInfo()
+function CDM.RefreshActionBarOverride()
+	local db = Kami.CDM.db
+
+	local vState   = CDM.viewers.ActionBar
+	local barIndex = Kami.CDM.GetActionBarOverride()
+	vState.barIndex  = barIndex
+	vState.barLocked = barIndex ~= nil and barIndex ~= db.Misc.SkyridingBarIndex
+end
+
+function CDM.RefreshVisible()
+	local hasBar = CDM.viewers.ActionBar.barIndex ~= nil
 	for category, vState in pairs(CDM.viewers) do
-		vState.Root:SetShown(not canGlide)
+		vState.Root:SetShown(not hasBar)
 	end
 
-	local vState = CDM.viewers.Skyriding
-	vState.Root:SetShown(canGlide)
+	local vState = CDM.viewers.ActionBar
+	vState.Root:SetShown(hasBar)
 end
 
 function CDM.RefreshBarSlot(slot)
 	slot.spellID, slot.itemID, slot.pressKeyType, slot.pressKeyID, slot.actionType, slot.subType = CDM.GetBarAction(slot.barSlot, true)
-	slot.hasAction = C_ActionBar.HasAction(slot.barSlot)
+
+	-- NOTE: HasAction and GetActionInfo do not always agree
+	-- * Un'sok's Reshape Life              - HasAction is true,  GetActionInfo is nil
+	-- * Orgrimmar Wolf (Argent Tournament) - HasAction is false, GetActionInfo is non-nil
+	slot.hasAction = C_ActionBar.HasAction(slot.barSlot) and slot.actionType ~= nil
 
 	local isAssist = slot.actionType == "spell" and slot.subType == "assistedcombat"
 	CDM.assistSlots[slot.barSlot] = isAssist or nil
@@ -1328,6 +1340,14 @@ function CDM.OnAssistChange()
 	CDM.RefreshAllAssist()
 end
 
+function CDM.OnActionBarChanged()
+	local vState   = CDM.viewers.ActionBar
+	local barIndex = Kami.CDM.GetActionBarOverride()
+	if barIndex ~= vState.barIndex or vState.barLocked then
+		CDM.Rebuild("OnActionBarChanged")
+	end
+end
+
 function CDM.ACTIONBAR_SLOT_CHANGED(barSlot)
 	-- NOTE: Any spell with a cooldown causes this event (e.g. Whirling Surge and Aerial Halt)
 	-- NOTE: Fires when a conditional macro changes state
@@ -1340,13 +1360,11 @@ function CDM.ACTIONBAR_SLOT_CHANGED(barSlot)
 	-- manually dragging abilities around. We reassign when an existing slot changes, which is the
 	-- conditional macro case.
 
-	local FIRST_SLOT = 121
-	local LAST_SLOT  = 132
-
-	if barSlot >= FIRST_SLOT and barSlot <= LAST_SLOT then
+	if barSlot ~= 0 then
 		for category, vState in pairs(CDM.viewers) do
-			local slot = vState.slots[barSlot - FIRST_SLOT + 1]
-			if slot and slot.barSlot == barSlot then
+			local firstSlot = vState.barIndex and (vState.barIndex - 1) * NUM_ACTIONBAR_BUTTONS + 1
+			local slot      = firstSlot and vState.slots[barSlot - firstSlot + 1]
+			if slot and not vState.barLocked then
 				local hadAction = slot.hasAction
 				CDM.RefreshBarSlot(slot)
 
@@ -1377,7 +1395,7 @@ function CDM.ACTIONBAR_SLOT_CHANGED(barSlot)
 			end
 		end
 
-	elseif barSlot == 0 then
+	else
 		CDM.Rebuild("ACTIONBAR_SLOT_CHANGED")
 	end
 end
@@ -1393,12 +1411,6 @@ function CDM.ACTIONBAR_UPDATE_USABLE()
 
 	-- NOTE: Runs on the same frame as SPELL_UPDATE_USABLE about a third of the time, so deferred.
 	CDM.refreshAllUsable = true
-end
-
-function CDM.PLAYER_CAN_GLIDE_CHANGED()
-	CDM.ClearAllBlings()
-	CDM.RefreshSkyriding()
-	CDM.RefreshAllCooldowns()
 end
 
 function CDM.ADDON_RESTRICTION_STATE_CHANGED(type, state)
@@ -1419,16 +1431,12 @@ function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
 end
 
 function CDM.ACTION_RANGE_CHECK_UPDATE(barSlot, isInRange, checksRange)
-	local FIRST_SLOT = 121
-	local LAST_SLOT  = 132
-
-	if barSlot >= FIRST_SLOT and barSlot <= LAST_SLOT then
-		for category, vState in pairs(CDM.viewers) do
-			local slot = vState.slots[barSlot - FIRST_SLOT + 1]
-			if slot and slot.barSlot == barSlot and slot.hasAction then
-				local fState = vState.allFrames[slot.key]
-				CDM.RefreshUsable(fState)
-			end
+	for category, vState in pairs(CDM.viewers) do
+		local firstSlot = vState.barIndex and (vState.barIndex - 1) * NUM_ACTIONBAR_BUTTONS + 1
+		local slot      = firstSlot and vState.slots[barSlot - firstSlot + 1]
+		if slot and slot.hasAction then
+			local fState = vState.allFrames[slot.key]
+			CDM.RefreshUsable(fState)
 		end
 	end
 end

@@ -20,7 +20,8 @@ function CDM.Load()
 		},
 
 		Misc = {
-			ThrillOfTheSkies = 377234,
+			ThrillOfTheSkies  = 377234,
+			SkyridingBarIndex = 11,
 		},
 
 		WARRIOR = {
@@ -112,6 +113,21 @@ function CDM.GatherCDs(viewers)
 				AddCD(cooldownID)
 			end
 		end
+	end
+end
+
+function CDM.GetActionBarOverride()
+	local db = CDM.db
+
+	if C_ActionBar.HasVehicleActionBar() then
+		local unit = C_ActionBar.IsPossessBarVisible() and "pet" or "vehicle"
+		return C_ActionBar.GetVehicleBarIndex(), unit
+	elseif C_ActionBar.HasOverrideActionBar() then
+		return C_ActionBar.GetOverrideBarIndex(), "player"
+	elseif C_ActionBar.HasTempShapeshiftActionBar() then
+		return C_ActionBar.GetTempShapeshiftBarIndex(), "player"
+	elseif C_ActionBar.GetBonusBarIndex() == db.Misc.SkyridingBarIndex then
+		return db.Misc.SkyridingBarIndex, "player"
 	end
 end
 

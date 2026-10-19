@@ -75,7 +75,9 @@ function CDM.Load()
 	CDM.eventFrame:SetScript("OnEvent",                         CDM.DispatchEvent)
 	CDM.RegisterEvent("UI_SCALE_CHANGED",                       CDM.OnScaleChanged)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                   CDM.OnScaleChanged)
-	CDM.RegisterEvent("PLAYER_CAN_GLIDE_CHANGED",               CDM.PLAYER_CAN_GLIDE_CHANGED)
+	CDM.RegisterEvent("UPDATE_VEHICLE_ACTIONBAR",               CDM.OnActionBarChanged)
+	CDM.RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR",              CDM.OnActionBarChanged)
+	CDM.RegisterEvent("UPDATE_BONUS_ACTIONBAR",                 CDM.OnActionBarChanged)
 	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                   CDM.PLAYER_REGEN_ENABLED)
 	CDM.RegisterEvent("PLAYER_TARGET_CHANGED",                  CDM.PLAYER_TARGET_CHANGED)
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                  CDM.SPELL_UPDATE_COOLDOWN)
@@ -131,7 +133,7 @@ function CDM.Rebuild()
 	CDM.AssignFrames()
 	CDM.RefreshAllConfig()
 	CDM.RefreshLayout()
-	CDM.RefreshSkyriding()
+	CDM.RefreshVisible()
 	CDM.RefreshAllCategories()
 	CDM.RefreshAllAuras()
 end
@@ -346,10 +348,10 @@ function CDM.RefreshLayout()
 	end
 end
 
-function CDM.RefreshSkyriding()
-	local isGliding, canGlide = C_PlayerInfo.GetGlidingInfo()
+function CDM.RefreshVisible()
+	local hasBar = Kami.CDM.GetActionBarOverride() ~= nil
 	for category, vState in pairs(CDM.viewers) do
-		vState.Root:SetShown(not canGlide)
+		vState.Root:SetShown(not hasBar)
 	end
 end
 
@@ -433,10 +435,6 @@ function CDM.DispatchEvent(frame, event, ...)
 	func(...)
 end
 
-function CDM.PLAYER_CAN_GLIDE_CHANGED()
-	CDM.RefreshSkyriding()
-end
-
 function CDM.PLAYER_REGEN_ENABLED()
 	CDM.Rebuild()
 end
@@ -471,6 +469,10 @@ end
 function CDM.OnScaleChanged()
 	CDM.RefreshScale()
 	CDM.RefreshLayout()
+end
+
+function CDM.OnActionBarChanged()
+	CDM.RefreshVisible()
 end
 
 function CDM.OnCDMChanged()

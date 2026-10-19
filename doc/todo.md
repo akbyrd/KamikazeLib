@@ -1,15 +1,14 @@
 To Do
 -----
-Possess / vehicle cooldowns
-	Test vehicle power prediction
-	Test vehicle with no power - resource bar hides
-	Similar to skyriding - hide buffs, swap resource, show abilities
+Attempt to remove OnCDMChanged
 
-Formalize the set of types
-	Probably 2 concepts: source type (or slot type?) and content type (or frame type?)
-	Source type: cdm, action bar
-	Content type: item, spell
-	What about these: macro, action
+Testing
+	Test vehicle power prediction
+	Nil spell id from GetShapeshiftFormInfo when exiting Ulduar
+	Check that /castsequence updates as the sequence progresses
+	Passenger mount - confirm resource bar behaves
+	Vehicle power prediction
+	Shared charges on Essential
 
 Known issues
 	Charge flicker when clearing target
@@ -17,7 +16,6 @@ Known issues
 		Central lookup?
 		Or pool frame by identity and reuse (complicated with duplicates)
 	Handle press highlight for `[btn:2]` macros
-	Test /castsequence (should update as the sequence progresses)
 
 Track any spell
 	Power infusion
@@ -26,6 +24,12 @@ Track any item
 Resources
 	Sweeping strikes bar
 	Whirlwind bar
+
+Formalize the set of types
+	Probably 2 concepts: source type (or slot type?) and content type (or frame type?)
+	Source type: cdm, action bar
+	Content type: item, spell
+	What about these: macro, action
 
 Generalize CDM infrastructure
 	Root frame and pixel perfect scaling
@@ -46,11 +50,6 @@ Settings
 	Implement search
 	Versioning
 
-Testing
-	Passenger mount - confirm resource bar behaves
-	Vehicle power prediction
-	Shared charges on Essential
-
 Auto-hide
 Track active duration
 Anchoring
@@ -59,7 +58,6 @@ Per-talent layout
 Find a suitable spell category database (Danders if loaded?)
 Profile performance
 Alerts
-Attempt to remove OnCDMChanged
 Store empower max stacks - better conditional macro support in combat
 Enable pandemic per-spell (disable on Bladestorm)
 Consider C_ActionBar.FindAssistedCombatActionButtons()

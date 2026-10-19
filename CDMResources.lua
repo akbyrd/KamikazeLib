@@ -117,20 +117,20 @@ function CDM.Init()
 	CDM.RegisterEvent("PLAYER_ENTERING_WORLD",     CDM.PLAYER_ENTERING_WORLD)
 	CDM.RegisterEvent("UI_SCALE_CHANGED",          CDM.OnScaleChanged)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",      CDM.OnScaleChanged)
-	CDM.RegisterEvent("PLAYER_CAN_GLIDE_CHANGED",  CDM.PLAYER_CAN_GLIDE_CHANGED)
-	CDM.RegisterUnitEvent("UNIT_DISPLAYPOWER",     CDM.UNIT_DISPLAYPOWER,     "player", "vehicle")
-	CDM.RegisterUnitEvent("UNIT_MAXPOWER",         CDM.UNIT_MAXPOWER,         "player", "vehicle")
-	CDM.RegisterUnitEvent("UNIT_POWER_FREQUENT",   CDM.UNIT_POWER_FREQUENT,   "player", "vehicle")
-	CDM.RegisterUnitEvent("UNIT_SPELLCAST_START",  CDM.UNIT_SPELLCAST_START,  "player", "vehicle")
-	CDM.RegisterUnitEvent("UNIT_SPELLCAST_STOP",   CDM.UNIT_SPELLCAST_STOP,   "player", "vehicle")
-	CDM.RegisterUnitEvent("UNIT_SPELLCAST_FAILED", CDM.UNIT_SPELLCAST_FAILED, "player", "vehicle")
+	CDM.RegisterEvent("UPDATE_VEHICLE_ACTIONBAR",  CDM.OnActionBarChanged)
+	CDM.RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR", CDM.OnActionBarChanged)
+	CDM.RegisterEvent("UPDATE_BONUS_ACTIONBAR",    CDM.OnActionBarChanged)
+	CDM.RegisterUnitEvent("UNIT_DISPLAYPOWER",     CDM.UNIT_DISPLAYPOWER,     "player", "vehicle", "pet")
+	CDM.RegisterUnitEvent("UNIT_MAXPOWER",         CDM.UNIT_MAXPOWER,         "player", "vehicle", "pet")
+	CDM.RegisterUnitEvent("UNIT_POWER_FREQUENT",   CDM.UNIT_POWER_FREQUENT,   "player", "vehicle", "pet")
+	CDM.RegisterUnitEvent("UNIT_SPELLCAST_START",  CDM.UNIT_SPELLCAST_START,  "player", "vehicle", "pet")
+	CDM.RegisterUnitEvent("UNIT_SPELLCAST_STOP",   CDM.UNIT_SPELLCAST_STOP,   "player", "vehicle", "pet")
+	CDM.RegisterUnitEvent("UNIT_SPELLCAST_FAILED", CDM.UNIT_SPELLCAST_FAILED, "player", "vehicle", "pet")
 	CDM.RegisterUnitEvent("UNIT_ENTERED_VEHICLE",  CDM.UNIT_ENTERED_VEHICLE,  "player")
-	CDM.RegisterUnitEvent("UNIT_EXITED_VEHICLE",   CDM.UNIT_EXITED_VEHICLE,   "player")
 	hooksecurefunc(UIParent, "SetScale",           CDM.OnScaleChanged)
 
 	CDM.cfg             = Config.GetBranch(CDM.cfgTree, "Default")
 	CDM.cfgPowerColors  = Config.GetBranch(CDM.cfgTree, "ElvUIPowerColors")
-	CDM.unit            = "player"
 	CDM.predictedCost   = 0
 	CDM.textConfig      = {
 		config = CreateAbbreviateConfig({
@@ -189,7 +189,8 @@ function CDM.Rebuild()
 	CDM.RefreshScale()
 	CDM.RefreshConfig()
 	CDM.RefreshLayout()
-	CDM.RefreshSkyriding()
+	CDM.RefreshUnit()
+	CDM.RefreshPowerSource()
 	CDM.RefreshPowerType()
 	CDM.RefreshPowerColor()
 	CDM.RefreshMaxPower()
@@ -197,6 +198,12 @@ function CDM.Rebuild()
 	CDM.RefreshPredictionCost()
 	CDM.RefreshPrediction()
 	CDM.RefreshCurrentPower()
+end
+
+function CDM.RefreshUnit()
+	local barIndex, barUnit = Kami.CDM.GetActionBarOverride()
+	CDM.barIndex = barIndex
+	CDM.unit     = barUnit or "player"
 end
 
 function CDM.RefreshScale()
@@ -251,16 +258,18 @@ function CDM.RefreshLayout()
 	CDM.Text:SetPoint("CENTER", 0.25, textYOffset + 0.25)
 end
 
-function CDM.RefreshSkyriding()
-	local isGliding, canGlide = C_PlayerInfo.GetGlidingInfo()
-	if canGlide then
+function CDM.RefreshPowerSource()
+	local db = Kami.CDM.db
+
+	if CDM.barIndex == db.Misc.SkyridingBarIndex then
 		CDM.GetPowerType    = CDM.GetPowerType_Skyriding
 		CDM.GetMaxPower     = CDM.GetMaxPower_Skyriding
 		CDM.GetCurrentPower = CDM.GetCurrentPower_Skyriding
 		CDM.eventFrame:SetScript("OnUpdate", CDM.Update)
 		CDM.RegisterUnitEvent("UNIT_AURA", CDM.UNIT_AURA, "player")
 	else
-		CDM.GetPowerType    = UnitPowerType
+		local useAlternate = CDM.barIndex ~= nil and CDM.unit == "player"
+		CDM.GetPowerType    = useAlternate and CDM.GetPowerType_Alternate or UnitPowerType
 		CDM.GetMaxPower     = UnitPowerMax
 		CDM.GetCurrentPower = UnitPower
 		CDM.eventFrame:SetScript("OnUpdate", nil)
@@ -317,7 +326,7 @@ function CDM.RefreshPowerType()
 	local type, token, r, g, b = CDM.GetPowerType(CDM.unit)
 	CDM.powerType  = type
 	CDM.powerToken = token
-	CDM.powerColor = CDM.cfgPowerColors[token] or CreateColor(r, g, b)
+	CDM.powerColor = CDM.cfgPowerColors[token] or CreateColor(r or 1, g or 1, b or 1)
 end
 
 function CDM.RefreshPowerColor()
@@ -339,6 +348,12 @@ end
 function CDM.GetPowerType_Skyriding(unit)
 	local type  = nil
 	local token = "SKYRIDING"
+	return type, token
+end
+
+function CDM.GetPowerType_Alternate(unit)
+	local type  = Enum.PowerType.Alternate
+	local token = "ALTERNATE"
 	return type, token
 end
 
@@ -389,11 +404,14 @@ function CDM.OnScaleChanged()
 	CDM.RefreshPrediction()
 end
 
-function CDM.PLAYER_ENTERING_WORLD()
-	CDM.Rebuild()
+function CDM.OnActionBarChanged()
+	local barIndex = Kami.CDM.GetActionBarOverride()
+	if barIndex ~= CDM.barIndex then
+		CDM.Rebuild()
+	end
 end
 
-function CDM.PLAYER_CAN_GLIDE_CHANGED()
+function CDM.PLAYER_ENTERING_WORLD()
 	CDM.Rebuild()
 end
 
@@ -408,12 +426,6 @@ function CDM.UNIT_DISPLAYPOWER(unit)
 end
 
 function CDM.UNIT_ENTERED_VEHICLE(unit, showVehicleFrame)
-	CDM.unit = showVehicleFrame and "vehicle" or "player"
-	CDM.Rebuild()
-end
-
-function CDM.UNIT_EXITED_VEHICLE()
-	CDM.unit = "player"
 	CDM.Rebuild()
 end
 

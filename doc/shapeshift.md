@@ -68,9 +68,3 @@ Workarounds:
 
 Current Solution:
 Workaround 2
-
-
-
-Sticky IsCurrentSpell
----------------------
-TODO: What do we want to do here?
