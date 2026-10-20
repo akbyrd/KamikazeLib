@@ -139,11 +139,21 @@ function CDM.Init()
 			{ breakpoint = 1e3, abbreviation = "K", significandDivisor = 1e2, fractionDivisor = 10, abbreviationIsGlobal = false },
 		})
 	}
-	CDM.speedTextConfig = {
-		config = CreateAbbreviateConfig({
-			{ breakpoint = 1e-6, abbreviation = "", significandDivisor = BASE_MOVEMENT_SPEED / 1000 * (1 - 1e-6), fractionDivisor = 10, abbreviationIsGlobal = false },
-		})
-	}
+
+	-- NOTE: Hack to allow division and rounding of secret numbers
+	local function AddBP(t, bp, sd)
+		table.insert(t, { breakpoint = bp, abbreviation = "%", significandDivisor = sd, fractionDivisor = 1, abbreviationIsGlobal = false })
+	end
+	local breakpoints    = {}
+	local speedToPercent = BASE_MOVEMENT_SPEED / 100
+	local speedPercent   = 210.5
+	AddBP(breakpoints, speedPercent * speedToPercent, speedToPercent * (1 - 1e-6))
+	while speedPercent > 0.5 do
+		speedPercent = speedPercent / 1.05
+		AddBP(breakpoints, speedPercent * speedToPercent, speedToPercent / (1 + 0.5 / speedPercent))
+	end
+	AddBP(breakpoints, 0, speedToPercent)
+	CDM.speedTextConfig = { breakpointData = breakpoints }
 
 	CDM.Root = CreateFrame("Frame", nil, UIParent)
 	CDM.Root:SetParentKey("Kami.CDM.Resources.Root")
@@ -181,7 +191,7 @@ function CDM.Init()
 end
 
 function CDM.Update()
-	-- NOTE: OInly enabled when skyriding
+	-- NOTE: Only enabled when skyriding
 	CDM.RefreshCurrentPower()
 end
 
@@ -372,11 +382,7 @@ function CDM.GetCurrentPower_Skyriding(unit, powerType)
 end
 
 function CDM.FormatPower_Skyriding(power)
-	local text
-	text = AbbreviateNumbers(power, CDM.speedTextConfig)
-	text = C_StringUtil.RoundToNearestString(text)
-	text = C_StringUtil.WrapString(text, nil, "%")
-	return text
+	return AbbreviateNumbers(power, CDM.speedTextConfig)
 end
 
 ----------------------------------------------------------------------------------------------------
