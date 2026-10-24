@@ -31,7 +31,7 @@ function CDM.Load()
 	Config.AddNode(CDM.cfgTree, "Default", "TrackedBar",
 		{
 			xPos       = Config.Size("0px"),
-			yPos       = Config.Size("-336px"),
+			yPos       = Config.Size("-337px"),
 			xSize      = Config.Size("514px"),
 			ySize      = Config.Size("16px"),
 			padSize    = Config.Size("-1px"),
@@ -100,10 +100,16 @@ function CDM.Load()
 		local Root = CreateFrame("Frame", nil, UIParent)
 		Root:SetParentKey(("Kami.CDM.Buffs.%s.Root"):format(categoryName))
 
+		local Base = CreateFrame("Frame", nil, Root)
+		Base:SetParentKey("Base")
+		Base:SetPoint("TOPLEFT",  Root, "BOTTOMLEFT")
+		Base:SetPoint("TOPRIGHT", Root, "BOTTOMRIGHT")
+
 		local vState = {
 			name     = categoryName,
 			cfg      = Config.GetBranch(CDM.cfgTree, categoryName),
 			Root     = Root,
+			Base     = Base,
 			cdvInfos = {},
 			cdFrames = {},
 			pool     = {},
@@ -311,6 +317,8 @@ function CDM.RefreshLayout()
 		local vyPos  = yPos - Round(pySize / 2) + vySize
 		vState.Root:SetPoint("TOPLEFT", UIParent, "TOPLEFT", vxPos, vyPos)
 		vState.Root:SetSize(vxSize, vySize)
+		vState.Base:SetHeight(max(1, abs(padSize)))
+		vState.Base:SetPointsOffset(0, -padSize)
 
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			fState.Button:ClearAllPoints()
@@ -318,10 +326,9 @@ function CDM.RefreshLayout()
 
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			local below  = vState.cdFrames[iFrame + 1]
-			local anchor = below and below.Button or vState.Root
-			local point  = below and "TOPLEFT" or "BOTTOMLEFT"
+			local anchor = below and below.Button or vState.Base
 			fState.Button:SetSize(xSize, ySize)
-			fState.Button:SetPoint("BOTTOMLEFT", anchor, point)
+			fState.Button:SetPoint("BOTTOMLEFT", anchor, "TOPLEFT")
 			fState.Button:SetPointsOffset(0, padSize)
 
 			local xScale, yScale = Util.AspectScale(iconAspect)
