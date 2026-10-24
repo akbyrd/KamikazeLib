@@ -1,22 +1,22 @@
 local Kami = select(2, ...)
-local CDM = {}
-Kami.CDM.Cooldowns = CDM
+local CDs = {}
+Kami.CDM.Cooldowns = CDs
 
 local BorderTrace = Kami.BorderTrace
+local CDM         = Kami.CDM
 local Config      = Kami.Config
 local Media       = Kami.Media
 local PixelAnts   = Kami.PixelAnts
 local Util        = Kami.Util
 local LSM         = LibStub("LibSharedMedia-3.0")
 
-function CDM.Load()
-	CDM.savedVars = KLSavedVars.CDM
-	CDM.charVars  = KLCharVars.CDM
+function CDs.Load()
+	CDs.savedVars = KLSavedVars.CDM
+	CDs.charVars  = KLCharVars.CDM
 
-	local db = Kami.CDM.db
-	CDM.cfgTree = Config.Create()
+	CDs.cfgTree = Config.Create()
 
-	Config.AddNode(CDM.cfgTree, nil, "Default",
+	Config.AddNode(CDs.cfgTree, nil, "Default",
 		{
 			xPos = Config.Size("0ui"),
 			yPos = Config.Size("0ui"),
@@ -67,8 +67,8 @@ function CDM.Load()
 			overrideSize   = Config.Size("4px"),
 			overrideTimers = Config.Table({
 				WARRIOR     = Config.Raw({
-					--[db.WARRIOR.Ability.Slam] = Config.Table({ overrideSpellID = Config.Number(db.WARRIOR.Ability.HeroicStrike), duration = Config.Number(15) }),
-					[db.WARRIOR.Ability.Slam] = { overrideSpellID = db.WARRIOR.Ability.HeroicStrike, duration = 15 },
+					--[CDM.db.WARRIOR.Ability.Slam] = Config.Table({ overrideSpellID = Config.Number(CDM.db.WARRIOR.Ability.HeroicStrike), duration = Config.Number(15) }),
+					[CDM.db.WARRIOR.Ability.Slam] = { overrideSpellID = CDM.db.WARRIOR.Ability.HeroicStrike, duration = 15 },
 				}),
 				PALADIN     = Config.Table({}),
 				HUNTER      = Config.Table({}),
@@ -89,12 +89,12 @@ function CDM.Load()
 			empowerBorderSize = Config.Size("2px"),
 			empowerBuffs      = Config.Table({
 				WARRIOR     = Config.Table({
-					[db.WARRIOR.Ability.Overpower]    = Config.Number(db.WARRIOR.Aura.Opportunist),
-					[db.WARRIOR.Ability.Cleave]       = Config.Number(db.WARRIOR.Aura.CollateralDamage),
-					[db.WARRIOR.Talent.Bladestorm]    = Config.Number(db.WARRIOR.Aura.ImminentDemise),
-					[db.WARRIOR.Ability.Slam]         = Config.Number(db.WARRIOR.Aura.WindingUp),
-					[db.WARRIOR.Ability.Execute]      = Config.Number(db.WARRIOR.Aura.Executioner),
-					[db.WARRIOR.Ability.MortalStrike] = Config.Number(db.WARRIOR.Aura.ExecutionersPrecision),
+					[CDM.db.WARRIOR.Ability.Overpower]    = Config.Number(CDM.db.WARRIOR.Aura.Opportunist),
+					[CDM.db.WARRIOR.Ability.Cleave]       = Config.Number(CDM.db.WARRIOR.Aura.CollateralDamage),
+					[CDM.db.WARRIOR.Talent.Bladestorm]    = Config.Number(CDM.db.WARRIOR.Aura.ImminentDemise),
+					[CDM.db.WARRIOR.Ability.Slam]         = Config.Number(CDM.db.WARRIOR.Aura.WindingUp),
+					[CDM.db.WARRIOR.Ability.Execute]      = Config.Number(CDM.db.WARRIOR.Aura.Executioner),
+					[CDM.db.WARRIOR.Ability.MortalStrike] = Config.Number(CDM.db.WARRIOR.Aura.ExecutionersPrecision),
 				}),
 				PALADIN     = Config.Table({}),
 				HUNTER      = Config.Table({}),
@@ -111,52 +111,52 @@ function CDM.Load()
 			})
 		})
 
-	Config.AddNode(CDM.cfgTree, "Default", "Essential",
+	Config.AddNode(CDs.cfgTree, "Default", "Essential",
 		{
 			yPos = Config.Size("-248ui"),
 		})
 
-	Config.AddNode(CDM.cfgTree, "Default", "Utility",
+	Config.AddNode(CDs.cfgTree, "Default", "Utility",
 		{
 			yPos      = Config.Size("-310ui"),
 			iconSize  = Config.Size("30ui"),
 			rowLimits = Config.Table({ Config.Number(4) }),
 		})
 
-	Config.AddNode(CDM.cfgTree, "Essential", "ActionBar", {})
+	Config.AddNode(CDs.cfgTree, "Essential", "ActionBar", {})
 
-	CDM.handlers = {}
-	CDM.eventFrame = CreateFrame("Frame")
-	CDM.eventFrame:SetParentKey("Kami.CDM.Cooldowns.Event")
-	CDM.eventFrame:SetScript("OnEvent",                              CDM.DispatchEvent)
-	CDM.RegisterEvent("UI_SCALE_CHANGED",                            CDM.OnScaleChanged)
-	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                        CDM.OnScaleChanged)
-	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                         CDM.SPELL_UPDATE_USABLE)
-	CDM.RegisterEvent("ACTIONBAR_UPDATE_USABLE",                     CDM.ACTIONBAR_UPDATE_USABLE)
-	CDM.RegisterEvent("UPDATE_VEHICLE_ACTIONBAR",                    CDM.OnActionBarChanged)
-	CDM.RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR",                   CDM.OnActionBarChanged)
-	CDM.RegisterEvent("UPDATE_BONUS_ACTIONBAR",                      CDM.OnActionBarChanged)
-	CDM.RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED",             CDM.ADDON_RESTRICTION_STATE_CHANGED)
-	CDM.RegisterEvent("ACTIONBAR_SLOT_CHANGED",                      CDM.ACTIONBAR_SLOT_CHANGED)
-	CDM.RegisterEvent("BAG_UPDATE_COOLDOWN",                         CDM.BAG_UPDATE_COOLDOWN)
-	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                       CDM.SPELL_UPDATE_COOLDOWN)
-	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",                    CDM.SPELL_RANGE_CHECK_UPDATE)
-	CDM.RegisterEvent("ACTION_RANGE_CHECK_UPDATE",                   CDM.ACTION_RANGE_CHECK_UPDATE)
-	CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",                  CDM.CURRENT_SPELL_CAST_CHANGED)
-	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",          CDM.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
-	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",          CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
-	CDM.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED",      CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
-	CDM.RegisterEvent("SPELL_UPDATE_ICON",                           CDM.SPELL_UPDATE_ICON)
-	CDM.RegisterEvent("UPDATE_SHAPESHIFT_FORM",                      CDM.UPDATE_SHAPESHIFT_FORM)
-	CDM.RegisterEvent("SPELL_UPDATE_USES",                           CDM.SPELL_UPDATE_USES)
-	hooksecurefunc(UIParent, "SetScale",                             CDM.OnScaleChanged)
-	hooksecurefunc("SecureActionButton_OnClick",                     CDM.OnClick)
-	SecureStateDriverManager:HookScript("OnUpdate",                  CDM.Update)
-	RegisterStateDriver(CDM.eventFrame, "poll", "1")
-	CVarCallbackRegistry:RegisterCallback("assistedCombatHighlight", CDM.OnAssistChange, CDM)
+	CDs.handlers = {}
+	CDs.eventFrame = CreateFrame("Frame")
+	CDs.eventFrame:SetParentKey("Kami.CDM.Cooldowns.Event")
+	CDs.eventFrame:SetScript("OnEvent",                              CDs.DispatchEvent)
+	CDs.RegisterEvent("UI_SCALE_CHANGED",                            CDs.OnScaleChanged)
+	CDs.RegisterEvent("DISPLAY_SIZE_CHANGED",                        CDs.OnScaleChanged)
+	CDs.RegisterEvent("SPELL_UPDATE_USABLE",                         CDs.SPELL_UPDATE_USABLE)
+	CDs.RegisterEvent("ACTIONBAR_UPDATE_USABLE",                     CDs.ACTIONBAR_UPDATE_USABLE)
+	CDs.RegisterEvent("UPDATE_VEHICLE_ACTIONBAR",                    CDs.OnActionBarChanged)
+	CDs.RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR",                   CDs.OnActionBarChanged)
+	CDs.RegisterEvent("UPDATE_BONUS_ACTIONBAR",                      CDs.OnActionBarChanged)
+	CDs.RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED",             CDs.ADDON_RESTRICTION_STATE_CHANGED)
+	CDs.RegisterEvent("ACTIONBAR_SLOT_CHANGED",                      CDs.ACTIONBAR_SLOT_CHANGED)
+	CDs.RegisterEvent("BAG_UPDATE_COOLDOWN",                         CDs.BAG_UPDATE_COOLDOWN)
+	CDs.RegisterEvent("SPELL_UPDATE_COOLDOWN",                       CDs.SPELL_UPDATE_COOLDOWN)
+	CDs.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",                    CDs.SPELL_RANGE_CHECK_UPDATE)
+	CDs.RegisterEvent("ACTION_RANGE_CHECK_UPDATE",                   CDs.ACTION_RANGE_CHECK_UPDATE)
+	CDs.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",                  CDs.CURRENT_SPELL_CAST_CHANGED)
+	CDs.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",          CDs.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
+	CDs.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",          CDs.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
+	CDs.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED",      CDs.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
+	CDs.RegisterEvent("SPELL_UPDATE_ICON",                           CDs.SPELL_UPDATE_ICON)
+	CDs.RegisterEvent("UPDATE_SHAPESHIFT_FORM",                      CDs.UPDATE_SHAPESHIFT_FORM)
+	CDs.RegisterEvent("SPELL_UPDATE_USES",                           CDs.SPELL_UPDATE_USES)
+	hooksecurefunc(UIParent, "SetScale",                             CDs.OnScaleChanged)
+	hooksecurefunc("SecureActionButton_OnClick",                     CDs.OnClick)
+	SecureStateDriverManager:HookScript("OnUpdate",                  CDs.Update)
+	RegisterStateDriver(CDs.eventFrame, "poll", "1")
+	CVarCallbackRegistry:RegisterCallback("assistedCombatHighlight", CDs.OnAssistChange, CDs)
 
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
-	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.OnCDMChanged)
+	hooksecurefunc(layoutMgr, "NotifyListeners", CDs.OnCDMChanged)
 
 	local cdTypeface = LSM:Fetch("font", "PT Sans Narrow")
 	local chargeTypeface = LSM:Fetch("font", "Homespun")
@@ -167,7 +167,7 @@ function CDM.Load()
 		ActionBar                               = "ActionBar",
 	}
 
-	CDM.viewers = {}
+	CDs.viewers = {}
 	for category, categoryName in pairs(categories) do
 		local Root = CreateFrame("Frame", nil, UIParent)
 		Root:SetParentKey(("Kami.CDM.Cooldowns.%s.Root"):format(categoryName))
@@ -182,7 +182,7 @@ function CDM.Load()
 
 		local vState = {
 			name         = categoryName,
-			cfg          = Config.GetBranch(CDM.cfgTree, categoryName),
+			cfg          = Config.GetBranch(CDs.cfgTree, categoryName),
 			Root         = Root,
 			cdFontName   = cdFontName,
 			cdFont       = cdFont,
@@ -198,7 +198,7 @@ function CDM.Load()
 			xSize        = nil,
 			ySize        = nil,
 		}
-		CDM.viewers[category] = vState
+		CDs.viewers[category] = vState
 	end
 
 	local units = CreateFromMixins(SecondsFormatterMixin)
@@ -209,8 +209,8 @@ function CDM.Load()
 	local dFmt  = units:GetFormatString(SecondsFormatter.Interval.Days,    SecondsFormatter.Abbreviation.OneLetter, true)
 	local round = Enum.NumericRuleFormatRounding.Up
 
-	CDM.cdFormatter = C_StringUtil.CreateNumericRuleFormatter()
-	CDM.cdFormatter:SetBreakpoints({
+	CDs.cdFormatter = C_StringUtil.CreateNumericRuleFormatter()
+	CDs.cdFormatter:SetBreakpoints({
 		{ threshold = 0,                     format = "%d",                      components = {{ div = 1,                step = 1,   rounding = round }} },
 		{ threshold = 99,                    format = mFmt:gsub("%%d", "%%.1f"), components = {{ div = SECONDS_PER_MIN,  step = 0.1, rounding = round }} },
 		{ threshold = 2  * SECONDS_PER_MIN,  format = mFmt,                      components = {{ div = SECONDS_PER_MIN,  step = 1,   rounding = round }} },
@@ -220,73 +220,73 @@ function CDM.Load()
 		{ threshold = 2  * SECONDS_PER_DAY,  format = dFmt,                      components = {{ div = SECONDS_PER_DAY,  step = 1,   rounding = round }} },
 	})
 
-	CDM.classToken     = select(2, UnitClass("player"))
-	CDM.classColor     = C_ClassColor.GetClassColor(CDM.classToken)
-	CDM.spellLookup    = {}
-	CDM.formLookup     = {}
-	CDM.categoryIcons  = {
-		[db.Category.CombatPotion] = "Interface/ICONS/INV_POTION_114",
-		[db.Category.HealthPotion] = "Interface/ICONS/INV_POTION_54",
-		[db.Category.Healthstone]  = "Interface/ICONS/Warlock_ Healthstone",
-		[db.Category.Bloodstone]   = "Interface/ICONS/Warlock_ Bloodstone",
+	CDs.classToken     = select(2, UnitClass("player"))
+	CDs.classColor     = C_ClassColor.GetClassColor(CDs.classToken)
+	CDs.spellLookup    = {}
+	CDs.formLookup     = {}
+	CDs.categoryIcons  = {
+		[CDM.db.Category.CombatPotion] = "Interface/ICONS/INV_POTION_114",
+		[CDM.db.Category.HealthPotion] = "Interface/ICONS/INV_POTION_54",
+		[CDM.db.Category.Healthstone]  = "Interface/ICONS/Warlock_ Healthstone",
+		[CDM.db.Category.Bloodstone]   = "Interface/ICONS/Warlock_ Bloodstone",
 	}
-	CDM.activePresses       = {}
-	CDM.pressKeyIDLookup    = {}
-	CDM.assistSlots         = {}
-	CDM.itemRangeFrames     = {}
-	CDM.activeOverrides     = {}
-	CDM.refreshAllCooldowns = false
-	CDM.refreshAllUsable    = false
-	CDM.aurasSecret         = C_Secrets.ShouldAurasBeSecret()
+	CDs.activePresses       = {}
+	CDs.pressKeyIDLookup    = {}
+	CDs.assistSlots         = {}
+	CDs.itemRangeFrames     = {}
+	CDs.activeOverrides     = {}
+	CDs.refreshAllCooldowns = false
+	CDs.refreshAllUsable    = false
+	CDs.aurasSecret         = C_Secrets.ShouldAurasBeSecret()
 
-	CDM.OnAssistChange()
-	CDM.Rebuild("Load")
+	CDs.OnAssistChange()
+	CDs.Rebuild("Load")
 end
 
-function CDM.Update()
-	if CDM.refreshAllCooldowns then
-		CDM.refreshAllCooldowns = false
-		CDM.RefreshAllCooldowns()
+function CDs.Update()
+	if CDs.refreshAllCooldowns then
+		CDs.refreshAllCooldowns = false
+		CDs.RefreshAllCooldowns()
 	end
 
-	if CDM.refreshAllUsable then
-		CDM.refreshAllUsable = false
-		CDM.RefreshAllUsable()
+	if CDs.refreshAllUsable then
+		CDs.refreshAllUsable = false
+		CDs.RefreshAllUsable()
 	end
 
-	CDM.PollAssist()
-	CDM.PollPresses()
-	CDM.PollItemRange()
+	CDs.PollAssist()
+	CDs.PollPresses()
+	CDs.PollItemRange()
 end
 
-function CDM.Rebuild(reason)
+function CDs.Rebuild(reason)
 	print("Rebuild", reason)
 
-	CDM.RefreshActionBarOverride()
-	CDM.GatherCDs()
-	CDM.RefreshFormLookup()
-	CDM.RefreshScale()
-	CDM.RefreshAllOverrideRecords()
-	CDM.RefreshAllBarSlots()
-	CDM.RefreshAllCategorySlots()
-	CDM.AssignFrames()
-	CDM.RefreshAllConfig()
-	CDM.RefreshAllOverrides()
-	CDM.RefreshAllCooldowns()
-	CDM.RefreshAllQueued()
-	CDM.RefreshAllProcs()
-	CDM.RefreshAllAssist()
-	CDM.RefreshAllEmpower()
-	CDM.RefreshAllSizes()
-	CDM.RefreshAllPositions()
-	CDM.RefreshAllRangeChecks()
-	CDM.RefreshAllIcons()
-	CDM.RefreshAllUsable()
-	CDM.RefreshAllPress()
-	CDM.RefreshVisible()
+	CDs.RefreshActionBarOverride()
+	CDs.GatherCDs()
+	CDs.RefreshFormLookup()
+	CDs.RefreshScale()
+	CDs.RefreshAllOverrideRecords()
+	CDs.RefreshAllBarSlots()
+	CDs.RefreshAllCategorySlots()
+	CDs.AssignFrames()
+	CDs.RefreshAllConfig()
+	CDs.RefreshAllOverrides()
+	CDs.RefreshAllCooldowns()
+	CDs.RefreshAllQueued()
+	CDs.RefreshAllProcs()
+	CDs.RefreshAllAssist()
+	CDs.RefreshAllEmpower()
+	CDs.RefreshAllSizes()
+	CDs.RefreshAllPositions()
+	CDs.RefreshAllRangeChecks()
+	CDs.RefreshAllIcons()
+	CDs.RefreshAllUsable()
+	CDs.RefreshAllPress()
+	CDs.RefreshVisible()
 end
 
-function CDM.ConstructFrame(vState, slot)
+function CDs.ConstructFrame(vState, slot)
 	local fState = {}
 	fState.cfg              = vState.cfg
 	fState.slot             = nil
@@ -382,7 +382,7 @@ function CDM.ConstructFrame(vState, slot)
 	fState.Cooldown:SetDrawEdge(false)
 	fState.Cooldown:SetSwipeColor(0, 0, 0, 0.8)
 	fState.Cooldown:SetDrawBling(false)
-	fState.Cooldown:SetCountdownFormatter(CDM.cdFormatter)
+	fState.Cooldown:SetCountdownFormatter(CDs.cdFormatter)
 	fState.Cooldown:SetCountdownFont(vState.cdFontName)
 	fState.Cooldown:SetScript("OnCooldownDone", function() fState.Icon:SetDesaturated(false) end)
 
@@ -425,7 +425,7 @@ function CDM.ConstructFrame(vState, slot)
 	fState.BlingTimer:SetDrawEdge(false)
 	fState.BlingTimer:SetDrawBling(false)
 	fState.BlingTimer:SetHideCountdownNumbers(true)
-	fState.BlingTimer:SetScript("OnCooldownDone", function() CDM.PlayBling(fState) end)
+	fState.BlingTimer:SetScript("OnCooldownDone", function() CDs.PlayBling(fState) end)
 
 	fState.Bling = BorderTrace.Create(fState.Outline)
 	fState.Bling:SetParentKey("Bling")
@@ -444,7 +444,7 @@ function CDM.ConstructFrame(vState, slot)
 	return fState
 end
 
-function CDM.EnableFrame(fState, slot)
+function CDs.EnableFrame(fState, slot)
 	fState.slot         = slot
 	fState.baseSpellID  = slot.spellID
 	fState.spellID      = slot.spellID
@@ -453,41 +453,41 @@ function CDM.EnableFrame(fState, slot)
 	fState.pressKeyID   = slot.pressKeyID
 
 	if fState.spellID then
-		CDM.spellLookup[fState.spellID] = CDM.spellLookup[fState.spellID] or {}
-		CDM.spellLookup[fState.spellID][fState] = true
+		CDs.spellLookup[fState.spellID] = CDs.spellLookup[fState.spellID] or {}
+		CDs.spellLookup[fState.spellID][fState] = true
 	end
 
 	if fState.pressKeyID then
-		CDM.pressKeyIDLookup[fState.pressKeyID] = CDM.pressKeyIDLookup[fState.pressKeyID] or {}
-		CDM.pressKeyIDLookup[fState.pressKeyID][fState] = true
+		CDs.pressKeyIDLookup[fState.pressKeyID] = CDs.pressKeyIDLookup[fState.pressKeyID] or {}
+		CDs.pressKeyIDLookup[fState.pressKeyID][fState] = true
 	end
 
 	if fState.itemID and not fState.barSlot then
-		CDM.itemRangeFrames[fState] = true
+		CDs.itemRangeFrames[fState] = true
 	end
 
-	CDM.ClearBling(fState)
+	CDs.ClearBling(fState)
 	fState.Root:Show()
 end
 
-function CDM.DisableFrame(fState)
+function CDs.DisableFrame(fState)
 	if fState.spellID then
-		CDM.spellLookup[fState.spellID][fState] = nil
-		CDM.spellLookup[fState.baseSpellID][fState] = nil
+		CDs.spellLookup[fState.spellID][fState] = nil
+		CDs.spellLookup[fState.baseSpellID][fState] = nil
 	end
 
 	if fState.pressKeyID then
-		CDM.pressKeyIDLookup[fState.pressKeyID][fState] = nil
+		CDs.pressKeyIDLookup[fState.pressKeyID][fState] = nil
 	end
 
 	if fState.itemID and not fState.barSlot then
-		CDM.itemRangeFrames[fState] = nil
+		CDs.itemRangeFrames[fState] = nil
 	end
 
 	fState.Root:Hide()
 end
 
-function CDM.AssignFrames()
+function CDs.AssignFrames()
 	-- NOTE: We key slots by a stable id then reassign the frame in that slot to different spells /
 	-- items as necessary. This approach allows duplicate spells and single-frame reassignment. We
 	-- don't have to run a rebuild or layout pass. This is especially nice for conditional macros
@@ -496,10 +496,10 @@ function CDM.AssignFrames()
 	-- bars is the only thing that isn't supported, but it gets fixed up as soon as auras are no
 	-- longer secret.
 
-	for category, vState in pairs(CDM.viewers) do
+	for category, vState in pairs(CDs.viewers) do
 		-- Disable existing frames
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			CDM.DisableFrame(fState)
+			CDs.DisableFrame(fState)
 		end
 		wipe(vState.activeFrames)
 
@@ -508,11 +508,11 @@ function CDM.AssignFrames()
 			if slot.hasAction then
 				local fState = vState.allFrames[slot.key]
 				if not fState then
-					fState = CDM.ConstructFrame(vState, slot)
+					fState = CDs.ConstructFrame(vState, slot)
 					vState.allFrames[slot.key] = fState
 				end
 
-				CDM.EnableFrame(fState, slot)
+				CDs.EnableFrame(fState, slot)
 				table.insert(vState.activeFrames, fState)
 			end
 		end
@@ -532,38 +532,38 @@ function CDM.AssignFrames()
 	end
 end
 
-function CDM.ReassignFrame(fState, slot)
-	CDM.DisableFrame(fState)
-	CDM.EnableFrame(fState, slot)
+function CDs.ReassignFrame(fState, slot)
+	CDs.DisableFrame(fState)
+	CDs.EnableFrame(fState, slot)
 
-	CDM.RefreshConfig(fState)
-	CDM.RefreshOverride(fState)
-	CDM.RefreshCooldown(fState)
-	CDM.RefreshQueued(fState)
-	CDM.RefreshProc(fState)
-	CDM.RefreshAssist(fState)
-	CDM.RefreshEmpower(fState)
-	CDM.RefreshRangeCheck(fState)
-	CDM.RefreshIcon(fState)
-	CDM.RefreshUsable(fState)
-	CDM.RefreshPress(fState)
+	CDs.RefreshConfig(fState)
+	CDs.RefreshOverride(fState)
+	CDs.RefreshCooldown(fState)
+	CDs.RefreshQueued(fState)
+	CDs.RefreshProc(fState)
+	CDs.RefreshAssist(fState)
+	CDs.RefreshEmpower(fState)
+	CDs.RefreshRangeCheck(fState)
+	CDs.RefreshIcon(fState)
+	CDs.RefreshUsable(fState)
+	CDs.RefreshPress(fState)
 
 	if fState.empowerBuff then
-		CDM.RefreshAllSizes()
+		CDs.RefreshAllSizes()
 	end
 end
 
-function CDM.RefreshScale()
+function CDs.RefreshScale()
 	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
-	for category, vState in pairs(CDM.viewers) do
+	for category, vState in pairs(CDs.viewers) do
 		vState.Root:SetScale(pixelsToUI)
 	end
 
-	Config.RefreshValues(CDM.cfgTree, pixelsToUI)
+	Config.RefreshValues(CDs.cfgTree, pixelsToUI)
 end
 
-function CDM.RefreshEmpower(fState)
-	local empowerBuff = fState.cfg.empowerBuffs[CDM.classToken][fState.baseSpellID]
+function CDs.RefreshEmpower(fState)
+	local empowerBuff = fState.cfg.empowerBuffs[CDs.classToken][fState.baseSpellID]
 
 	if empowerBuff and not C_Secrets.ShouldAurasBeSecret() then
 		fState.empowerMaxStacks = max(1, C_Spell.GetSpellMaxCumulativeAuraApplications(empowerBuff))
@@ -584,16 +584,16 @@ function CDM.RefreshEmpower(fState)
 	end
 end
 
-function CDM.RefreshAllEmpower()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllEmpower()
+	for category, vState in pairs(CDs.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			CDM.RefreshEmpower(fState)
+			CDs.RefreshEmpower(fState)
 		end
 	end
 end
 
-function CDM.RefreshConfig(fState)
-	fState.overrideTimer = fState.cfg.overrideTimers[CDM.classToken][fState.baseSpellID]
+function CDs.RefreshConfig(fState)
+	fState.overrideTimer = fState.cfg.overrideTimers[CDs.classToken][fState.baseSpellID]
 
 	fState.Border:SetVertexColor(fState.cfg.borderColor:GetRGBA())
 	fState.Press:SetColorTexture(fState.cfg.pressColor:GetRGBA())
@@ -604,7 +604,7 @@ function CDM.RefreshConfig(fState)
 
 	if not C_Secrets.ShouldAurasBeSecret() then
 		fState.EmpowerBorder:SetVertexColor(fState.cfg.borderColor:GetRGBA())
-		fState.EmpowerFill:SetVertexColor(CDM.classColor:GetRGBA())
+		fState.EmpowerFill:SetVertexColor(CDs.classColor:GetRGBA())
 	end
 
 	fState.Proc:SetConfig(
@@ -624,18 +624,18 @@ function CDM.RefreshConfig(fState)
 		fState.cfg.blingFill)
 end
 
-function CDM.RefreshAllConfig()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllConfig()
+	for category, vState in pairs(CDs.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			CDM.RefreshConfig(fState)
+			CDs.RefreshConfig(fState)
 		end
 	end
 end
 
-function CDM.RefreshAllSizes()
+function CDs.RefreshAllSizes()
 	local pxSize, pySize = GetPhysicalScreenSize()
 
-	for category, vState in pairs(CDM.viewers) do
+	for category, vState in pairs(CDs.viewers) do
 		local cfg               = vState.cfg
 		local iconZoom          = cfg.iconZoom
 		local iconAspect        = cfg.iconAspect
@@ -711,10 +711,10 @@ function CDM.RefreshAllSizes()
 	end
 end
 
-function CDM.RefreshAllPositions()
+function CDs.RefreshAllPositions()
 	local pxSize, pySize = GetPhysicalScreenSize()
 
-	for category, vState in pairs(CDM.viewers) do
+	for category, vState in pairs(CDs.viewers) do
 		local cfg      = vState.cfg
 		local vxPos    = Round(cfg.xPos     + cfg.xPosRel     * pxSize)
 		local vyPos    = Round(cfg.yPos     + cfg.yPosRel     * pySize)
@@ -749,44 +749,44 @@ function CDM.RefreshAllPositions()
 	end
 end
 
-function CDM.RefreshOverrideRecord(spellID)
-	if not CDM.activeOverrides[spellID] then
+function CDs.RefreshOverrideRecord(spellID)
+	if not CDs.activeOverrides[spellID] then
 		local overrideSpellID = C_Spell.GetOverrideSpell(spellID)
 		if overrideSpellID ~= spellID then
-			CDM.activeOverrides[spellID] = { overrideSpellID = overrideSpellID, time = nil }
+			CDs.activeOverrides[spellID] = { overrideSpellID = overrideSpellID, time = nil }
 		end
 	end
 end
 
-function CDM.RefreshAllOverrideRecords()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllOverrideRecords()
+	for category, vState in pairs(CDs.viewers) do
 		for iSlot, slot in ipairs(vState.slots) do
 			if slot.spellID then
-				CDM.RefreshOverrideRecord(slot.spellID)
+				CDs.RefreshOverrideRecord(slot.spellID)
 			end
 		end
 	end
 end
 
-function CDM.SetOverride(fState, spellID)
+function CDs.SetOverride(fState, spellID)
 	-- Remove the current override
 	if fState.spellID ~= fState.baseSpellID then
-		CDM.spellLookup[fState.spellID][fState] = nil
+		CDs.spellLookup[fState.spellID][fState] = nil
 		fState.spellID = fState.baseSpellID
 	end
 
 	-- Apply the new override (or revert back to base)
 	if spellID and spellID ~= fState.spellID then
-		CDM.spellLookup[spellID] = CDM.spellLookup[spellID] or {}
-		CDM.spellLookup[spellID][fState] = true
+		CDs.spellLookup[spellID] = CDs.spellLookup[spellID] or {}
+		CDs.spellLookup[spellID][fState] = true
 		fState.spellID = spellID
 	end
 end
 
-function CDM.RefreshOverride(fState)
-	local override = CDM.activeOverrides[fState.baseSpellID]
+function CDs.RefreshOverride(fState)
+	local override = CDs.activeOverrides[fState.baseSpellID]
 	local spellID  = override and override.overrideSpellID
-	CDM.SetOverride(fState, spellID)
+	CDs.SetOverride(fState, spellID)
 
 	local timer = fState.overrideTimer
 	if timer and override and override.time and override.overrideSpellID == timer.overrideSpellID then
@@ -798,15 +798,15 @@ function CDM.RefreshOverride(fState)
 	end
 end
 
-function CDM.RefreshAllOverrides()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllOverrides()
+	for category, vState in pairs(CDs.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			CDM.RefreshOverride(fState)
+			CDs.RefreshOverride(fState)
 		end
 	end
 end
 
-function CDM.RefreshCooldown(fState)
+function CDs.RefreshCooldown(fState)
 	-- NOTE: The shared, GCD-like cooldown on several skyriding abilities is not actually the GCD.
 	-- It's a shared cooldown category (closer to the trinket / item burst category). So we go out of
 	-- our way to re-classify it as a GCD. activeCategory is secret in combat for most spells, but
@@ -846,8 +846,6 @@ function CDM.RefreshCooldown(fState)
 	-- C_ActionBar.GetActionCooldownDuration | Yes    | Yes | N/A     | Yes | Yes    | Broken    |
 	-- C_Spell.GetSpellCooldownDuration      | Yes    | Yes | N/A     | No  | Yes    | Works     |
 
-	local db = Kami.CDM.db
-
 	local isItem, onCD, onGCD, duration, rechargeDuration, chargeCount
 
 	if fState.itemID then
@@ -867,7 +865,7 @@ function CDM.RefreshCooldown(fState)
 		local chargeInfo = C_ActionBar.GetActionCharges(fState.barSlot) -- SpellChargeInfo
 
 		isItem           = C_ActionBar.IsItemAction(fState.barSlot)
-		onGCD            = cdInfo.isOnGCD or Util.Sanitize(cdInfo.activeCategory) == db.Category.SkyridingGCD
+		onGCD            = cdInfo.isOnGCD or Util.Sanitize(cdInfo.activeCategory) == CDM.db.Category.SkyridingGCD
 		onCD             = cdInfo.isActive and not onGCD
 		duration         = C_ActionBar.GetActionCooldownDuration(fState.barSlot)
 		rechargeDuration = C_ActionBar.GetActionChargeDuration(fState.barSlot)
@@ -878,7 +876,7 @@ function CDM.RefreshCooldown(fState)
 		local chargeInfo = C_Spell.GetSpellCharges(fState.spellID) -- SpellChargeInfo
 
 		isItem           = false
-		onGCD            = cdInfo.isOnGCD or Util.Sanitize(cdInfo.activeCategory) == db.Category.SkyridingGCD
+		onGCD            = cdInfo.isOnGCD or Util.Sanitize(cdInfo.activeCategory) == CDM.db.Category.SkyridingGCD
 		onCD             = cdInfo.isActive and not onGCD
 		duration         = C_Spell.GetSpellCooldownDuration(fState.spellID)
 		rechargeDuration = C_Spell.GetSpellChargeDuration(fState.spellID)
@@ -903,7 +901,7 @@ function CDM.RefreshCooldown(fState)
 		fState.BlingTimer:SetCooldownFromDurationObject(duration)
 		fState.Bling:Stop()
 	else
-		CDM.PlayBling(fState)
+		CDs.PlayBling(fState)
 	end
 
 	if rechargeDuration and not onCD then
@@ -917,15 +915,15 @@ function CDM.RefreshCooldown(fState)
 	fState.Charges:SetText(chargeCount)
 end
 
-function CDM.RefreshAllCooldowns()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllCooldowns()
+	for category, vState in pairs(CDs.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			CDM.RefreshCooldown(fState)
+			CDs.RefreshCooldown(fState)
 		end
 	end
 end
 
-function CDM.PlayBling(fState)
+function CDs.PlayBling(fState)
 	if fState.hasBling then
 		fState.hasBling = nil
 		fState.BlingTimer:Clear()
@@ -933,13 +931,13 @@ function CDM.PlayBling(fState)
 	end
 end
 
-function CDM.ClearBling(fState)
+function CDs.ClearBling(fState)
 	fState.hasBling = nil
 	fState.BlingTimer:Clear()
 	fState.Bling:Stop()
 end
 
-function CDM.RefreshRangeCheck(fState)
+function CDs.RefreshRangeCheck(fState)
 	if fState.barSlot then
 		if fState.rangeCheckKey ~= fState.barSlot then
 			fState.rangeCheckKey = fState.barSlot
@@ -959,38 +957,38 @@ function CDM.RefreshRangeCheck(fState)
 	end
 end
 
-function CDM.RefreshAllRangeChecks()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllRangeChecks()
+	for category, vState in pairs(CDs.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			CDM.RefreshRangeCheck(fState)
+			CDs.RefreshRangeCheck(fState)
 		end
 	end
 end
 
-function CDM.RefreshIcon(fState)
+function CDs.RefreshIcon(fState)
 	local texture = nil
-	local formIndex = CDM.formLookup[fState.baseSpellID]
+	local formIndex = CDs.formLookup[fState.baseSpellID]
 
 	if     fState.barSlot    then texture = C_ActionBar.GetActionTexture(fState.barSlot)
 	elseif fState.itemID     then texture = C_Item.GetItemIconByID(fState.itemID)
 	elseif fState.equipSlot  then texture = GetInventoryItemTexture("player", fState.equipSlot)
 	elseif formIndex         then texture = GetShapeshiftFormInfo(formIndex)
 	elseif fState.spellID    then texture = C_Spell.GetSpellTexture(fState.spellID)
-	elseif fState.categoryID then texture = CDM.categoryIcons[fState.categoryID]
+	elseif fState.categoryID then texture = CDs.categoryIcons[fState.categoryID]
 	end
 
 	fState.Icon:SetTexture(texture)
 end
 
-function CDM.RefreshAllIcons()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllIcons()
+	for category, vState in pairs(CDs.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			CDM.RefreshIcon(fState)
+			CDs.RefreshIcon(fState)
 		end
 	end
 end
 
-function CDM.RefreshUsable(fState)
+function CDs.RefreshUsable(fState)
 	-- NOTE: Each of the "in range" functions return nil for "no target", etc
 	-- NOTE: C_Item.IsItemInRange is blocked in combat for friendly, self, and nil targets.
 
@@ -1018,19 +1016,19 @@ function CDM.RefreshUsable(fState)
 	fState.Icon:SetVertexColor(color:GetRGBA())
 end
 
-function CDM.RefreshAllUsable()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllUsable()
+	for category, vState in pairs(CDs.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			CDM.RefreshUsable(fState)
+			CDs.RefreshUsable(fState)
 		end
 	end
 end
 
-function CDM.RefreshPress(fState)
+function CDs.RefreshPress(fState)
 	-- BUG: Flyouts on ElvUI action bars do not have a press highlight
 	local pressed = false
 	if fState.pressKeyType then
-		for button, mouseButton in pairs(CDM.activePresses) do
+		for button, mouseButton in pairs(CDs.activePresses) do
 			if button.klPressKeyType == fState.pressKeyType and button.klPressKeyID == fState.pressKeyID then
 				pressed = true
 			end
@@ -1039,15 +1037,15 @@ function CDM.RefreshPress(fState)
 	fState.Press:SetShown(pressed)
 end
 
-function CDM.RefreshAllPress()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllPress()
+	for category, vState in pairs(CDs.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			CDM.RefreshPress(fState)
+			CDs.RefreshPress(fState)
 		end
 	end
 end
 
-function CDM.RefreshQueued(fState)
+function CDs.RefreshQueued(fState)
 	local isCurrent = false
 	if fState.barSlot then
 		isCurrent = C_ActionBar.IsCurrentAction(fState.barSlot)
@@ -1059,83 +1057,83 @@ function CDM.RefreshQueued(fState)
 	fState.Queued:SetShown(isCurrent)
 end
 
-function CDM.RefreshAllQueued()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllQueued()
+	for category, vState in pairs(CDs.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			CDM.RefreshQueued(fState)
+			CDs.RefreshQueued(fState)
 		end
 	end
 end
 
-function CDM.RefreshProc(fState)
+function CDs.RefreshProc(fState)
 	local show = fState.spellID and C_SpellActivationOverlay.IsSpellOverlayed(fState.spellID)
 	fState.Proc:SetShown(show)
 end
 
-function CDM.RefreshAllProcs()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllProcs()
+	for category, vState in pairs(CDs.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			CDM.RefreshProc(fState)
+			CDs.RefreshProc(fState)
 		end
 	end
 end
 
-function CDM.PollAssist()
+function CDs.PollAssist()
 	local assistSpellID = C_AssistedCombat.GetNextCastSpell(false)
-	if CDM.assistSpellID ~= assistSpellID then
-		for fState in pairs(CDM.spellLookup[CDM.assistSpellID] or {}) do
-			CDM.SetAssist(fState, false)
+	if CDs.assistSpellID ~= assistSpellID then
+		for fState in pairs(CDs.spellLookup[CDs.assistSpellID] or {}) do
+			CDs.SetAssist(fState, false)
 		end
 
-		CDM.assistSpellID = assistSpellID
+		CDs.assistSpellID = assistSpellID
 
 		-- NOTE: Fix stale charge counts on assistant slots
-		for barSlot in pairs(CDM.assistSlots) do
+		for barSlot in pairs(CDs.assistSlots) do
 			C_ActionBar.ForceUpdateAction(barSlot, false)
 		end
 
-		for fState in pairs(CDM.spellLookup[CDM.assistSpellID] or {}) do
-			CDM.SetAssist(fState, true)
+		for fState in pairs(CDs.spellLookup[CDs.assistSpellID] or {}) do
+			CDs.SetAssist(fState, true)
 		end
 	end
 end
 
-function CDM.SetAssist(fState, isAssist)
-	fState.Assist:SetShown(CDM.showAssist and isAssist)
+function CDs.SetAssist(fState, isAssist)
+	fState.Assist:SetShown(CDs.showAssist and isAssist)
 end
 
-function CDM.RefreshAssist(fState)
-	local isAssist = fState.spellID and (fState.spellID == CDM.assistSpellID or fState.baseSpellID == CDM.assistSpellID)
-	CDM.SetAssist(fState, isAssist)
+function CDs.RefreshAssist(fState)
+	local isAssist = fState.spellID and (fState.spellID == CDs.assistSpellID or fState.baseSpellID == CDs.assistSpellID)
+	CDs.SetAssist(fState, isAssist)
 end
 
-function CDM.RefreshAllAssist()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllAssist()
+	for category, vState in pairs(CDs.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
-			CDM.RefreshAssist(fState)
+			CDs.RefreshAssist(fState)
 		end
 	end
 end
 
-function CDM.PollPresses()
-	for button, mouseButton in pairs(CDM.activePresses) do
+function CDs.PollPresses()
+	for button, mouseButton in pairs(CDs.activePresses) do
 		local down = button:GetButtonState() == "PUSHED"
-		CDM.OnClick(button, mouseButton, down, nil, nil)
+		CDs.OnClick(button, mouseButton, down, nil, nil)
 	end
 end
 
-function CDM.PollItemRange()
+function CDs.PollItemRange()
 	local canCheck = not InCombatLockdown() or UnitCanAttack("player", "target")
-	for fState in pairs(CDM.itemRangeFrames) do
+	for fState in pairs(CDs.itemRangeFrames) do
 		local inRange = canCheck and C_Item.IsItemInRange(fState.itemID, "target")
 		if fState.itemInRange ~= inRange then
 			fState.itemInRange = inRange
-			CDM.RefreshUsable(fState)
+			CDs.RefreshUsable(fState)
 		end
 	end
 end
 
-function CDM.GetBarAction(barSlot, needItemID)
+function CDs.GetBarAction(barSlot, needItemID)
 	-- BUG: https://github.com/Stanzilla/WoWUIBugs/issues/495
 	--
 	-- Getting the item id is important for cooldowns to work properly. The spell cooldown shows the
@@ -1166,7 +1164,7 @@ function CDM.GetBarAction(barSlot, needItemID)
 		spellID = C_ActionBar.GetSpell(barSlot)
 		spellID = spellID ~= 0 and spellID or nil
 
-		for baseSpellID, override in pairs(CDM.activeOverrides) do
+		for baseSpellID, override in pairs(CDs.activeOverrides) do
 			if override.overrideSpellID == spellID then
 				spellID = baseSpellID
 			end
@@ -1201,9 +1199,9 @@ function CDM.GetBarAction(barSlot, needItemID)
 	return spellID, itemID, pressKeyType, pressKeyID, actionType, subType
 end
 
-function CDM.GatherCDs()
-	Kami.CDM.GatherCDs(CDM.viewers)
-	for category, vState in pairs(CDM.viewers) do
+function CDs.GatherCDs()
+	CDM.GatherCDs(CDs.viewers)
+	for category, vState in pairs(CDs.viewers) do
 		wipe(vState.slots)
 		for iInfo, cdvInfo in ipairs(vState.cdvInfos) do
 			local slot = {
@@ -1223,7 +1221,7 @@ function CDM.GatherCDs()
 		end
 	end
 
-	local vState = CDM.viewers.ActionBar
+	local vState = CDs.viewers.ActionBar
 	wipe(vState.slots)
 	if vState.barIndex then
 		local firstSlot = (vState.barIndex - 1) * NUM_ACTIONBAR_BUTTONS + 1
@@ -1247,35 +1245,33 @@ function CDM.GatherCDs()
 	end
 end
 
-function CDM.RefreshFormLookup()
-	wipe(CDM.formLookup)
+function CDs.RefreshFormLookup()
+	wipe(CDs.formLookup)
 	for iForm = 1, GetNumShapeshiftForms() do
 		local spellID = select(4, GetShapeshiftFormInfo(iForm))
-		CDM.formLookup[spellID] = iForm
+		CDs.formLookup[spellID] = iForm
 	end
 end
 
-function CDM.RefreshActionBarOverride()
-	local db = Kami.CDM.db
-
-	local vState   = CDM.viewers.ActionBar
-	local barIndex = Kami.CDM.GetActionBarOverride()
+function CDs.RefreshActionBarOverride()
+	local vState   = CDs.viewers.ActionBar
+	local barIndex = CDM.GetActionBarOverride()
 	vState.barIndex  = barIndex
-	vState.barLocked = barIndex ~= nil and barIndex ~= db.Misc.SkyridingBarIndex
+	vState.barLocked = barIndex ~= nil and barIndex ~= CDM.db.Misc.SkyridingBarIndex
 end
 
-function CDM.RefreshVisible()
-	local hasBar = CDM.viewers.ActionBar.barIndex ~= nil
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshVisible()
+	local hasBar = CDs.viewers.ActionBar.barIndex ~= nil
+	for category, vState in pairs(CDs.viewers) do
 		vState.Root:SetShown(not hasBar)
 	end
 
-	local vState = CDM.viewers.ActionBar
+	local vState = CDs.viewers.ActionBar
 	vState.Root:SetShown(hasBar)
 end
 
-function CDM.RefreshBarSlot(slot)
-	slot.spellID, slot.itemID, slot.pressKeyType, slot.pressKeyID, slot.actionType, slot.subType = CDM.GetBarAction(slot.barSlot, true)
+function CDs.RefreshBarSlot(slot)
+	slot.spellID, slot.itemID, slot.pressKeyType, slot.pressKeyID, slot.actionType, slot.subType = CDs.GetBarAction(slot.barSlot, true)
 
 	-- NOTE: HasAction and GetActionInfo do not always agree
 	-- * Un'sok's Reshape Life              - HasAction is true,  GetActionInfo is nil
@@ -1283,21 +1279,21 @@ function CDM.RefreshBarSlot(slot)
 	slot.hasAction = C_ActionBar.HasAction(slot.barSlot) and slot.actionType ~= nil
 
 	local isAssist = slot.actionType == "spell" and slot.subType == "assistedcombat"
-	CDM.assistSlots[slot.barSlot] = isAssist or nil
+	CDs.assistSlots[slot.barSlot] = isAssist or nil
 end
 
-function CDM.RefreshAllBarSlots()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllBarSlots()
+	for category, vState in pairs(CDs.viewers) do
 		for iSlot, slot in ipairs(vState.slots) do
 			if slot.barSlot then
-				CDM.RefreshBarSlot(slot)
+				CDs.RefreshBarSlot(slot)
 			end
 		end
 	end
 end
 
-function CDM.RefreshCategorySlot(slot)
-	local source = CDM.charVars.lastCategorySource[slot.categoryID]
+function CDs.RefreshCategorySlot(slot)
+	local source = CDs.charVars.lastCategorySource[slot.categoryID]
 	if source then
 		slot.spellID      = source.spellID
 		slot.itemID       = source.itemID
@@ -1306,11 +1302,11 @@ function CDM.RefreshCategorySlot(slot)
 	end
 end
 
-function CDM.RefreshAllCategorySlots()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.RefreshAllCategorySlots()
+	for category, vState in pairs(CDs.viewers) do
 		for iSlot, slot in ipairs(vState.slots) do
 			if slot.categoryID then
-				CDM.RefreshCategorySlot(slot)
+				CDs.RefreshCategorySlot(slot)
 			end
 		end
 	end
@@ -1319,36 +1315,36 @@ end
 ----------------------------------------------------------------------------------------------------
 -- Event Handlers
 
-function CDM.RegisterEvent(event, func)
-	CDM.eventFrame:RegisterEvent(event)
-	CDM.handlers[event] = func
+function CDs.RegisterEvent(event, func)
+	CDs.eventFrame:RegisterEvent(event)
+	CDs.handlers[event] = func
 end
 
-function CDM.DispatchEvent(frame, event, ...)
-	local func = CDM.handlers[event]
+function CDs.DispatchEvent(frame, event, ...)
+	local func = CDs.handlers[event]
 	func(...)
 end
 
-function CDM.OnScaleChanged()
-	CDM.RefreshScale()
-	CDM.RefreshAllSizes()
-	CDM.RefreshAllPositions()
+function CDs.OnScaleChanged()
+	CDs.RefreshScale()
+	CDs.RefreshAllSizes()
+	CDs.RefreshAllPositions()
 end
 
-function CDM.OnAssistChange()
-	CDM.showAssist = GetCVarBool("assistedCombatHighlight")
-	CDM.RefreshAllAssist()
+function CDs.OnAssistChange()
+	CDs.showAssist = GetCVarBool("assistedCombatHighlight")
+	CDs.RefreshAllAssist()
 end
 
-function CDM.OnActionBarChanged()
-	local vState   = CDM.viewers.ActionBar
-	local barIndex = Kami.CDM.GetActionBarOverride()
+function CDs.OnActionBarChanged()
+	local vState   = CDs.viewers.ActionBar
+	local barIndex = CDM.GetActionBarOverride()
 	if barIndex ~= vState.barIndex or vState.barLocked then
-		CDM.Rebuild("OnActionBarChanged")
+		CDs.Rebuild("OnActionBarChanged")
 	end
 end
 
-function CDM.ACTIONBAR_SLOT_CHANGED(barSlot)
+function CDs.ACTIONBAR_SLOT_CHANGED(barSlot)
 	-- NOTE: Any spell with a cooldown causes this event (e.g. Whirling Surge and Aerial Halt)
 	-- NOTE: Fires when a conditional macro changes state
 
@@ -1361,12 +1357,12 @@ function CDM.ACTIONBAR_SLOT_CHANGED(barSlot)
 	-- conditional macro case.
 
 	if barSlot ~= 0 then
-		for category, vState in pairs(CDM.viewers) do
+		for category, vState in pairs(CDs.viewers) do
 			local firstSlot = vState.barIndex and (vState.barIndex - 1) * NUM_ACTIONBAR_BUTTONS + 1
 			local slot      = firstSlot and vState.slots[barSlot - firstSlot + 1]
 			if slot and not vState.barLocked then
 				local hadAction = slot.hasAction
-				CDM.RefreshBarSlot(slot)
+				CDs.RefreshBarSlot(slot)
 
 				local added   = not hadAction and     slot.hasAction
 				local removed =     hadAction and not slot.hasAction
@@ -1378,80 +1374,80 @@ function CDM.ACTIONBAR_SLOT_CHANGED(barSlot)
 					local itemChanged     = slot.itemID  ~= fState.itemID
 					local pressKeyChanged = slot.pressKeyType ~= fState.pressKeyType or slot.pressKeyID ~= fState.pressKeyID
 					if spellChanged or itemChanged or pressKeyChanged then
-						CDM.ReassignFrame(fState, slot)
+						CDs.ReassignFrame(fState, slot)
 					else
 						-- NOTE: There are cases where we need to refresh things even when the spell hasn't changed:
 						-- * Macros can have custom icons and need to be updated when swapped with the same spell.
 						-- * Different items can have the same spell (e.g. Algari Healing Potion).
-						CDM.RefreshIcon(fState)
-						CDM.RefreshCooldown(fState)
-						CDM.RefreshQueued(fState)
-						CDM.RefreshUsable(fState)
+						CDs.RefreshIcon(fState)
+						CDs.RefreshCooldown(fState)
+						CDs.RefreshQueued(fState)
+						CDs.RefreshUsable(fState)
 					end
 
 				elseif added or removed then
-					CDM.Rebuild("ACTIONBAR_SLOT_CHANGED")
+					CDs.Rebuild("ACTIONBAR_SLOT_CHANGED")
 				end
 			end
 		end
 
 	else
-		CDM.Rebuild("ACTIONBAR_SLOT_CHANGED")
+		CDs.Rebuild("ACTIONBAR_SLOT_CHANGED")
 	end
 end
 
-function CDM.SPELL_UPDATE_USABLE()
-	CDM.refreshAllUsable = true
+function CDs.SPELL_UPDATE_USABLE()
+	CDs.refreshAllUsable = true
 end
 
-function CDM.ACTIONBAR_UPDATE_USABLE()
+function CDs.ACTIONBAR_UPDATE_USABLE()
 	-- NOTE: We could use ACTION_USABLE_UPDATE which carries an array of changes as payload, but
 	-- SPELL_UPDATE_USABLE already forces us to run the full RefreshAllUsable so we know it has to be
 	-- fast enough to be acceptable.
 
 	-- NOTE: Runs on the same frame as SPELL_UPDATE_USABLE about a third of the time, so deferred.
-	CDM.refreshAllUsable = true
+	CDs.refreshAllUsable = true
 end
 
-function CDM.ADDON_RESTRICTION_STATE_CHANGED(type, state)
+function CDs.ADDON_RESTRICTION_STATE_CHANGED(type, state)
 	-- NOTE: Only states Activating and Inactive are sent, not Active.
 	local aurasSecret = state == Enum.AddOnRestrictionState.Activating or C_Secrets.ShouldAurasBeSecret()
-	if CDM.aurasSecret and not aurasSecret then
-		CDM.Rebuild("ADDON_RESTRICTION_STATE_CHANGED")
+	if CDs.aurasSecret and not aurasSecret then
+		CDs.Rebuild("ADDON_RESTRICTION_STATE_CHANGED")
 	end
-	CDM.aurasSecret = aurasSecret
+	CDs.aurasSecret = aurasSecret
 end
 
-function CDM.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
-	for fState in pairs(CDM.spellLookup[spellID] or {}) do
+function CDs.SPELL_RANGE_CHECK_UPDATE(spellID, isInRange, checksRange)
+	for fState in pairs(CDs.spellLookup[spellID] or {}) do
 		if not fState.barSlot then
-			CDM.RefreshUsable(fState)
+			CDs.RefreshUsable(fState)
 		end
 	end
 end
 
-function CDM.ACTION_RANGE_CHECK_UPDATE(barSlot, isInRange, checksRange)
-	for category, vState in pairs(CDM.viewers) do
+function CDs.ACTION_RANGE_CHECK_UPDATE(barSlot, isInRange, checksRange)
+	for category, vState in pairs(CDs.viewers) do
 		local firstSlot = vState.barIndex and (vState.barIndex - 1) * NUM_ACTIONBAR_BUTTONS + 1
 		local slot      = firstSlot and vState.slots[barSlot - firstSlot + 1]
 		if slot and slot.hasAction then
 			local fState = vState.allFrames[slot.key]
-			CDM.RefreshUsable(fState)
+			CDs.RefreshUsable(fState)
 		end
 	end
 end
 
-function CDM.BAG_UPDATE_COOLDOWN()
-	for category, vState in pairs(CDM.viewers) do
+function CDs.BAG_UPDATE_COOLDOWN()
+	for category, vState in pairs(CDs.viewers) do
 		for iFrame, fState in ipairs(vState.activeFrames) do
 			if fState.itemID or fState.barSlot then
-				CDM.RefreshCooldown(fState)
+				CDs.RefreshCooldown(fState)
 			end
 		end
 	end
 end
 
-function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
+function CDs.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
 	-- NOTE: Combat potions from older expansions seem to have different categories even though they
 	-- share a cooldown with current combat potions. Draenic Versatility Potion is 99 instead of the
 	-- expected 4. It does update the value of C_Spell.GetLastCategoryCooldownSource(4). If we want
@@ -1463,18 +1459,18 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 	if category and itemID then
 		-- TODO: Do we need to save this to an account saved vars too?
 		-- TODO: Move the saved var update to CDM.lua
-		CDM.charVars.lastCategorySource[category] = { spellID = baseSpellID or spellID, itemID = itemID }
+		CDs.charVars.lastCategorySource[category] = { spellID = baseSpellID or spellID, itemID = itemID }
 
-		for vCategory, vState in pairs(CDM.viewers) do
+		for vCategory, vState in pairs(CDs.viewers) do
 			for iFrame, fState in ipairs(vState.activeFrames) do
 				if fState.categoryID == category then
 					local slot = fState.slot
-					CDM.RefreshCategorySlot(slot)
+					CDs.RefreshCategorySlot(slot)
 
 					local spellChanged = slot.spellID ~= fState.baseSpellID
 					local itemChanged  = slot.itemID  ~= fState.itemID
 					if spellChanged or itemChanged then
-						CDM.ReassignFrame(fState, slot)
+						CDs.ReassignFrame(fState, slot)
 					end
 				end
 			end
@@ -1484,69 +1480,69 @@ function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecovery
 	local hasCategory         = category and category ~= 0
 	local hasRecoveryCategory = startRecoveryCategory and startRecoveryCategory ~= 0
 	if hasCategory or hasRecoveryCategory or not spellID then
-		CDM.refreshAllCooldowns = true
+		CDs.refreshAllCooldowns = true
 	else
 		-- NOTE: Supposedly this event can arrive before the override event, so we need to check base
-		for fState in pairs(CDM.spellLookup[baseSpellID or spellID] or {}) do
-			CDM.RefreshCooldown(fState)
+		for fState in pairs(CDs.spellLookup[baseSpellID or spellID] or {}) do
+			CDs.RefreshCooldown(fState)
 		end
 	end
 end
 
-function CDM.SPELL_UPDATE_USES(spellID, baseSpellID)
-	for fState in pairs(CDM.spellLookup[baseSpellID or spellID] or {}) do
-		CDM.RefreshCooldown(fState)
+function CDs.SPELL_UPDATE_USES(spellID, baseSpellID)
+	for fState in pairs(CDs.spellLookup[baseSpellID or spellID] or {}) do
+		CDs.RefreshCooldown(fState)
 	end
 end
 
-function CDM.CURRENT_SPELL_CAST_CHANGED(cancelledCast)
-	CDM.RefreshAllQueued()
+function CDs.CURRENT_SPELL_CAST_CHANGED(cancelledCast)
+	CDs.RefreshAllQueued()
 end
 
-function CDM.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW(spellID)
-	for fState in pairs(CDM.spellLookup[spellID] or {}) do
+function CDs.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW(spellID)
+	for fState in pairs(CDs.spellLookup[spellID] or {}) do
 		fState.Proc:Show()
 	end
 end
 
-function CDM.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE(spellID)
-	for fState in pairs(CDM.spellLookup[spellID] or {}) do
+function CDs.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE(spellID)
+	for fState in pairs(CDs.spellLookup[spellID] or {}) do
 		fState.Proc:Hide()
 	end
 end
 
-function CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID)
+function CDs.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID)
 	if overrideSpellID then
-		CDM.activeOverrides[baseSpellID] = { overrideSpellID = overrideSpellID, time = GetTime() }
+		CDs.activeOverrides[baseSpellID] = { overrideSpellID = overrideSpellID, time = GetTime() }
 	else
-		CDM.activeOverrides[baseSpellID] = nil
+		CDs.activeOverrides[baseSpellID] = nil
 	end
 
-	for fState in pairs(CDM.spellLookup[baseSpellID] or {}) do
-		CDM.RefreshOverride(fState)
-		CDM.RefreshAssist(fState)
+	for fState in pairs(CDs.spellLookup[baseSpellID] or {}) do
+		CDs.RefreshOverride(fState)
+		CDs.RefreshAssist(fState)
 	end
 end
 
-function CDM.SPELL_UPDATE_ICON(spellID)
+function CDs.SPELL_UPDATE_ICON(spellID)
 	if spellID then
-		for fState in pairs(CDM.spellLookup[spellID] or {}) do
-			CDM.RefreshIcon(fState)
+		for fState in pairs(CDs.spellLookup[spellID] or {}) do
+			CDs.RefreshIcon(fState)
 		end
 	else
-		CDM.RefreshAllIcons()
+		CDs.RefreshAllIcons()
 	end
 end
 
-function CDM.UPDATE_SHAPESHIFT_FORM()
-	for spellID in pairs(CDM.formLookup) do
-		for fState in pairs(CDM.spellLookup[spellID] or {}) do
-			CDM.RefreshIcon(fState)
+function CDs.UPDATE_SHAPESHIFT_FORM()
+	for spellID in pairs(CDs.formLookup) do
+		for fState in pairs(CDs.spellLookup[spellID] or {}) do
+			CDs.RefreshIcon(fState)
 		end
 	end
 end
 
-function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
+function CDs.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 	-- NOTE: We are not guaranteed to get a release after a press:
 	-- Mouse down, drag off, mouse release                - no event
 	-- Mouse down, drag off (far), drag on, mouse release - no event, was turned into a drag
@@ -1573,28 +1569,28 @@ function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 		local buttonType = SecureButton_GetModifiedAttribute(button, "type", mouseButton)
 		if buttonType == "action" then
 			local barSlot = button:CalculateAction(mouseButton)
-			pressKeyType, pressKeyID = select(3, CDM.GetBarAction(barSlot, false))
+			pressKeyType, pressKeyID = select(3, CDs.GetBarAction(barSlot, false))
 		end
 	end
 
-	CDM.activePresses[button] = down and mouseButton or nil
+	CDs.activePresses[button] = down and mouseButton or nil
 
 	if button.klPressKeyType ~= pressKeyType or button.klPressKeyID ~= pressKeyID then
 		local prevKeyID = button.klPressKeyID
 		button.klPressKeyType = pressKeyType
 		button.klPressKeyID   = pressKeyID
 
-		for fState in pairs(CDM.pressKeyIDLookup[prevKeyID] or {}) do
-			CDM.RefreshPress(fState)
+		for fState in pairs(CDs.pressKeyIDLookup[prevKeyID] or {}) do
+			CDs.RefreshPress(fState)
 		end
-		for fState in pairs(CDM.pressKeyIDLookup[button.klPressKeyID] or {}) do
-			CDM.RefreshPress(fState)
+		for fState in pairs(CDs.pressKeyIDLookup[button.klPressKeyID] or {}) do
+			CDs.RefreshPress(fState)
 		end
 	end
 end
 
 -- TODO: We want to rebuild in combat when a spell is added or removed
-function CDM.OnCDMChanged()
+function CDs.OnCDMChanged()
 	-- NOTE: Hook fires when events are being throttled. Wait for the unlock.
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	if layoutMgr:AreNotificationsLocked() then return end
@@ -1605,10 +1601,10 @@ function CDM.OnCDMChanged()
 	-- and CDM settings changes.
 	if InCombatLockdown() then return end
 
-	CDM.Rebuild("OnCDMChanged")
+	CDs.Rebuild("OnCDMChanged")
 end
 
 ----------------------------------------------------------------------------------------------------
 -- File Load
 
-CDM.Load()
+CDs.Load()

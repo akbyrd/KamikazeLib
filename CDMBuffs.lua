@@ -1,19 +1,19 @@
 local Kami = select(2, ...)
-local CDM = {}
-Kami.CDM.Buffs = CDM
+local Buffs = {}
+Kami.CDM.Buffs = Buffs
 
+local CDM       = Kami.CDM
 local Config    = Kami.Config
 local Media     = Kami.Media
 local PixelAnts = Kami.PixelAnts
 local Util      = Kami.Util
 
-function CDM.Load()
-	CDM.charVars = KLCharVars.CDM
+function Buffs.Load()
+	Buffs.charVars = KLCharVars.CDM
 
-	local db = Kami.CDM.db
-	CDM.cfgTree = Config.Create()
+	Buffs.cfgTree = Config.Create()
 
-	Config.AddNode(CDM.cfgTree, nil, "Default",
+	Config.AddNode(Buffs.cfgTree, nil, "Default",
 		{
 			iconZoom   = Config.Number(0.08),
 			iconAspect = Config.Number(2.5), -- TODO: Try making this width instead
@@ -28,7 +28,7 @@ function CDM.Load()
 			pandemicSegments = Config.Number(8),
 			pandemicDuty     = Config.Number(0.6),
 		})
-	Config.AddNode(CDM.cfgTree, "Default", "TrackedBar",
+	Config.AddNode(Buffs.cfgTree, "Default", "TrackedBar",
 		{
 			xPos       = Config.Size("0px"),
 			yPos       = Config.Size("-337px"),
@@ -41,51 +41,51 @@ function CDM.Load()
 			backgroundColor = Config.Color("80000000"),
 		})
 
-	Config.AddNode(CDM.cfgTree, "TrackedBar", "Defensive",
+	Config.AddNode(Buffs.cfgTree, "TrackedBar", "Defensive",
 		{
 			barColor = Config.Color("FF4232C6"),
 		})
 
-	Config.AddNode(CDM.cfgTree, "TrackedBar", "Offensive",
+	Config.AddNode(Buffs.cfgTree, "TrackedBar", "Offensive",
 		{
 			barColor = Config.Color("FFC91309"),
 		})
 
-	Config.AddNode(CDM.cfgTree, nil, "FilterCategories",
+	Config.AddNode(Buffs.cfgTree, nil, "FilterCategories",
 		{
 			SpellCategory = Config.Table({
-				[db.Category.CombatPotion] = Config.String("Offensive"),
+				[CDM.db.Category.CombatPotion] = Config.String("Offensive"),
 			}),
 
 			Ability = Config.Table({
-				[db.WARRIOR.Ability.Avatar]        = Config.String("Offensive"),
-				[db.WARRIOR.Ability.Bladestorm]    = Config.String("Offensive"),
-				[db.WARRIOR.Ability.ColossusSmash] = Config.String("Offensive"),
+				[CDM.db.WARRIOR.Ability.Avatar]        = Config.String("Offensive"),
+				[CDM.db.WARRIOR.Ability.Bladestorm]    = Config.String("Offensive"),
+				[CDM.db.WARRIOR.Ability.ColossusSmash] = Config.String("Offensive"),
 
-				[db.WARRIOR.Ability.DieByTheSword]   = Config.String("Defensive"),
-				[db.WARRIOR.Ability.RallyingCry]     = Config.String("Defensive"),
-				[db.WARRIOR.Ability.SpellReflection] = Config.String("Defensive"),
-				[db.WARRIOR.Ability.DefensiveStance] = Config.String("Defensive"),
+				[CDM.db.WARRIOR.Ability.DieByTheSword]   = Config.String("Defensive"),
+				[CDM.db.WARRIOR.Ability.RallyingCry]     = Config.String("Defensive"),
+				[CDM.db.WARRIOR.Ability.SpellReflection] = Config.String("Defensive"),
+				[CDM.db.WARRIOR.Ability.DefensiveStance] = Config.String("Defensive"),
 			}),
 		})
 
-	CDM.handlers = {}
-	CDM.eventFrame = CreateFrame("Frame")
-	CDM.eventFrame:SetParentKey("Kami.CDM.Buffs.Event")
-	CDM.eventFrame:SetScript("OnEvent",                         CDM.DispatchEvent)
-	CDM.RegisterEvent("UI_SCALE_CHANGED",                       CDM.OnScaleChanged)
-	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                   CDM.OnScaleChanged)
-	CDM.RegisterEvent("UPDATE_VEHICLE_ACTIONBAR",               CDM.OnActionBarChanged)
-	CDM.RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR",              CDM.OnActionBarChanged)
-	CDM.RegisterEvent("UPDATE_BONUS_ACTIONBAR",                 CDM.OnActionBarChanged)
-	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                   CDM.PLAYER_REGEN_ENABLED)
-	CDM.RegisterEvent("PLAYER_TARGET_CHANGED",                  CDM.PLAYER_TARGET_CHANGED)
-	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                  CDM.SPELL_UPDATE_COOLDOWN)
-	CDM.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED", CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
-	hooksecurefunc(UIParent, "SetScale",                        CDM.OnScaleChanged)
+	Buffs.handlers = {}
+	Buffs.eventFrame = CreateFrame("Frame")
+	Buffs.eventFrame:SetParentKey("Kami.CDM.Buffs.Event")
+	Buffs.eventFrame:SetScript("OnEvent",                         Buffs.DispatchEvent)
+	Buffs.RegisterEvent("UI_SCALE_CHANGED",                       Buffs.OnScaleChanged)
+	Buffs.RegisterEvent("DISPLAY_SIZE_CHANGED",                   Buffs.OnScaleChanged)
+	Buffs.RegisterEvent("UPDATE_VEHICLE_ACTIONBAR",               Buffs.OnActionBarChanged)
+	Buffs.RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR",              Buffs.OnActionBarChanged)
+	Buffs.RegisterEvent("UPDATE_BONUS_ACTIONBAR",                 Buffs.OnActionBarChanged)
+	Buffs.RegisterEvent("PLAYER_REGEN_ENABLED",                   Buffs.PLAYER_REGEN_ENABLED)
+	Buffs.RegisterEvent("PLAYER_TARGET_CHANGED",                  Buffs.PLAYER_TARGET_CHANGED)
+	Buffs.RegisterEvent("SPELL_UPDATE_COOLDOWN",                  Buffs.SPELL_UPDATE_COOLDOWN)
+	Buffs.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED", Buffs.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
+	hooksecurefunc(UIParent, "SetScale",                          Buffs.OnScaleChanged)
 
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
-	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.OnCDMChanged)
+	hooksecurefunc(layoutMgr, "NotifyListeners", Buffs.OnCDMChanged)
 
 	local categoryToName = EnumUtil.GenerateNameTranslation(Enum.CooldownViewerCategory)
 
@@ -93,7 +93,7 @@ function CDM.Load()
 		Enum.CooldownViewerCategory.TrackedBar,
 	}
 
-	CDM.viewers = {}
+	Buffs.viewers = {}
 	for index, category in ipairs(viewerCategories) do
 		local categoryName = categoryToName(category)
 
@@ -107,44 +107,44 @@ function CDM.Load()
 
 		local vState = {
 			name     = categoryName,
-			cfg      = Config.GetBranch(CDM.cfgTree, categoryName),
+			cfg      = Config.GetBranch(Buffs.cfgTree, categoryName),
 			Root     = Root,
 			Base     = Base,
 			cdvInfos = {},
 			cdFrames = {},
 			pool     = {},
 		}
-		CDM.viewers[category] = vState
+		Buffs.viewers[category] = vState
 	end
 
-	CDM.categoryLookup   = {}
-	CDM.onTargetLookup   = {}
-	CDM.filterCategories = Config.GetBranch(CDM.cfgTree, "FilterCategories")
+	Buffs.categoryLookup   = {}
+	Buffs.onTargetLookup   = {}
+	Buffs.filterCategories = Config.GetBranch(Buffs.cfgTree, "FilterCategories")
 
-	CDM.Rebuild()
+	Buffs.Rebuild()
 end
 
-function CDM.Rebuild()
+function Buffs.Rebuild()
 	-- NOTE: Keys (and certain other content) are restricted the whole time. We can't touch the Aura
 	-- Containers.
 	if C_Secrets.ShouldAurasBeSecret() then return end
 
-	Kami.CDM.GatherCDs(CDM.viewers)
+	CDM.GatherCDs(Buffs.viewers)
 
 	-- TODO: RefreshScale is first because it's responsible for Config.RefreshValues. That seems a
 	-- bit weird. If we make config a dedicated operation we can move RefreshScale into
 	-- RefreshLayout (same for CDMCooldowns)
 
-	CDM.RefreshScale()
-	CDM.AssignFrames()
-	CDM.RefreshAllConfig()
-	CDM.RefreshLayout()
-	CDM.RefreshVisible()
-	CDM.RefreshAllCategories()
-	CDM.RefreshAllAuras()
+	Buffs.RefreshScale()
+	Buffs.AssignFrames()
+	Buffs.RefreshAllConfig()
+	Buffs.RefreshLayout()
+	Buffs.RefreshVisible()
+	Buffs.RefreshAllCategories()
+	Buffs.RefreshAllAuras()
 end
 
-function CDM.ConstructFrame(vState)
+function Buffs.ConstructFrame(vState)
 	local fState = {}
 	fState.slotKey  = tostring(fState)
 	fState.spellIDs = {}
@@ -192,10 +192,10 @@ function CDM.ConstructFrame(vState)
 	return fState
 end
 
-function CDM.EnableFrame(fState, cdvInfo, vState)
+function Buffs.EnableFrame(fState, cdvInfo, vState)
 	fState.spellCategory = cdvInfo.spellCategoryID
 	if fState.spellCategory then
-		CDM.categoryLookup[fState.spellCategory] = fState
+		Buffs.categoryLookup[fState.spellCategory] = fState
 	end
 
 	fState.baseSpellID = cdvInfo.spellID
@@ -204,7 +204,7 @@ function CDM.EnableFrame(fState, cdvInfo, vState)
 	-- NOTE: Category slots (e.g. Combat Potion) don't have a spell id
 	if cdvInfo.spellID then
 		fState.spellIDs[cdvInfo.spellID] = true
-		CDM.SetOverride(fState, C_Spell.GetOverrideSpell(cdvInfo.spellID))
+		Buffs.SetOverride(fState, C_Spell.GetOverrideSpell(cdvInfo.spellID))
 	end
 	for iLinked, linkedSpellID in ipairs(cdvInfo.linkedSpellIDs) do
 		fState.spellIDs[linkedSpellID] = true
@@ -212,14 +212,14 @@ function CDM.EnableFrame(fState, cdvInfo, vState)
 
 	fState.auraSpellID = cdvInfo.linkedSpellIDs[1] or cdvInfo.spellID
 
-	local filterCategory = CDM.filterCategories.SpellCategory[fState.spellCategory]
+	local filterCategory = Buffs.filterCategories.SpellCategory[fState.spellCategory]
 	for spellID, v in pairs(fState.spellIDs) do
-		filterCategory = filterCategory or CDM.filterCategories.Ability[spellID]
+		filterCategory = filterCategory or Buffs.filterCategories.Ability[spellID]
 	end
-	fState.cfg = filterCategory and Config.GetBranch(CDM.cfgTree, filterCategory) or vState.cfg
+	fState.cfg = filterCategory and Config.GetBranch(Buffs.cfgTree, filterCategory) or vState.cfg
 end
 
-function CDM.DisableFrame(fState)
+function Buffs.DisableFrame(fState)
 	wipe(fState.spellIDs)
 	fState.baseSpellID = nil
 	fState.spellID = nil
@@ -233,14 +233,14 @@ function CDM.DisableFrame(fState)
 	fState.Container:SetAuraSlotCandidateFilters(fState.slotKey, { includeSpellIDs = fState.spellIDs })
 end
 
-function CDM.AssignFrames()
-	wipe(CDM.categoryLookup)
-	wipe(CDM.onTargetLookup)
+function Buffs.AssignFrames()
+	wipe(Buffs.categoryLookup)
+	wipe(Buffs.onTargetLookup)
 
-	for category, vState in pairs(CDM.viewers) do
+	for category, vState in pairs(Buffs.viewers) do
 		-- Disable existing frames
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			CDM.DisableFrame(fState)
+			Buffs.DisableFrame(fState)
 			table.insert(vState.pool, fState)
 		end
 		wipe(vState.cdFrames)
@@ -249,30 +249,30 @@ function CDM.AssignFrames()
 		local have = #vState.pool
 		local need = #vState.cdvInfos
 		for iNeed = have + 1, need do
-			local fState = CDM.ConstructFrame(vState)
+			local fState = Buffs.ConstructFrame(vState)
 			table.insert(vState.pool, fState)
 		end
 
 		-- Enable new frames
 		for iInfo, cdvInfo in ipairs(vState.cdvInfos) do
 			local fState = table.remove(vState.pool)
-			CDM.EnableFrame(fState, cdvInfo, vState)
+			Buffs.EnableFrame(fState, cdvInfo, vState)
 			table.insert(vState.cdFrames, fState)
 		end
 	end
 end
 
-function CDM.RefreshScale()
+function Buffs.RefreshScale()
 	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
-	for category, vState in pairs(CDM.viewers) do
+	for category, vState in pairs(Buffs.viewers) do
 		vState.Root:SetScale(pixelsToUI)
 	end
 
-	Config.RefreshValues(CDM.cfgTree, pixelsToUI)
+	Config.RefreshValues(Buffs.cfgTree, pixelsToUI)
 end
 
-function CDM.RefreshAllConfig()
-	for category, vState in pairs(CDM.viewers) do
+function Buffs.RefreshAllConfig()
+	for category, vState in pairs(Buffs.viewers) do
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			local cfg = fState.cfg
 
@@ -294,10 +294,10 @@ function CDM.RefreshAllConfig()
 
 end
 
-function CDM.RefreshLayout()
+function Buffs.RefreshLayout()
 	local pxSize, pySize = GetPhysicalScreenSize()
 
-	for category, vState in pairs(CDM.viewers) do
+	for category, vState in pairs(Buffs.viewers) do
 		-- TODO: Handle relative sizes
 		local cfg           = vState.cfg
 		local xPos          = Round(cfg.xPos          + cfg.xPosRel          * 0)
@@ -355,14 +355,14 @@ function CDM.RefreshLayout()
 	end
 end
 
-function CDM.RefreshVisible()
-	local hasBar = Kami.CDM.GetActionBarOverride() ~= nil
-	for category, vState in pairs(CDM.viewers) do
+function Buffs.RefreshVisible()
+	local hasBar = CDM.GetActionBarOverride() ~= nil
+	for category, vState in pairs(Buffs.viewers) do
 		vState.Root:SetShown(not hasBar)
 	end
 end
 
-function CDM.SetOverride(fState, spellID)
+function Buffs.SetOverride(fState, spellID)
 	-- Remove the current override
 	if fState.spellID ~= fState.baseSpellID then
 		fState.spellIDs[fState.spellID] = nil
@@ -376,26 +376,26 @@ function CDM.SetOverride(fState, spellID)
 	end
 end
 
-function CDM.RefreshCategory(fState, spellID)
+function Buffs.RefreshCategory(fState, spellID)
 	wipe(fState.spellIDs)
 	fState.auraSpellID = spellID
 	fState.spellIDs[spellID] = true
 end
 
-function CDM.RefreshAllCategories()
-	for category, vState in pairs(CDM.viewers) do
+function Buffs.RefreshAllCategories()
+	for category, vState in pairs(Buffs.viewers) do
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			if fState.spellCategory then
-				local lastSource = CDM.charVars.lastCategorySource[fState.spellCategory]
+				local lastSource = Buffs.charVars.lastCategorySource[fState.spellCategory]
 				if lastSource then
-					CDM.RefreshCategory(fState, lastSource.spellID)
+					Buffs.RefreshCategory(fState, lastSource.spellID)
 				end
 			end
 		end
 	end
 end
 
-function CDM.RefreshAuras(fState)
+function Buffs.RefreshAuras(fState)
 	-- NOTE: selfAura and hasAura are unreliable. Colossus Smash selfAura is true. Avatar hasAura is
 	-- false. These are not sensible values. So we check IsSpellHarmful/Helpful instead.
 
@@ -408,7 +408,7 @@ function CDM.RefreshAuras(fState)
 	-- buffs and that works correctly with this approach.
 
 	fState.onTarget = fState.auraSpellID and C_Spell.IsSpellHarmful(fState.auraSpellID)
-	CDM.onTargetLookup[fState] = fState.onTarget or nil
+	Buffs.onTargetLookup[fState] = fState.onTarget or nil
 
 	local unit   = fState.onTarget and "target"          or "player"
 	local filter = fState.onTarget and "HARMFUL|PLAYER"  or "HELPFUL|PLAYER" -- AuraUtil.AuraFilters
@@ -421,10 +421,10 @@ function CDM.RefreshAuras(fState)
 	end
 end
 
-function CDM.RefreshAllAuras()
-	for category, vState in pairs(CDM.viewers) do
+function Buffs.RefreshAllAuras()
+	for category, vState in pairs(Buffs.viewers) do
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			CDM.RefreshAuras(fState)
+			Buffs.RefreshAuras(fState)
 		end
 	end
 end
@@ -432,68 +432,68 @@ end
 ----------------------------------------------------------------------------------------------------
 -- Event Handlers
 
-function CDM.RegisterEvent(event, func)
-	CDM.eventFrame:RegisterEvent(event)
-	CDM.handlers[event] = func
+function Buffs.RegisterEvent(event, func)
+	Buffs.eventFrame:RegisterEvent(event)
+	Buffs.handlers[event] = func
 end
 
-function CDM.DispatchEvent(frame, event, ...)
-	local func = CDM.handlers[event]
+function Buffs.DispatchEvent(frame, event, ...)
+	local func = Buffs.handlers[event]
 	func(...)
 end
 
-function CDM.PLAYER_REGEN_ENABLED()
-	CDM.Rebuild()
+function Buffs.PLAYER_REGEN_ENABLED()
+	Buffs.Rebuild()
 end
 
-function CDM.PLAYER_TARGET_CHANGED()
-	for fState, onTarget in pairs(CDM.onTargetLookup) do
+function Buffs.PLAYER_TARGET_CHANGED()
+	for fState, onTarget in pairs(Buffs.onTargetLookup) do
 		fState.Container:UpdateAllAuras()
 	end
 end
 
-function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
-	local fState = CDM.categoryLookup[category]
+function Buffs.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
+	local fState = Buffs.categoryLookup[category]
 	if fState then
 		if not fState.spellIDs[spellID] then
-			CDM.RefreshCategory(fState, spellID)
-			CDM.RefreshAuras(fState)
+			Buffs.RefreshCategory(fState, spellID)
+			Buffs.RefreshAuras(fState)
 		end
 	end
 end
 
-function CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID)
-	for category, vState in pairs(CDM.viewers) do
+function Buffs.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID)
+	for category, vState in pairs(Buffs.viewers) do
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			if fState.baseSpellID == baseSpellID then
-				CDM.SetOverride(fState, overrideSpellID)
-				CDM.RefreshAuras(fState)
+				Buffs.SetOverride(fState, overrideSpellID)
+				Buffs.RefreshAuras(fState)
 			end
 		end
 	end
 end
 
-function CDM.OnScaleChanged()
-	CDM.RefreshScale()
-	CDM.RefreshLayout()
+function Buffs.OnScaleChanged()
+	Buffs.RefreshScale()
+	Buffs.RefreshLayout()
 end
 
-function CDM.OnActionBarChanged()
-	CDM.RefreshVisible()
+function Buffs.OnActionBarChanged()
+	Buffs.RefreshVisible()
 end
 
-function CDM.OnCDMChanged()
+function Buffs.OnCDMChanged()
 	-- NOTE: Hook fires when events are being throttled. Wait for the unlock.
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	if layoutMgr:AreNotificationsLocked() then return end
 
-	CDM.Rebuild()
+	Buffs.Rebuild()
 end
 
 ----------------------------------------------------------------------------------------------------
 -- File Load
 
-CDM.Load()
+Buffs.Load()
 
 -- TODO: The flicker happens when tabbing between targets with Rend
 -- TODO: Come up with better naming. self? buffs/cds?
