@@ -2,6 +2,10 @@ local Kami = select(2, ...)
 local CDM = {}
 Kami.CDM = CDM
 
+local CDs
+local Buffs
+local Res
+
 function CDM.Load()
 	KLSavedVars.CDM = KLSavedVars.CDM or {}
 	KLCharVars.CDM  = KLCharVars.CDM  or {}
@@ -63,37 +67,45 @@ function CDM.Load()
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
 	CDM.eventFrame:SetScript("OnEvent", CDM.DispatchEvent)
-	CDM.RegisterEvent("PLAYER_LOGIN",                           CDM.PLAYER_LOGIN)
+	CDM.RegisterEvent("PLAYER_LOGIN", CDM.PLAYER_LOGIN)
+end
+
+function CDM.Init()
+	CDs   = CDM.Cooldowns
+	Buffs = CDM.Buffs
+	Res   = CDM.Resources
+
 	CDM.RegisterEvent("UI_SCALE_CHANGED",                       CDM.OnScaleChanged)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                   CDM.OnScaleChanged)
 	CDM.RegisterEvent("UPDATE_VEHICLE_ACTIONBAR",               CDM.OnActionBarChanged)
 	CDM.RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR",              CDM.OnActionBarChanged)
 	CDM.RegisterEvent("UPDATE_BONUS_ACTIONBAR",                 CDM.OnActionBarChanged)
-	-- CDM.RegisterEvent("ACTIONBAR_SLOT_CHANGED",              CDM.Cooldowns.ACTIONBAR_SLOT_CHANGED)
-	-- CDM.RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED",     CDM.Cooldowns.ADDON_RESTRICTION_STATE_CHANGED)
+	CDM.RegisterEvent("ACTIONBAR_SLOT_CHANGED",                 CDs.ACTIONBAR_SLOT_CHANGED)
+	CDM.RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED",        CDs.ADDON_RESTRICTION_STATE_CHANGED)
 	CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                  CDM.SPELL_UPDATE_COOLDOWN)
-	-- CDM.RegisterEvent("BAG_UPDATE_COOLDOWN",                 CDM.Cooldowns.BAG_UPDATE_COOLDOWN)
-	-- CDM.RegisterEvent("SPELL_UPDATE_USES",                   CDM.Cooldowns.SPELL_UPDATE_USES)
+	CDM.RegisterEvent("BAG_UPDATE_COOLDOWN",                    CDs.BAG_UPDATE_COOLDOWN)
+	CDM.RegisterEvent("SPELL_UPDATE_USES",                      CDs.SPELL_UPDATE_USES)
 	CDM.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED", CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
-	-- CDM.RegisterEvent("SPELL_UPDATE_ICON",                   CDM.Cooldowns.SPELL_UPDATE_ICON)
-	-- CDM.RegisterEvent("UPDATE_SHAPESHIFT_FORM",              CDM.Cooldowns.UPDATE_SHAPESHIFT_FORM)
-	-- CDM.RegisterEvent("SPELL_UPDATE_USABLE",                 CDM.Cooldowns.SPELL_UPDATE_USABLE)
-	-- CDM.RegisterEvent("ACTIONBAR_UPDATE_USABLE",             CDM.Cooldowns.ACTIONBAR_UPDATE_USABLE)
-	-- CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",            CDM.Cooldowns.SPELL_RANGE_CHECK_UPDATE)
-	-- CDM.RegisterEvent("ACTION_RANGE_CHECK_UPDATE",           CDM.Cooldowns.ACTION_RANGE_CHECK_UPDATE)
-	-- CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",          CDM.Cooldowns.CURRENT_SPELL_CAST_CHANGED)
-	-- CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",  CDM.Cooldowns.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
-	-- CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",  CDM.Cooldowns.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
-	-- CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                CDM.Buffs.PLAYER_REGEN_ENABLED)
-	-- CDM.RegisterEvent("PLAYER_TARGET_CHANGED",               CDM.Buffs.PLAYER_TARGET_CHANGED)
-	-- CDM.RegisterUnitEvent("UNIT_AURA",                       CDM.Resources.UNIT_AURA,             "player")
-	-- CDM.RegisterUnitEvent("UNIT_DISPLAYPOWER",               CDM.Resources.UNIT_DISPLAYPOWER,     "player", "vehicle", "pet")
-	-- CDM.RegisterUnitEvent("UNIT_MAXPOWER",                   CDM.Resources.UNIT_MAXPOWER,         "player", "vehicle", "pet")
-	-- CDM.RegisterUnitEvent("UNIT_POWER_FREQUENT",             CDM.Resources.UNIT_POWER_FREQUENT,   "player", "vehicle", "pet")
-	-- CDM.RegisterUnitEvent("UNIT_ENTERED_VEHICLE",            CDM.Resources.UNIT_ENTERED_VEHICLE,  "player")
-	-- CDM.RegisterUnitEvent("UNIT_SPELLCAST_START",            CDM.Resources.UNIT_SPELLCAST_START,  "player", "vehicle", "pet")
-	-- CDM.RegisterUnitEvent("UNIT_SPELLCAST_STOP",             CDM.Resources.UNIT_SPELLCAST_STOP,   "player", "vehicle", "pet")
-	-- CDM.RegisterUnitEvent("UNIT_SPELLCAST_FAILED",           CDM.Resources.UNIT_SPELLCAST_FAILED, "player", "vehicle", "pet")
+	CDM.RegisterEvent("SPELL_UPDATE_ICON",                      CDs.SPELL_UPDATE_ICON)
+	CDM.RegisterEvent("UPDATE_SHAPESHIFT_FORM",                 CDs.UPDATE_SHAPESHIFT_FORM)
+	CDM.RegisterEvent("SPELL_UPDATE_USABLE",                    CDs.SPELL_UPDATE_USABLE)
+	CDM.RegisterEvent("ACTIONBAR_UPDATE_USABLE",                CDs.ACTIONBAR_UPDATE_USABLE)
+	CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",               CDs.SPELL_RANGE_CHECK_UPDATE)
+	CDM.RegisterEvent("ACTION_RANGE_CHECK_UPDATE",              CDs.ACTION_RANGE_CHECK_UPDATE)
+	CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",             CDs.CURRENT_SPELL_CAST_CHANGED)
+	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",     CDs.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
+	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",     CDs.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
+	-- CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                Buffs.PLAYER_REGEN_ENABLED)
+	-- CDM.RegisterEvent("PLAYER_TARGET_CHANGED",               Buffs.PLAYER_TARGET_CHANGED)
+	-- CDM.RegisterUnitEvent("UNIT_AURA",                       Res.UNIT_AURA,             "player")
+	-- CDM.RegisterUnitEvent("UNIT_DISPLAYPOWER",               Res.UNIT_DISPLAYPOWER,     "player", "vehicle", "pet")
+	-- CDM.RegisterUnitEvent("UNIT_MAXPOWER",                   Res.UNIT_MAXPOWER,         "player", "vehicle", "pet")
+	-- CDM.RegisterUnitEvent("UNIT_POWER_FREQUENT",             Res.UNIT_POWER_FREQUENT,   "player", "vehicle", "pet")
+	-- CDM.RegisterUnitEvent("UNIT_ENTERED_VEHICLE",            Res.UNIT_ENTERED_VEHICLE,  "player")
+	-- CDM.RegisterUnitEvent("UNIT_SPELLCAST_START",            Res.UNIT_SPELLCAST_START,  "player", "vehicle", "pet")
+	-- CDM.RegisterUnitEvent("UNIT_SPELLCAST_STOP",             Res.UNIT_SPELLCAST_STOP,   "player", "vehicle", "pet")
+	-- CDM.RegisterUnitEvent("UNIT_SPELLCAST_FAILED",           Res.UNIT_SPELLCAST_FAILED, "player", "vehicle", "pet")
+
 	hooksecurefunc(UIParent, "SetScale", CDM.OnScaleChanged)
 
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
@@ -185,21 +197,22 @@ function CDM.DispatchEvent(frame, event, ...)
 end
 
 function CDM.PLAYER_LOGIN()
-	CDM.Cooldowns.Init()
-	CDM.Buffs.Init()
-	CDM.Resources.Init()
+	CDM.Init()
+	CDs.Init()
+	Buffs.Init()
+	Res.Init()
 end
 
 function CDM.OnScaleChanged()
-	CDM.Cooldowns.OnScaleChanged()
-	CDM.Buffs.OnScaleChanged()
-	CDM.Resources.OnScaleChanged()
+	CDs.OnScaleChanged()
+	Buffs.OnScaleChanged()
+	Res.OnScaleChanged()
 end
 
 function CDM.OnActionBarChanged()
-	CDM.Cooldowns.OnActionBarChanged()
-	CDM.Buffs.OnActionBarChanged()
-	CDM.Resources.OnActionBarChanged()
+	CDs.OnActionBarChanged()
+	Buffs.OnActionBarChanged()
+	Res.OnActionBarChanged()
 end
 
 function CDM.OnCDMChanged()
@@ -207,18 +220,18 @@ function CDM.OnCDMChanged()
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	if layoutMgr:AreNotificationsLocked() then return end
 
-	CDM.Cooldowns.OnCDMChanged()
-	CDM.Buffs.OnCDMChanged()
+	CDs.OnCDMChanged()
+	Buffs.OnCDMChanged()
 end
 
 function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
-	CDM.Cooldowns.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
-	CDM.Buffs.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
+	CDs.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
+	Buffs.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)
 end
 
 function CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID)
-	CDM.Cooldowns.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID)
-	CDM.Buffs.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID)
+	CDs.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID)
+	Buffs.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED(baseSpellID, overrideSpellID)
 end
 
 ----------------------------------------------------------------------------------------------------

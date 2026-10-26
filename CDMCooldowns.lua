@@ -125,23 +125,8 @@ function CDs.Init()
 
 	Config.AddNode(CDs.cfgTree, "Essential", "ActionBar", {})
 
-	CDs.handlers = {}
 	CDs.eventFrame = CreateFrame("Frame")
 	CDs.eventFrame:SetParentKey("Kami.CDM.Cooldowns.Event")
-	CDs.eventFrame:SetScript("OnEvent",                              CDs.DispatchEvent)
-	CDs.RegisterEvent("SPELL_UPDATE_USABLE",                         CDs.SPELL_UPDATE_USABLE)
-	CDs.RegisterEvent("ACTIONBAR_UPDATE_USABLE",                     CDs.ACTIONBAR_UPDATE_USABLE)
-	CDs.RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED",             CDs.ADDON_RESTRICTION_STATE_CHANGED)
-	CDs.RegisterEvent("ACTIONBAR_SLOT_CHANGED",                      CDs.ACTIONBAR_SLOT_CHANGED)
-	CDs.RegisterEvent("BAG_UPDATE_COOLDOWN",                         CDs.BAG_UPDATE_COOLDOWN)
-	CDs.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",                    CDs.SPELL_RANGE_CHECK_UPDATE)
-	CDs.RegisterEvent("ACTION_RANGE_CHECK_UPDATE",                   CDs.ACTION_RANGE_CHECK_UPDATE)
-	CDs.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",                  CDs.CURRENT_SPELL_CAST_CHANGED)
-	CDs.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",          CDs.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
-	CDs.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",          CDs.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
-	CDs.RegisterEvent("SPELL_UPDATE_ICON",                           CDs.SPELL_UPDATE_ICON)
-	CDs.RegisterEvent("UPDATE_SHAPESHIFT_FORM",                      CDs.UPDATE_SHAPESHIFT_FORM)
-	CDs.RegisterEvent("SPELL_UPDATE_USES",                           CDs.SPELL_UPDATE_USES)
 	hooksecurefunc("SecureActionButton_OnClick",                     CDs.OnClick)
 	SecureStateDriverManager:HookScript("OnUpdate",                  CDs.Update)
 	RegisterStateDriver(CDs.eventFrame, "poll", "1")
@@ -1303,16 +1288,6 @@ end
 
 ----------------------------------------------------------------------------------------------------
 -- Event Handlers
-
-function CDs.RegisterEvent(event, func)
-	CDs.eventFrame:RegisterEvent(event)
-	CDs.handlers[event] = func
-end
-
-function CDs.DispatchEvent(frame, event, ...)
-	local func = CDs.handlers[event]
-	func(...)
-end
 
 function CDs.OnScaleChanged()
 	CDs.RefreshScale()
