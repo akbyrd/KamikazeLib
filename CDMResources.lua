@@ -8,7 +8,7 @@ local Media  = Kami.Media
 local Util   = Kami.Util
 local LSM    = LibStub("LibSharedMedia-3.0")
 
-function Res.Load()
+function Res.Init()
 	Res.cfgTree = Config.Create()
 
 	Config.AddNode(Res.cfgTree, nil, "Default",
@@ -111,16 +111,6 @@ function Res.Load()
 	Res.eventFrame = CreateFrame("Frame")
 	Res.eventFrame:SetParentKey("Kami.CDM.Resources.Event")
 	Res.eventFrame:SetScript("OnEvent",        Res.DispatchEvent)
-	Res.RegisterEvent("PLAYER_ENTERING_WORLD", Res.Init)
-end
-
-function Res.Init()
-	Res.RegisterEvent("PLAYER_ENTERING_WORLD",     Res.PLAYER_ENTERING_WORLD)
-	Res.RegisterEvent("UI_SCALE_CHANGED",          Res.OnScaleChanged)
-	Res.RegisterEvent("DISPLAY_SIZE_CHANGED",      Res.OnScaleChanged)
-	Res.RegisterEvent("UPDATE_VEHICLE_ACTIONBAR",  Res.OnActionBarChanged)
-	Res.RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR", Res.OnActionBarChanged)
-	Res.RegisterEvent("UPDATE_BONUS_ACTIONBAR",    Res.OnActionBarChanged)
 	Res.RegisterUnitEvent("UNIT_DISPLAYPOWER",     Res.UNIT_DISPLAYPOWER,     "player", "vehicle", "pet")
 	Res.RegisterUnitEvent("UNIT_MAXPOWER",         Res.UNIT_MAXPOWER,         "player", "vehicle", "pet")
 	Res.RegisterUnitEvent("UNIT_POWER_FREQUENT",   Res.UNIT_POWER_FREQUENT,   "player", "vehicle", "pet")
@@ -128,7 +118,6 @@ function Res.Init()
 	Res.RegisterUnitEvent("UNIT_SPELLCAST_STOP",   Res.UNIT_SPELLCAST_STOP,   "player", "vehicle", "pet")
 	Res.RegisterUnitEvent("UNIT_SPELLCAST_FAILED", Res.UNIT_SPELLCAST_FAILED, "player", "vehicle", "pet")
 	Res.RegisterUnitEvent("UNIT_ENTERED_VEHICLE",  Res.UNIT_ENTERED_VEHICLE,  "player")
-	hooksecurefunc(UIParent, "SetScale",           Res.OnScaleChanged)
 
 	Res.cfg             = Config.GetBranch(Res.cfgTree, "Default")
 	Res.cfgPowerColors  = Config.GetBranch(Res.cfgTree, "ElvUIPowerColors")
@@ -414,10 +403,6 @@ function Res.OnActionBarChanged()
 	end
 end
 
-function Res.PLAYER_ENTERING_WORLD()
-	Res.Rebuild()
-end
-
 function Res.UNIT_AURA()
 	Res.RefreshPowerColor()
 end
@@ -474,8 +459,3 @@ function Res.UNIT_SPELLCAST_FAILED(unit)
 		Res.RefreshPrediction()
 	end
 end
-
-----------------------------------------------------------------------------------------------------
--- File Load
-
-Res.Load()

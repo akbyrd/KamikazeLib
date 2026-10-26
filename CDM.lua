@@ -58,6 +58,43 @@ function CDM.Load()
 			},
 		},
 	}
+
+	CDM.handlers = {}
+	CDM.eventFrame = CreateFrame("Frame")
+	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
+	CDM.eventFrame:SetScript("OnEvent", CDM.DispatchEvent)
+	CDM.RegisterEvent("PLAYER_LOGIN",                              CDM.PLAYER_LOGIN)
+	CDM.RegisterEvent("UI_SCALE_CHANGED",                          CDM.OnScaleChanged)
+	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                      CDM.OnScaleChanged)
+	CDM.RegisterEvent("UPDATE_VEHICLE_ACTIONBAR",                  CDM.OnActionBarChanged)
+	CDM.RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR",                 CDM.OnActionBarChanged)
+	CDM.RegisterEvent("UPDATE_BONUS_ACTIONBAR",                    CDM.OnActionBarChanged)
+	-- CDM.RegisterEvent("ACTIONBAR_SLOT_CHANGED",                 CDM.Cooldowns.ACTIONBAR_SLOT_CHANGED)
+	-- CDM.RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED",        CDM.Cooldowns.ADDON_RESTRICTION_STATE_CHANGED)
+	-- CDM.RegisterEvent("SPELL_UPDATE_COOLDOWN",                  CDM.SPELL_UPDATE_COOLDOWN)
+	-- CDM.RegisterEvent("BAG_UPDATE_COOLDOWN",                    CDM.Cooldowns.BAG_UPDATE_COOLDOWN)
+	-- CDM.RegisterEvent("SPELL_UPDATE_USES",                      CDM.Cooldowns.SPELL_UPDATE_USES)
+	-- CDM.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED", CDM.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
+	-- CDM.RegisterEvent("SPELL_UPDATE_ICON",                      CDM.Cooldowns.SPELL_UPDATE_ICON)
+	-- CDM.RegisterEvent("UPDATE_SHAPESHIFT_FORM",                 CDM.Cooldowns.UPDATE_SHAPESHIFT_FORM)
+	-- CDM.RegisterEvent("SPELL_UPDATE_USABLE",                    CDM.Cooldowns.SPELL_UPDATE_USABLE)
+	-- CDM.RegisterEvent("ACTIONBAR_UPDATE_USABLE",                CDM.Cooldowns.ACTIONBAR_UPDATE_USABLE)
+	-- CDM.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",               CDM.Cooldowns.SPELL_RANGE_CHECK_UPDATE)
+	-- CDM.RegisterEvent("ACTION_RANGE_CHECK_UPDATE",              CDM.Cooldowns.ACTION_RANGE_CHECK_UPDATE)
+	-- CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",             CDM.Cooldowns.CURRENT_SPELL_CAST_CHANGED)
+	-- CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",     CDM.Cooldowns.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
+	-- CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",     CDM.Cooldowns.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
+	-- CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                   CDM.Buffs.PLAYER_REGEN_ENABLED)
+	-- CDM.RegisterEvent("PLAYER_TARGET_CHANGED",                  CDM.Buffs.PLAYER_TARGET_CHANGED)
+	-- CDM.RegisterUnitEvent("UNIT_AURA",                          CDM.Resources.UNIT_AURA,             "player")
+	-- CDM.RegisterUnitEvent("UNIT_DISPLAYPOWER",                  CDM.Resources.UNIT_DISPLAYPOWER,     "player", "vehicle", "pet")
+	-- CDM.RegisterUnitEvent("UNIT_MAXPOWER",                      CDM.Resources.UNIT_MAXPOWER,         "player", "vehicle", "pet")
+	-- CDM.RegisterUnitEvent("UNIT_POWER_FREQUENT",                CDM.Resources.UNIT_POWER_FREQUENT,   "player", "vehicle", "pet")
+	-- CDM.RegisterUnitEvent("UNIT_ENTERED_VEHICLE",               CDM.Resources.UNIT_ENTERED_VEHICLE,  "player")
+	-- CDM.RegisterUnitEvent("UNIT_SPELLCAST_START",               CDM.Resources.UNIT_SPELLCAST_START,  "player", "vehicle", "pet")
+	-- CDM.RegisterUnitEvent("UNIT_SPELLCAST_STOP",                CDM.Resources.UNIT_SPELLCAST_STOP,   "player", "vehicle", "pet")
+	-- CDM.RegisterUnitEvent("UNIT_SPELLCAST_FAILED",              CDM.Resources.UNIT_SPELLCAST_FAILED, "player", "vehicle", "pet")
+	hooksecurefunc(UIParent, "SetScale", CDM.OnScaleChanged)
 end
 
 function CDM.GatherCDs(viewers)
@@ -130,5 +167,39 @@ function CDM.GetActionBarOverride()
 		return db.Misc.SkyridingBarIndex, "player"
 	end
 end
+
+----------------------------------------------------------------------------------------------------
+-- Event Handlers
+
+function CDM.RegisterEvent(event, func)
+	CDM.eventFrame:RegisterEvent(event)
+	CDM.handlers[event] = func
+end
+
+function CDM.DispatchEvent(frame, event, ...)
+	local func = CDM.handlers[event]
+	func(...)
+end
+
+function CDM.PLAYER_LOGIN()
+	CDM.Cooldowns.Init()
+	CDM.Buffs.Init()
+	CDM.Resources.Init()
+end
+
+function CDM.OnScaleChanged()
+	CDM.Cooldowns.OnScaleChanged()
+	CDM.Buffs.OnScaleChanged()
+	CDM.Resources.OnScaleChanged()
+end
+
+function CDM.OnActionBarChanged()
+	CDM.Cooldowns.OnActionBarChanged()
+	CDM.Buffs.OnActionBarChanged()
+	CDM.Resources.OnActionBarChanged()
+end
+
+----------------------------------------------------------------------------------------------------
+-- File Load
 
 CDM.Load()

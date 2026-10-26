@@ -211,7 +211,7 @@ end
 ----------------------------------------------------------------------------------------------------
 -- File Load
 
-Settings.Load()
+--Settings.Load()
 --Settings.Toggle()
 
 -- TODO: Refine cfg and construction ordering

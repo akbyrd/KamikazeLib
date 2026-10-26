@@ -1,5 +1,6 @@
 To Do
 -----
+Anchoring
 Attempt to remove OnCDMChanged
 
 Testing
@@ -36,7 +37,6 @@ Generalize CDM infrastructure
 	Scale change events
 	Rebuild events
 	Share more config by default?
-	Maybe event handling?
 	Override tracking
 
 Settings
@@ -52,7 +52,6 @@ Settings
 
 Auto-hide
 Track active duration
-Anchoring
 Disable ability highlight on specific spells
 Per-talent layout
 Find a suitable spell category database (Danders if loaded?)

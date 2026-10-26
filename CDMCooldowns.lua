@@ -10,7 +10,7 @@ local PixelAnts   = Kami.PixelAnts
 local Util        = Kami.Util
 local LSM         = LibStub("LibSharedMedia-3.0")
 
-function CDs.Load()
+function CDs.Init()
 	CDs.savedVars = KLSavedVars.CDM
 	CDs.charVars  = KLCharVars.CDM
 
@@ -129,13 +129,8 @@ function CDs.Load()
 	CDs.eventFrame = CreateFrame("Frame")
 	CDs.eventFrame:SetParentKey("Kami.CDM.Cooldowns.Event")
 	CDs.eventFrame:SetScript("OnEvent",                              CDs.DispatchEvent)
-	CDs.RegisterEvent("UI_SCALE_CHANGED",                            CDs.OnScaleChanged)
-	CDs.RegisterEvent("DISPLAY_SIZE_CHANGED",                        CDs.OnScaleChanged)
 	CDs.RegisterEvent("SPELL_UPDATE_USABLE",                         CDs.SPELL_UPDATE_USABLE)
 	CDs.RegisterEvent("ACTIONBAR_UPDATE_USABLE",                     CDs.ACTIONBAR_UPDATE_USABLE)
-	CDs.RegisterEvent("UPDATE_VEHICLE_ACTIONBAR",                    CDs.OnActionBarChanged)
-	CDs.RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR",                   CDs.OnActionBarChanged)
-	CDs.RegisterEvent("UPDATE_BONUS_ACTIONBAR",                      CDs.OnActionBarChanged)
 	CDs.RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED",             CDs.ADDON_RESTRICTION_STATE_CHANGED)
 	CDs.RegisterEvent("ACTIONBAR_SLOT_CHANGED",                      CDs.ACTIONBAR_SLOT_CHANGED)
 	CDs.RegisterEvent("BAG_UPDATE_COOLDOWN",                         CDs.BAG_UPDATE_COOLDOWN)
@@ -149,7 +144,6 @@ function CDs.Load()
 	CDs.RegisterEvent("SPELL_UPDATE_ICON",                           CDs.SPELL_UPDATE_ICON)
 	CDs.RegisterEvent("UPDATE_SHAPESHIFT_FORM",                      CDs.UPDATE_SHAPESHIFT_FORM)
 	CDs.RegisterEvent("SPELL_UPDATE_USES",                           CDs.SPELL_UPDATE_USES)
-	hooksecurefunc(UIParent, "SetScale",                             CDs.OnScaleChanged)
 	hooksecurefunc("SecureActionButton_OnClick",                     CDs.OnClick)
 	SecureStateDriverManager:HookScript("OnUpdate",                  CDs.Update)
 	RegisterStateDriver(CDs.eventFrame, "poll", "1")
@@ -240,7 +234,7 @@ function CDs.Load()
 	CDs.aurasSecret         = C_Secrets.ShouldAurasBeSecret()
 
 	CDs.OnAssistChange()
-	CDs.Rebuild("Load")
+	CDs.Rebuild("Init")
 end
 
 function CDs.Update()
@@ -1603,8 +1597,3 @@ function CDs.OnCDMChanged()
 
 	CDs.Rebuild("OnCDMChanged")
 end
-
-----------------------------------------------------------------------------------------------------
--- File Load
-
-CDs.Load()

@@ -8,7 +8,7 @@ local Media     = Kami.Media
 local PixelAnts = Kami.PixelAnts
 local Util      = Kami.Util
 
-function Buffs.Load()
+function Buffs.Init()
 	Buffs.charVars = KLCharVars.CDM
 
 	Buffs.cfgTree = Config.Create()
@@ -73,16 +73,10 @@ function Buffs.Load()
 	Buffs.eventFrame = CreateFrame("Frame")
 	Buffs.eventFrame:SetParentKey("Kami.CDM.Buffs.Event")
 	Buffs.eventFrame:SetScript("OnEvent",                         Buffs.DispatchEvent)
-	Buffs.RegisterEvent("UI_SCALE_CHANGED",                       Buffs.OnScaleChanged)
-	Buffs.RegisterEvent("DISPLAY_SIZE_CHANGED",                   Buffs.OnScaleChanged)
-	Buffs.RegisterEvent("UPDATE_VEHICLE_ACTIONBAR",               Buffs.OnActionBarChanged)
-	Buffs.RegisterEvent("UPDATE_OVERRIDE_ACTIONBAR",              Buffs.OnActionBarChanged)
-	Buffs.RegisterEvent("UPDATE_BONUS_ACTIONBAR",                 Buffs.OnActionBarChanged)
 	Buffs.RegisterEvent("PLAYER_REGEN_ENABLED",                   Buffs.PLAYER_REGEN_ENABLED)
 	Buffs.RegisterEvent("PLAYER_TARGET_CHANGED",                  Buffs.PLAYER_TARGET_CHANGED)
 	Buffs.RegisterEvent("SPELL_UPDATE_COOLDOWN",                  Buffs.SPELL_UPDATE_COOLDOWN)
 	Buffs.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED", Buffs.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
-	hooksecurefunc(UIParent, "SetScale",                          Buffs.OnScaleChanged)
 
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	hooksecurefunc(layoutMgr, "NotifyListeners", Buffs.OnCDMChanged)
@@ -489,11 +483,6 @@ function Buffs.OnCDMChanged()
 
 	Buffs.Rebuild()
 end
-
-----------------------------------------------------------------------------------------------------
--- File Load
-
-Buffs.Load()
 
 -- TODO: The flicker happens when tabbing between targets with Rend
 -- TODO: Come up with better naming. self? buffs/cds?
