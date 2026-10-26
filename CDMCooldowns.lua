@@ -134,13 +134,11 @@ function CDs.Init()
 	CDs.RegisterEvent("ADDON_RESTRICTION_STATE_CHANGED",             CDs.ADDON_RESTRICTION_STATE_CHANGED)
 	CDs.RegisterEvent("ACTIONBAR_SLOT_CHANGED",                      CDs.ACTIONBAR_SLOT_CHANGED)
 	CDs.RegisterEvent("BAG_UPDATE_COOLDOWN",                         CDs.BAG_UPDATE_COOLDOWN)
-	CDs.RegisterEvent("SPELL_UPDATE_COOLDOWN",                       CDs.SPELL_UPDATE_COOLDOWN)
 	CDs.RegisterEvent("SPELL_RANGE_CHECK_UPDATE",                    CDs.SPELL_RANGE_CHECK_UPDATE)
 	CDs.RegisterEvent("ACTION_RANGE_CHECK_UPDATE",                   CDs.ACTION_RANGE_CHECK_UPDATE)
 	CDs.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",                  CDs.CURRENT_SPELL_CAST_CHANGED)
 	CDs.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",          CDs.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
 	CDs.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",          CDs.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
-	CDs.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED",      CDs.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
 	CDs.RegisterEvent("SPELL_UPDATE_ICON",                           CDs.SPELL_UPDATE_ICON)
 	CDs.RegisterEvent("UPDATE_SHAPESHIFT_FORM",                      CDs.UPDATE_SHAPESHIFT_FORM)
 	CDs.RegisterEvent("SPELL_UPDATE_USES",                           CDs.SPELL_UPDATE_USES)
@@ -148,9 +146,6 @@ function CDs.Init()
 	SecureStateDriverManager:HookScript("OnUpdate",                  CDs.Update)
 	RegisterStateDriver(CDs.eventFrame, "poll", "1")
 	CVarCallbackRegistry:RegisterCallback("assistedCombatHighlight", CDs.OnAssistChange, CDs)
-
-	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
-	hooksecurefunc(layoutMgr, "NotifyListeners", CDs.OnCDMChanged)
 
 	local cdTypeface = LSM:Fetch("font", "PT Sans Narrow")
 	local chargeTypeface = LSM:Fetch("font", "Homespun")
@@ -1585,10 +1580,6 @@ end
 
 -- TODO: We want to rebuild in combat when a spell is added or removed
 function CDs.OnCDMChanged()
-	-- NOTE: Hook fires when events are being throttled. Wait for the unlock.
-	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
-	if layoutMgr:AreNotificationsLocked() then return end
-
 	-- NOTE: Spell overrides cause this event. We don't need to rebuild due to overrides and that
 	-- would cause rebuilds in combat. I wish we could be more selective about when we get this
 	-- event. Really, we only want it for non-combat related events like hotfixes, talent changes,

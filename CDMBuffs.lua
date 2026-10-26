@@ -75,11 +75,6 @@ function Buffs.Init()
 	Buffs.eventFrame:SetScript("OnEvent",                         Buffs.DispatchEvent)
 	Buffs.RegisterEvent("PLAYER_REGEN_ENABLED",                   Buffs.PLAYER_REGEN_ENABLED)
 	Buffs.RegisterEvent("PLAYER_TARGET_CHANGED",                  Buffs.PLAYER_TARGET_CHANGED)
-	Buffs.RegisterEvent("SPELL_UPDATE_COOLDOWN",                  Buffs.SPELL_UPDATE_COOLDOWN)
-	Buffs.RegisterEvent("COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED", Buffs.COOLDOWN_VIEWER_SPELL_OVERRIDE_UPDATED)
-
-	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
-	hooksecurefunc(layoutMgr, "NotifyListeners", Buffs.OnCDMChanged)
 
 	local categoryToName = EnumUtil.GenerateNameTranslation(Enum.CooldownViewerCategory)
 
@@ -477,10 +472,6 @@ function Buffs.OnActionBarChanged()
 end
 
 function Buffs.OnCDMChanged()
-	-- NOTE: Hook fires when events are being throttled. Wait for the unlock.
-	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
-	if layoutMgr:AreNotificationsLocked() then return end
-
 	Buffs.Rebuild()
 end
 
