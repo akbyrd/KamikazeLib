@@ -107,17 +107,9 @@ function Res.Init()
 			}),
 		})
 
-	Res.handlers = {}
 	Res.eventFrame = CreateFrame("Frame")
 	Res.eventFrame:SetParentKey("Kami.CDM.Resources.Event")
-	Res.eventFrame:SetScript("OnEvent",        Res.DispatchEvent)
-	Res.RegisterUnitEvent("UNIT_DISPLAYPOWER",     Res.UNIT_DISPLAYPOWER,     "player", "vehicle", "pet")
-	Res.RegisterUnitEvent("UNIT_MAXPOWER",         Res.UNIT_MAXPOWER,         "player", "vehicle", "pet")
-	Res.RegisterUnitEvent("UNIT_POWER_FREQUENT",   Res.UNIT_POWER_FREQUENT,   "player", "vehicle", "pet")
-	Res.RegisterUnitEvent("UNIT_SPELLCAST_START",  Res.UNIT_SPELLCAST_START,  "player", "vehicle", "pet")
-	Res.RegisterUnitEvent("UNIT_SPELLCAST_STOP",   Res.UNIT_SPELLCAST_STOP,   "player", "vehicle", "pet")
-	Res.RegisterUnitEvent("UNIT_SPELLCAST_FAILED", Res.UNIT_SPELLCAST_FAILED, "player", "vehicle", "pet")
-	Res.RegisterUnitEvent("UNIT_ENTERED_VEHICLE",  Res.UNIT_ENTERED_VEHICLE,  "player")
+	Res.eventFrame:SetScript("OnEvent", Res.DispatchEvent)
 
 	Res.cfg             = Config.GetBranch(Res.cfgTree, "Default")
 	Res.cfgPowerColors  = Config.GetBranch(Res.cfgTree, "ElvUIPowerColors")
@@ -181,8 +173,9 @@ function Res.Init()
 end
 
 function Res.Update()
-	-- NOTE: Only enabled when skyriding
-	Res.RefreshCurrentPower()
+	if Res.barIndex == CDM.db.Misc.SkyridingBarIndex then
+		Res.RefreshCurrentPower()
+	end
 end
 
 function Res.Rebuild()
@@ -263,14 +256,12 @@ function Res.RefreshPowerSource()
 		Res.GetPowerType    = Res.GetPowerType_Skyriding
 		Res.GetMaxPower     = Res.GetMaxPower_Skyriding
 		Res.GetCurrentPower = Res.GetCurrentPower_Skyriding
-		Res.eventFrame:SetScript("OnUpdate", Res.Update)
-		Res.RegisterUnitEvent("UNIT_AURA", Res.UNIT_AURA, "player")
+		Res.eventFrame:RegisterUnitEvent("UNIT_AURA", "player")
 	else
 		local useAlternate = Res.barIndex ~= nil and Res.unit == "player"
 		Res.GetPowerType    = useAlternate and Res.GetPowerType_Alternate or UnitPowerType
 		Res.GetMaxPower     = UnitPowerMax
 		Res.GetCurrentPower = UnitPower
-		Res.eventFrame:SetScript("OnUpdate", nil)
 		Res.eventFrame:UnregisterEvent("UNIT_AURA")
 	end
 end
@@ -374,18 +365,8 @@ end
 ----------------------------------------------------------------------------------------------------
 -- Event Handlers
 
-function Res.RegisterEvent(event, func)
-	Res.eventFrame:RegisterEvent(event)
-	Res.handlers[event] = func
-end
-
-function Res.RegisterUnitEvent(event, func, ...)
-	Res.eventFrame:RegisterUnitEvent(event, ...)
-	Res.handlers[event] = func
-end
-
 function Res.DispatchEvent(frame, event, ...)
-	local func = Res.handlers[event]
+	local func = Res[event]
 	func(...)
 end
 

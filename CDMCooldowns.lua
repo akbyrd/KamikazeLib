@@ -128,7 +128,6 @@ function CDs.Init()
 	CDs.eventFrame = CreateFrame("Frame")
 	CDs.eventFrame:SetParentKey("Kami.CDM.Cooldowns.Event")
 	hooksecurefunc("SecureActionButton_OnClick",                     CDs.OnClick)
-	SecureStateDriverManager:HookScript("OnUpdate",                  CDs.Update)
 	RegisterStateDriver(CDs.eventFrame, "poll", "1")
 	CVarCallbackRegistry:RegisterCallback("assistedCombatHighlight", CDs.OnAssistChange, CDs)
 

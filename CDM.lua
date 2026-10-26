@@ -95,17 +95,17 @@ function CDM.Init()
 	CDM.RegisterEvent("CURRENT_SPELL_CAST_CHANGED",             CDs.CURRENT_SPELL_CAST_CHANGED)
 	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_SHOW",     CDs.SPELL_ACTIVATION_OVERLAY_GLOW_SHOW)
 	CDM.RegisterEvent("SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",     CDs.SPELL_ACTIVATION_OVERLAY_GLOW_HIDE)
-	-- CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                Buffs.PLAYER_REGEN_ENABLED)
-	-- CDM.RegisterEvent("PLAYER_TARGET_CHANGED",               Buffs.PLAYER_TARGET_CHANGED)
-	-- CDM.RegisterUnitEvent("UNIT_AURA",                       Res.UNIT_AURA,             "player")
-	-- CDM.RegisterUnitEvent("UNIT_DISPLAYPOWER",               Res.UNIT_DISPLAYPOWER,     "player", "vehicle", "pet")
-	-- CDM.RegisterUnitEvent("UNIT_MAXPOWER",                   Res.UNIT_MAXPOWER,         "player", "vehicle", "pet")
-	-- CDM.RegisterUnitEvent("UNIT_POWER_FREQUENT",             Res.UNIT_POWER_FREQUENT,   "player", "vehicle", "pet")
-	-- CDM.RegisterUnitEvent("UNIT_ENTERED_VEHICLE",            Res.UNIT_ENTERED_VEHICLE,  "player")
-	-- CDM.RegisterUnitEvent("UNIT_SPELLCAST_START",            Res.UNIT_SPELLCAST_START,  "player", "vehicle", "pet")
-	-- CDM.RegisterUnitEvent("UNIT_SPELLCAST_STOP",             Res.UNIT_SPELLCAST_STOP,   "player", "vehicle", "pet")
-	-- CDM.RegisterUnitEvent("UNIT_SPELLCAST_FAILED",           Res.UNIT_SPELLCAST_FAILED, "player", "vehicle", "pet")
+	CDM.RegisterEvent("PLAYER_REGEN_ENABLED",                   Buffs.PLAYER_REGEN_ENABLED)
+	CDM.RegisterEvent("PLAYER_TARGET_CHANGED",                  Buffs.PLAYER_TARGET_CHANGED)
+	CDM.RegisterUnitEvent("UNIT_DISPLAYPOWER",                  Res.UNIT_DISPLAYPOWER,     "player", "vehicle", "pet")
+	CDM.RegisterUnitEvent("UNIT_MAXPOWER",                      Res.UNIT_MAXPOWER,         "player", "vehicle", "pet")
+	CDM.RegisterUnitEvent("UNIT_POWER_FREQUENT",                Res.UNIT_POWER_FREQUENT,   "player", "vehicle", "pet")
+	CDM.RegisterUnitEvent("UNIT_ENTERED_VEHICLE",               Res.UNIT_ENTERED_VEHICLE,  "player")
+	CDM.RegisterUnitEvent("UNIT_SPELLCAST_START",               Res.UNIT_SPELLCAST_START,  "player", "vehicle", "pet")
+	CDM.RegisterUnitEvent("UNIT_SPELLCAST_STOP",                Res.UNIT_SPELLCAST_STOP,   "player", "vehicle", "pet")
+	CDM.RegisterUnitEvent("UNIT_SPELLCAST_FAILED",              Res.UNIT_SPELLCAST_FAILED, "player", "vehicle", "pet")
 
+	SecureStateDriverManager:HookScript("OnUpdate", CDM.Update)
 	hooksecurefunc(UIParent, "SetScale", CDM.OnScaleChanged)
 
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
@@ -191,6 +191,11 @@ function CDM.RegisterEvent(event, func)
 	CDM.handlers[event] = func
 end
 
+function CDM.RegisterUnitEvent(event, func, ...)
+	CDM.eventFrame:RegisterUnitEvent(event, ...)
+	CDM.handlers[event] = func
+end
+
 function CDM.DispatchEvent(frame, event, ...)
 	local func = CDM.handlers[event]
 	func(...)
@@ -213,6 +218,11 @@ function CDM.OnActionBarChanged()
 	CDs.OnActionBarChanged()
 	Buffs.OnActionBarChanged()
 	Res.OnActionBarChanged()
+end
+
+function CDM.Update()
+	CDs.Update()
+	Res.Update()
 end
 
 function CDM.OnCDMChanged()

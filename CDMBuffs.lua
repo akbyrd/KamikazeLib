@@ -69,13 +69,6 @@ function Buffs.Init()
 			}),
 		})
 
-	Buffs.handlers = {}
-	Buffs.eventFrame = CreateFrame("Frame")
-	Buffs.eventFrame:SetParentKey("Kami.CDM.Buffs.Event")
-	Buffs.eventFrame:SetScript("OnEvent",                         Buffs.DispatchEvent)
-	Buffs.RegisterEvent("PLAYER_REGEN_ENABLED",                   Buffs.PLAYER_REGEN_ENABLED)
-	Buffs.RegisterEvent("PLAYER_TARGET_CHANGED",                  Buffs.PLAYER_TARGET_CHANGED)
-
 	local categoryToName = EnumUtil.GenerateNameTranslation(Enum.CooldownViewerCategory)
 
 	local viewerCategories = {
@@ -420,16 +413,6 @@ end
 
 ----------------------------------------------------------------------------------------------------
 -- Event Handlers
-
-function Buffs.RegisterEvent(event, func)
-	Buffs.eventFrame:RegisterEvent(event)
-	Buffs.handlers[event] = func
-end
-
-function Buffs.DispatchEvent(frame, event, ...)
-	local func = Buffs.handlers[event]
-	func(...)
-end
 
 function Buffs.PLAYER_REGEN_ENABLED()
 	Buffs.Rebuild()
