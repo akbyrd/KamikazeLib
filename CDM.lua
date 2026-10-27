@@ -68,6 +68,7 @@ function CDM.Load()
 	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
 	CDM.eventFrame:SetScript("OnEvent", CDM.DispatchEvent)
 	CDM.RegisterEvent("PLAYER_LOGIN", CDM.PLAYER_LOGIN)
+	hooksecurefunc("SecureActionButton_OnClick", CDM.OnClick)
 end
 
 function CDM.Init()
@@ -218,6 +219,10 @@ function CDM.OnActionBarChanged()
 	CDs.OnActionBarChanged()
 	Buffs.OnActionBarChanged()
 	Res.OnActionBarChanged()
+end
+
+function CDM.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
+	CDs.OnClick(button, mouseButton, down, isKeyPress, isSecureAction)
 end
 
 function CDM.Update()
