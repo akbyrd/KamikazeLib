@@ -232,7 +232,7 @@ function CDs.Update()
 end
 
 function CDs.Rebuild(reason)
-	print("Rebuild", reason)
+	--print("Rebuild", reason)
 
 	CDs.RefreshActionBarOverride()
 	CDs.GatherCDs()

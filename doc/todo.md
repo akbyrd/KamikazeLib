@@ -2,6 +2,20 @@ To Do
 -----
 Anchoring
 Attempt to remove OnCDMChanged
+Track any spell
+	Power infusion
+Track any item
+
+Settings
+	Row highlights
+	Tooltips
+		Put file earlier in toc
+		Figure out how profiles should work
+	Show in built-in Options > Addons?
+	Edit Mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
+	"show all" buff bars for edit mode
+	Implement search
+	Versioning
 
 Testing
 	Test vehicle power prediction
@@ -17,10 +31,6 @@ Known issues
 		Central lookup?
 		Or pool frame by identity and reuse (complicated with duplicates)
 	Handle press highlight for `[btn:2]` macros
-
-Track any spell
-	Power infusion
-Track any item
 
 Resources
 	Sweeping strikes bar
@@ -38,17 +48,6 @@ Generalize CDM infrastructure
 	Rebuild events
 	Share more config by default?
 	Override tracking
-
-Settings
-	Row highlights
-	Tooltips
-		Put file earlier in toc
-		Figure out how profiles should work
-	Show in built-in Options > Addons?
-	Edit Mode support? (C_EditMode.GetLayouts(), EDIT_MODE_LAYOUTS_UPDATED)
-	"show all" buff bars for edit mode
-	Implement search
-	Versioning
 
 Auto-hide
 Track active duration
