@@ -35,8 +35,6 @@ function Buffs.Init()
 		})
 	Config.AddNode(Buffs.cfgTree, "Default", "TrackedBar",
 		{
-			xPos       = Config.Size("0px"),
-			yPos       = Config.Size("-328px"),
 			xSize      = Config.Size("514px"),
 			ySize      = Config.Size("16px"),
 			padSize    = Config.Size("-1px"),
@@ -291,13 +289,9 @@ function Buffs.RefreshAllConfig()
 end
 
 function Buffs.RefreshLayout()
-	local pxSize, pySize = GetPhysicalScreenSize()
-
 	for category, vState in pairs(Buffs.viewers) do
 		-- TODO: Handle relative sizes
 		local cfg           = vState.cfg
-		local xPos          = Round(cfg.xPos          + cfg.xPosRel          * 0)
-		local yPos          = Round(cfg.yPos          + cfg.yPosRel          * 0)
 		local xSize         = Round(cfg.xSize         + cfg.xSizeRel         * 0)
 		local ySize         = Round(cfg.ySize         + cfg.ySizeRel         * 0)
 		local padSize       = Round(cfg.padSize       + cfg.padSizeRel       * 0)
@@ -309,9 +303,6 @@ function Buffs.RefreshLayout()
 
 		local vxSize = cfg.xSize
 		local vySize = #vState.cdFrames * #auraUnits * (ySize + padSize) - padSize
-		local vxPos  = xPos + Round((pxSize - vxSize) / 2)
-		local vyPos  = yPos - Round(pySize / 2) + vySize
-		vState.Root:SetPoint("TOPLEFT", UIParent, "TOPLEFT", vxPos, vyPos)
 		vState.Root:SetSize(vxSize, vySize)
 		vState.Base:SetHeight(max(1, abs(padSize)))
 		vState.Base:SetPointsOffset(0, -padSize)

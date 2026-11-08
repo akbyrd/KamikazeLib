@@ -18,9 +18,6 @@ function CDs.Init()
 
 	Config.AddNode(CDs.cfgTree, nil, "Default",
 		{
-			xPos = Config.Size("0ui"),
-			yPos = Config.Size("0ui"),
-
 			iconSize   = Config.Size("50ui"),
 			iconZoom   = Config.Number(0.08),
 			iconAspect = Config.Number(1.65),
@@ -111,14 +108,10 @@ function CDs.Init()
 			})
 		})
 
-	Config.AddNode(CDs.cfgTree, "Default", "Essential",
-		{
-			yPos = Config.Size("-248ui"),
-		})
+	Config.AddNode(CDs.cfgTree, "Default", "Essential", {})
 
 	Config.AddNode(CDs.cfgTree, "Default", "Utility",
 		{
-			yPos      = Config.Size("-310ui"),
 			iconSize  = Config.Size("30ui"),
 			rowLimits = Config.Table({ Config.Number(4) }),
 		})
@@ -688,8 +681,6 @@ function CDs.RefreshAllPositions()
 
 	for category, vState in pairs(CDs.viewers) do
 		local cfg      = vState.cfg
-		local vxPos    = Round(cfg.xPos     + cfg.xPosRel     * pxSize)
-		local vyPos    = Round(cfg.yPos     + cfg.yPosRel     * pySize)
 		local iconSize = Round(cfg.iconSize + cfg.iconSizeRel * pySize)
 		local iconPad  = Round(cfg.iconPad  + cfg.iconPadRel  * iconSize)
 
@@ -714,9 +705,6 @@ function CDs.RefreshAllPositions()
 			myPos = min(myPos, yPos - vState.ySize)
 		end
 
-		vxPos = Round((0 + pxSize - mxPos) / 2 + vxPos)
-		vyPos = Round((0 - pySize - myPos) / 2 + vyPos)
-		vState.Root:SetPoint("TOPLEFT", UIParent, "TOPLEFT", vxPos, vyPos)
 		vState.Root:SetSize(mxPos, -myPos)
 	end
 end

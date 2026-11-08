@@ -6,6 +6,14 @@ local CDs
 local Buffs
 local Res
 
+local Config = Kami.Config
+
+local function HookLayout(Root)
+	Root:HookScript("OnSizeChanged", CDM.OnLayoutChanged)
+	Root:HookScript("OnShow",        CDM.OnLayoutChanged)
+	Root:HookScript("OnHide",        CDM.OnLayoutChanged)
+end
+
 function CDM.Load()
 	KLSavedVars.CDM = KLSavedVars.CDM or {}
 	KLCharVars.CDM  = KLCharVars.CDM  or {}
@@ -64,6 +72,7 @@ function CDM.Load()
 	}
 
 	CDM.handlers = {}
+	CDM.layoutDirty = false
 	CDM.eventFrame = CreateFrame("Frame")
 	CDM.eventFrame:SetParentKey("Kami.CDM.Event")
 	CDM.eventFrame:SetScript("OnEvent", CDM.DispatchEvent)
@@ -75,6 +84,33 @@ function CDM.Init()
 	CDs   = CDM.Cooldowns
 	Buffs = CDM.Buffs
 	Res   = CDM.Resources
+
+	CDM.cfgTree = Config.Create()
+
+	Config.AddNode(CDM.cfgTree, nil, "Default",
+		{
+			xPos = Config.Size("0px"),
+			yPos = Config.Size("0px"),
+		})
+	Config.AddNode(CDM.cfgTree, "Default", "Essential",
+		{
+			yPos = Config.Size("-248ui"),
+		})
+	Config.AddNode(CDM.cfgTree, "Essential", "ActionBar", {})
+	Config.AddNode(CDM.cfgTree, "Default", "Utility",
+		{
+			yPos = Config.Size("-310ui"),
+		})
+	Config.AddNode(CDM.cfgTree, "Default", "TrackedBar",
+		{
+			yPos = Config.Size("-328px"),
+		})
+	Config.AddNode(CDM.cfgTree, "Default", "Resources",
+		{
+			yPos = Config.Size("-365px"),
+		})
+
+	CDM.RefreshScale()
 
 	CDM.RegisterEvent("UI_SCALE_CHANGED",                       CDM.OnScaleChanged)
 	CDM.RegisterEvent("DISPLAY_SIZE_CHANGED",                   CDM.OnScaleChanged)
@@ -111,6 +147,16 @@ function CDM.Init()
 
 	local layoutMgr = CooldownViewerSettings:GetLayoutManager()
 	hooksecurefunc(layoutMgr, "NotifyListeners", CDM.OnCDMChanged)
+end
+
+function CDM.PostInit()
+	for category, vState in pairs(CDs.viewers) do
+		HookLayout(vState.Root)
+	end
+	for category, vState in pairs(Buffs.viewers) do
+		HookLayout(vState.Root)
+	end
+	HookLayout(Res.Root)
 end
 
 function CDM.GatherCDs(viewers)
@@ -184,6 +230,35 @@ function CDM.GetActionBarOverride()
 	end
 end
 
+function CDM.RefreshScale()
+	local pixelsToUI = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
+	Config.RefreshValues(CDM.cfgTree, pixelsToUI)
+	CDM.layoutDirty = true
+end
+
+function CDM.RefreshLayout()
+	local pxSize, pySize = GetPhysicalScreenSize()
+
+	local function Place(Root, name, yPoint)
+		local cfg   = Config.GetBranch(CDM.cfgTree, name)
+		local xPos  = Round(cfg.xPos + cfg.xPosRel * pxSize)
+		local yPos  = Round(cfg.yPos + cfg.yPosRel * pySize)
+		local xSize, ySize = Root:GetSize(true)
+
+		local vxPos = Round(pxSize / 2 + xPos - 0.5 * xSize)
+		local vyPos = Round(-pySize / 2 + yPos + (1 - yPoint) * ySize)
+		Root:SetPoint("TOPLEFT", UIParent, "TOPLEFT", vxPos, vyPos)
+	end
+
+	for category, vState in pairs(CDs.viewers) do
+		Place(vState.Root, vState.name, 0.5)
+	end
+	for category, vState in pairs(Buffs.viewers) do
+		Place(vState.Root, vState.name, 0)
+	end
+	Place(Res.Root, "Resources", 0)
+end
+
 ----------------------------------------------------------------------------------------------------
 -- Event Handlers
 
@@ -207,9 +282,11 @@ function CDM.PLAYER_LOGIN()
 	CDs.Init()
 	Buffs.Init()
 	Res.Init()
+	CDM.PostInit()
 end
 
 function CDM.OnScaleChanged()
+	CDM.RefreshScale()
 	CDs.OnScaleChanged()
 	Buffs.OnScaleChanged()
 	Res.OnScaleChanged()
@@ -228,6 +305,11 @@ end
 function CDM.Update()
 	CDs.Update()
 	Res.Update()
+
+	if CDM.layoutDirty then
+		CDM.layoutDirty = false
+		CDM.RefreshLayout()
+	end
 end
 
 function CDM.OnCDMChanged()
@@ -237,6 +319,10 @@ function CDM.OnCDMChanged()
 
 	CDs.OnCDMChanged()
 	Buffs.OnCDMChanged()
+end
+
+function CDM.OnLayoutChanged()
+	CDM.layoutDirty = true
 end
 
 function CDM.SPELL_UPDATE_COOLDOWN(spellID, baseSpellID, category, startRecoveryCategory, itemID)

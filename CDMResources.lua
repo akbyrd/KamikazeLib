@@ -13,8 +13,6 @@ function Res.Init()
 
 	Config.AddNode(Res.cfgTree, nil, "Default",
 		{
-			xPos  = Config.Size("0px"),
-			yPos  = Config.Size("-365px"),
 			xSize = Config.Size("514px"),
 			ySize = Config.Size("26px"),
 
@@ -219,12 +217,8 @@ function Res.RefreshConfig()
 end
 
 function Res.RefreshLayout()
-	local pxSize, pySize = GetPhysicalScreenSize()
-
 	-- TODO: Handle relative sizes
 	local cfg         = Res.cfg
-	local xPos        = Round(cfg.xPos        + cfg.xPosRel        * 0)
-	local yPos        = Round(cfg.yPos        + cfg.yPosRel        * 0)
 	local xSize       = Round(cfg.xSize       + cfg.xSizeRel       * 0)
 	local ySize       = Round(cfg.ySize       + cfg.ySizeRel       * 0)
 	local borderSize  = Round(cfg.borderSize  + cfg.borderSizeRel  * 0)
@@ -232,9 +226,6 @@ function Res.RefreshLayout()
 	local textYOffset = Round(cfg.textYOffset + cfg.textYOffsetRel * ySize)
 	local markerSize  = Round(cfg.markerSize  + cfg.markerSizeRel  * 0)
 
-	local vxPos = xPos + Round((pxSize - xSize) / 2)
-	local vyPos = yPos - Round(pySize / 2) + ySize
-	Res.Root:SetPoint("TOPLEFT", UIParent, "TOPLEFT", vxPos, vyPos)
 	Res.Root:SetSize(xSize, ySize)
 
 	Res.Bar:SetPoint("TOPLEFT",      borderSize, -borderSize)
