@@ -8,6 +8,11 @@ local Media     = Kami.Media
 local PixelAnts = Kami.PixelAnts
 local Util      = Kami.Util
 
+local auraUnits = {
+	{ unit = "player", filter = "HELPFUL|PLAYER", fillStyle = Enum.StatusBarFillStyle.StandardNoRangeFill },
+	{ unit = "target", filter = "HARMFUL|PLAYER", fillStyle = Enum.StatusBarFillStyle.Standard            },
+}
+
 function Buffs.Init()
 	Buffs.charVars = KLCharVars.CDM
 
@@ -31,7 +36,7 @@ function Buffs.Init()
 	Config.AddNode(Buffs.cfgTree, "Default", "TrackedBar",
 		{
 			xPos       = Config.Size("0px"),
-			yPos       = Config.Size("-337px"),
+			yPos       = Config.Size("-328px"),
 			xSize      = Config.Size("514px"),
 			ySize      = Config.Size("16px"),
 			padSize    = Config.Size("-1px"),
@@ -100,7 +105,6 @@ function Buffs.Init()
 	end
 
 	Buffs.categoryLookup   = {}
-	Buffs.onTargetLookup   = {}
 	Buffs.filterCategories = Config.GetBranch(Buffs.cfgTree, "FilterCategories")
 
 	Buffs.Rebuild()
@@ -130,46 +134,57 @@ function Buffs.ConstructFrame(vState)
 	local fState = {}
 	fState.slotKey  = tostring(fState)
 	fState.spellIDs = {}
+	fState.units    = {}
 
-	fState.Container = CreateFrame("AuraContainer", nil, vState.Root, "CustomAuraContainerTemplate")
-	fState.Container:SetAllPoints()
+	for iUnit, auraUnit in ipairs(auraUnits) do
+		local uState = {}
+		uState.unit      = auraUnit.unit
+		uState.filter    = auraUnit.filter
+		uState.fillStyle = auraUnit.fillStyle
 
-	fState.Container:AddAuraSlot(fState.slotKey, "HELPFUL",
-		{
-			initializeFrame = function(button)
-				-- NOTE: Errors here are swallowed silently. This runs under securecallfunction.
+		uState.Container = CreateFrame("AuraContainer", nil, vState.Root, "CustomAuraContainerTemplate")
+		uState.Container:SetAllPoints()
 
-				fState.Button = button
-				fState.Button:EnableMouse(false)
-				fState.Button:SetCollapsesLayout(true)
+		uState.Container:AddAuraSlot(fState.slotKey, "HELPFUL",
+			{
+				initializeFrame = function(button)
+					-- NOTE: Errors here are swallowed silently. This runs under securecallfunction.
 
-				fState.Icon = fState.Button:CreateTexture(nil, "ARTWORK")
-				fState.Button:SetIcon(fState.Icon)
+					uState.Button = button
+					uState.Button:EnableMouse(false)
+					uState.Button:SetCollapsesLayout(true)
 
-				fState.IconBorder = fState.Button:CreateTexture(nil, "OVERLAY")
-				fState.IconBorder:SetParentKey("IconBorder")
-				fState.IconBorder:SetPoint("BOTTOMLEFT")
-				fState.IconBorder:SetTexture(Media.Border.texture, "CLAMP", "CLAMP", "NEAREST")
-				fState.IconBorder:SetTextureSliceMargins(1, 1, 1, 1)
+					uState.Icon = uState.Button:CreateTexture(nil, "ARTWORK")
+					uState.Button:SetIcon(uState.Icon)
 
-				fState.Bar = CreateFrame("StatusBar", nil, fState.Button)
-				fState.Button:SetDurationBar(fState.Bar, { direction = Enum.StatusBarTimerDirection.RemainingTime })
+					uState.IconBorder = uState.Button:CreateTexture(nil, "OVERLAY")
+					uState.IconBorder:SetParentKey("IconBorder")
+					uState.IconBorder:SetPoint("BOTTOMLEFT")
+					uState.IconBorder:SetTexture(Media.Border.texture, "CLAMP", "CLAMP", "NEAREST")
+					uState.IconBorder:SetTextureSliceMargins(1, 1, 1, 1)
 
-				fState.BarBackground = fState.Bar:CreateTexture(nil, "BACKGROUND")
-				fState.BarBackground:SetParentKey("Background")
-				fState.BarBackground:SetAllPoints()
+					uState.Bar = CreateFrame("StatusBar", nil, uState.Button)
+					uState.Button:SetDurationBar(uState.Bar, { direction = Enum.StatusBarTimerDirection.RemainingTime })
 
-				fState.BarBorder = fState.Button:CreateTexture(nil, "OVERLAY")
-				fState.BarBorder:SetParentKey("BarBorder")
-				fState.BarBorder:SetPoint("BOTTOMLEFT")
-				fState.BarBorder:SetTexture(Media.Border.texture, "CLAMP", "CLAMP", "NEAREST")
-				fState.BarBorder:SetTextureSliceMargins(1, 1, 1, 1)
+					uState.BarBackground = uState.Bar:CreateTexture(nil, "BACKGROUND")
+					uState.BarBackground:SetParentKey("Background")
+					uState.BarBackground:SetAllPoints()
 
-				fState.Pandemic = PixelAnts.Create(fState.Button)
-				fState.Pandemic:SetParentKey("Pandemic")
-				fState.Button:AddPandemicRegion(fState.Pandemic)
-			end,
-		})
+					uState.BarBorder = uState.Button:CreateTexture(nil, "OVERLAY")
+					uState.BarBorder:SetParentKey("BarBorder")
+					uState.BarBorder:SetPoint("BOTTOMLEFT")
+					uState.BarBorder:SetTexture(Media.Border.texture, "CLAMP", "CLAMP", "NEAREST")
+					uState.BarBorder:SetTextureSliceMargins(1, 1, 1, 1)
+
+					uState.Pandemic = PixelAnts.Create(uState.Button)
+					uState.Pandemic:SetParentKey("Pandemic")
+					uState.Button:AddPandemicRegion(uState.Pandemic)
+				end,
+			})
+
+		table.insert(fState.units, uState)
+		fState.units[uState.unit] = uState
+	end
 
 	return fState
 end
@@ -192,8 +207,6 @@ function Buffs.EnableFrame(fState, cdvInfo, vState)
 		fState.spellIDs[linkedSpellID] = true
 	end
 
-	fState.auraSpellID = cdvInfo.linkedSpellIDs[1] or cdvInfo.spellID
-
 	local filterCategory = Buffs.filterCategories.SpellCategory[fState.spellCategory]
 	for spellID, v in pairs(fState.spellIDs) do
 		filterCategory = filterCategory or Buffs.filterCategories.Ability[spellID]
@@ -206,18 +219,17 @@ function Buffs.DisableFrame(fState)
 	fState.baseSpellID = nil
 	fState.spellID = nil
 	fState.cfg = nil
-	fState.auraSpellID = nil
 	fState.spellCategory = nil
-	fState.onTarget = nil
-	fState.Button:ClearAllPoints()
-	fState.Container:SetUnit("none")
-	fState.Container:SetAuraSlotFilterString(fState.slotKey, "")
-	fState.Container:SetAuraSlotCandidateFilters(fState.slotKey, { includeSpellIDs = fState.spellIDs })
+	for iUnit, uState in ipairs(fState.units) do
+		uState.Button:ClearAllPoints()
+		uState.Container:SetUnit("none")
+		uState.Container:SetAuraSlotFilterString(fState.slotKey, "")
+		uState.Container:SetAuraSlotCandidateFilters(fState.slotKey, { includeSpellIDs = fState.spellIDs })
+	end
 end
 
 function Buffs.AssignFrames()
 	wipe(Buffs.categoryLookup)
-	wipe(Buffs.onTargetLookup)
 
 	for category, vState in pairs(Buffs.viewers) do
 		-- Disable existing frames
@@ -258,19 +270,21 @@ function Buffs.RefreshAllConfig()
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			local cfg = fState.cfg
 
-			fState.Bar:SetStatusBarTexture(cfg.barTexture)
-			fState.Bar:SetStatusBarColor(cfg.barColor:GetRGBA())
-			fState.BarBackground:SetColorTexture(cfg.backgroundColor:GetRGBA())
-			fState.BarBorder:SetVertexColor(cfg.borderColor:GetRGBA())
-			fState.IconBorder:SetVertexColor(cfg.borderColor:GetRGBA())
+			for iUnit, uState in ipairs(fState.units) do
+				uState.Bar:SetStatusBarTexture(cfg.barTexture)
+				uState.Bar:SetStatusBarColor(cfg.barColor:GetRGBA())
+				uState.BarBackground:SetColorTexture(cfg.backgroundColor:GetRGBA())
+				uState.BarBorder:SetVertexColor(cfg.borderColor:GetRGBA())
+				uState.IconBorder:SetVertexColor(cfg.borderColor:GetRGBA())
 
-			fState.Pandemic:SetConfig(
-				nil,
-				nil,
-				fState.cfg.pandemicColor,
-				fState.cfg.pandemicSpeed,
-				fState.cfg.pandemicSegments,
-				fState.cfg.pandemicDuty)
+				uState.Pandemic:SetConfig(
+					nil,
+					nil,
+					fState.cfg.pandemicColor,
+					fState.cfg.pandemicSpeed,
+					fState.cfg.pandemicSegments,
+					fState.cfg.pandemicDuty)
+			end
 		end
 	end
 
@@ -294,7 +308,7 @@ function Buffs.RefreshLayout()
 		local iconZoom      = cfg.iconZoom
 
 		local vxSize = cfg.xSize
-		local vySize = #vState.cdFrames * (ySize + padSize) - padSize
+		local vySize = #vState.cdFrames * #auraUnits * (ySize + padSize) - padSize
 		local vxPos  = xPos + Round((pxSize - vxSize) / 2)
 		local vyPos  = yPos - Round(pySize / 2) + vySize
 		vState.Root:SetPoint("TOPLEFT", UIParent, "TOPLEFT", vxPos, vyPos)
@@ -303,36 +317,42 @@ function Buffs.RefreshLayout()
 		vState.Base:SetPointsOffset(0, -padSize)
 
 		for iFrame, fState in ipairs(vState.cdFrames) do
-			fState.Button:ClearAllPoints()
+			for iUnit, uState in ipairs(fState.units) do
+				uState.Button:ClearAllPoints()
+			end
 		end
 
 		for iFrame, fState in ipairs(vState.cdFrames) do
 			local below  = vState.cdFrames[iFrame + 1]
-			local anchor = below and below.Button or vState.Base
-			fState.Button:SetSize(xSize, ySize)
-			fState.Button:SetPoint("BOTTOMLEFT", anchor, "TOPLEFT")
-			fState.Button:SetPointsOffset(0, padSize)
+			local anchor = below and below.units[1].Button or vState.Base
+			for iUnit = #fState.units, 1, -1 do
+				local uState = fState.units[iUnit]
+				uState.Button:SetSize(xSize, ySize)
+				uState.Button:SetPoint("BOTTOMLEFT", anchor, "TOPLEFT")
+				uState.Button:SetPointsOffset(0, padSize)
+				anchor = uState.Button
 
-			local xScale, yScale = Util.AspectScale(iconAspect)
-			local ibxSize = Round(xScale / yScale * ySize)
-			local ixSize  = ibxSize - 2*borderSize
-			local iySize  = ySize   - 2*borderSize
-			Util.ZoomIcon(fState.Icon, iconZoom, ixSize, iySize)
-			fState.Icon:SetPoint("TOPLEFT",     fState.IconBorder, "TOPLEFT",      borderSize, -borderSize)
-			fState.Icon:SetPoint("BOTTOMRIGHT", fState.IconBorder, "BOTTOMRIGHT", -borderSize,  borderSize)
-			fState.IconBorder:SetSize(ibxSize / borderSize, ySize / borderSize)
-			fState.IconBorder:SetScale(borderSize)
+				local xScale, yScale = Util.AspectScale(iconAspect)
+				local ibxSize = Round(xScale / yScale * ySize)
+				local ixSize  = ibxSize - 2*borderSize
+				local iySize  = ySize   - 2*borderSize
+				Util.ZoomIcon(uState.Icon, iconZoom, ixSize, iySize)
+				uState.Icon:SetPoint("TOPLEFT",     uState.IconBorder, "TOPLEFT",      borderSize, -borderSize)
+				uState.Icon:SetPoint("BOTTOMRIGHT", uState.IconBorder, "BOTTOMRIGHT", -borderSize,  borderSize)
+				uState.IconBorder:SetSize(ibxSize / borderSize, ySize / borderSize)
+				uState.IconBorder:SetScale(borderSize)
 
-			local bbxPos  = (ibxSize - borderSize)
-			local bbxSize = xSize - bbxPos
-			fState.Bar:SetPoint("TOPLEFT",     fState.BarBorder, "TOPLEFT",      borderSize, -borderSize)
-			fState.Bar:SetPoint("BOTTOMRIGHT", fState.BarBorder, "BOTTOMRIGHT", -borderSize,  borderSize)
-			fState.BarBorder:SetPointsOffset(bbxPos / borderSize, 0)
-			fState.BarBorder:SetSize(bbxSize / borderSize, ySize / borderSize)
-			fState.BarBorder:SetScale(borderSize)
+				local bbxPos  = (ibxSize - borderSize)
+				local bbxSize = xSize - bbxPos
+				uState.Bar:SetPoint("TOPLEFT",     uState.BarBorder, "TOPLEFT",      borderSize, -borderSize)
+				uState.Bar:SetPoint("BOTTOMRIGHT", uState.BarBorder, "BOTTOMRIGHT", -borderSize,  borderSize)
+				uState.BarBorder:SetPointsOffset(bbxPos / borderSize, 0)
+				uState.BarBorder:SetSize(bbxSize / borderSize, ySize / borderSize)
+				uState.BarBorder:SetScale(borderSize)
 
-			fState.Pandemic:SetConfig(pandemicSize, pandemicInset, nil, nil, nil, nil)
-			fState.Pandemic:RefreshSize(xSize, ySize)
+				uState.Pandemic:SetConfig(pandemicSize, pandemicInset, nil, nil, nil, nil)
+				uState.Pandemic:RefreshSize(xSize, ySize)
+			end
 		end
 	end
 end
@@ -360,7 +380,6 @@ end
 
 function Buffs.RefreshCategory(fState, spellID)
 	wipe(fState.spellIDs)
-	fState.auraSpellID = spellID
 	fState.spellIDs[spellID] = true
 end
 
@@ -379,27 +398,25 @@ end
 
 function Buffs.RefreshAuras(fState)
 	-- NOTE: selfAura and hasAura are unreliable. Colossus Smash selfAura is true. Avatar hasAura is
-	-- false. These are not sensible values. So we check IsSpellHarmful/Helpful instead.
+	-- false. These are not sensible values.
+
+	-- NOTE: IsSpellHelpful and IsSpellHarmful are unreliable. Slice and Dice is classified harmful.
 
 	-- NOTE: The list of spell ids can include both helpful and harmful spells. Usually this is a
 	-- helpful ability as the main spell id and the harmful debuff it applies. But sometimes there's
 	-- a spell that genuinely has both a helpful and harmful effect, like Piercing Howl. Blizzard
-	-- will show both on the same bar (player first, then target). We prioritize the first linked
-	-- spell, which appears to always give us the expected result. There are two Piercing Howl
+	-- will show both on the same bar (player first, then target). There are two Piercing Howl
 	-- entires in the CDM settings specifically so you can choose between the helpful and harmful
-	-- buffs and that works correctly with this approach.
+	-- buffs.
 
-	fState.onTarget = fState.auraSpellID and C_Spell.IsSpellHarmful(fState.auraSpellID)
-	Buffs.onTargetLookup[fState] = fState.onTarget or nil
+	for iUnit, uState in ipairs(fState.units) do
+		uState.Container:SetUnit(uState.unit)
+		uState.Container:SetAuraSlotFilterString(fState.slotKey, uState.filter)
+		uState.Container:SetAuraSlotCandidateFilters(fState.slotKey, { includeSpellIDs = fState.spellIDs })
 
-	local unit   = fState.onTarget and "target"          or "player"
-	local filter = fState.onTarget and "HARMFUL|PLAYER"  or "HELPFUL|PLAYER" -- AuraUtil.AuraFilters
-	fState.Container:SetUnit(unit)
-	fState.Container:SetAuraSlotFilterString(fState.slotKey, filter)
-	fState.Container:SetAuraSlotCandidateFilters(fState.slotKey, { includeSpellIDs = fState.spellIDs })
-
-	if not C_Secrets.ShouldAurasBeSecret() then
-		fState.Bar:SetFillStyle(fState.onTarget and Enum.StatusBarFillStyle.Standard or Enum.StatusBarFillStyle.StandardNoRangeFill)
+		if not C_Secrets.ShouldAurasBeSecret() then
+			uState.Bar:SetFillStyle(uState.fillStyle)
+		end
 	end
 end
 
@@ -419,8 +436,10 @@ function Buffs.PLAYER_REGEN_ENABLED()
 end
 
 function Buffs.PLAYER_TARGET_CHANGED()
-	for fState, onTarget in pairs(Buffs.onTargetLookup) do
-		fState.Container:UpdateAllAuras()
+	for category, vState in pairs(Buffs.viewers) do
+		for iFrame, fState in ipairs(vState.cdFrames) do
+			fState.units.target.Container:UpdateAllAuras()
+		end
 	end
 end
 
