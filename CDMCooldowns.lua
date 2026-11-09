@@ -1218,10 +1218,14 @@ function CDs.GatherCDs()
 end
 
 function CDs.RefreshFormLookup()
+	-- NOTE: GetShapeshiftFormInfo sometimes returns nil when leaving an instance
+
 	wipe(CDs.formLookup)
 	for iForm = 1, GetNumShapeshiftForms() do
 		local spellID = select(4, GetShapeshiftFormInfo(iForm))
-		CDs.formLookup[spellID] = iForm
+		if spellID then
+			CDs.formLookup[spellID] = iForm
+		end
 	end
 end
 

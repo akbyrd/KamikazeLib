@@ -19,7 +19,6 @@ Settings
 
 Testing
 	Test vehicle power prediction
-	Nil spell id from GetShapeshiftFormInfo when exiting Ulduar
 	Check that /castsequence updates as the sequence progresses
 	Passenger mount - confirm resource bar behaves
 	Vehicle power prediction
