@@ -19,8 +19,6 @@ UI.lua
 PixelAnts.lua
 BorderTrace.lua
 WorldMarkers.lua
-MouseCursor.lua
-CombatText.lua
 CDM.lua
 CDMCooldowns.lua
 CDMBuffs.lua
