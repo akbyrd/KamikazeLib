@@ -19,6 +19,8 @@ UI.lua
 PixelAnts.lua
 BorderTrace.lua
 WorldMarkers.lua
+DamageEvents.lua
+SCT.lua
 CDM.lua
 CDMCooldowns.lua
 CDMBuffs.lua
